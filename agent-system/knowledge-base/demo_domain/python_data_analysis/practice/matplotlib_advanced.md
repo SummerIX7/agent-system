@@ -1,3 +1,13 @@
+---
+title: Matplotlib 高级图表
+source_type: book
+source_name: Python数据科学手册
+author: Jake VanderPlas
+publisher: O'Reilly
+year: 2023
+chapter: 第4章
+---
+
 # Matplotlib 高级图表
 
 ## 子图布局

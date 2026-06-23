@@ -1,3 +1,13 @@
+---
+title: 数据分析行业规范与最佳实践
+source_type: standard
+source_name: 数据分析行业规范
+author: 行业标准
+publisher: 中国统计出版社
+year: 2023
+url: https://www.stats.gov.cn/
+---
+
 # 数据分析行业规范与最佳实践
 
 ## 数据处理规范

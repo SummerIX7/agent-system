@@ -1,3 +1,13 @@
+---
+title: NumPy 随机数与性能优化
+source_type: book
+source_name: Python数据科学手册
+author: Jake VanderPlas
+publisher: O'Reilly
+year: 2023
+chapter: 第2章
+---
+
 # NumPy 随机数与性能优化
 
 ## 随机数生成

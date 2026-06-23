@@ -1,3 +1,13 @@
+---
+title: Matplotlib 基础图表
+source_type: book
+source_name: Python数据科学手册
+author: Jake VanderPlas
+publisher: O'Reilly
+year: 2023
+chapter: 第4章
+---
+
 # Matplotlib 基础图表
 
 ## 概述

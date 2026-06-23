@@ -1,3 +1,13 @@
+---
+title: Pandas 数据合并与连接
+source_type: book
+source_name: 利用Python进行数据分析
+author: Wes McKinney
+publisher: O'Reilly
+year: 2022
+chapter: 第8章
+---
+
 # Pandas 数据合并与连接
 
 ## merge（类似 SQL JOIN）

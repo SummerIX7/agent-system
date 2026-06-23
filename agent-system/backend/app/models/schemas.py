@@ -2,6 +2,19 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 
+# === 知识溯源 ===
+
+class SourceReference(BaseModel):
+    source_type: str = "document"  # book / paper / standard / website
+    source_name: str = ""
+    author: str = ""
+    publisher: str = ""
+    year: str = ""
+    chapter: str = ""
+    url: str = ""
+    confidence: float = 0.0
+
+
 # === 学习者画像 ===
 
 class KnowledgePoint(BaseModel):

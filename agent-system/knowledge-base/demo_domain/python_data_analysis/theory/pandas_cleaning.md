@@ -1,3 +1,13 @@
+---
+title: Pandas 数据清洗
+source_type: book
+source_name: 利用Python进行数据分析
+author: Wes McKinney
+publisher: O'Reilly
+year: 2022
+chapter: 第7章
+---
+
 # Pandas 数据清洗
 
 ## 缺失值处理

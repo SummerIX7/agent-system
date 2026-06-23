@@ -32,19 +32,60 @@ class BaseAgent:
         return self._kb
 
     def retrieve_context(self, query: str, k: int = 5) -> str:
-        """从知识库检索相关文档，不可用时返回空字符串"""
+        """从知识库检索相关文档，返回带完整来源信息的上下文"""
         if self.kb is False:
             return ""
         try:
             docs = self.kb.search(query, k=k)
             context_parts = []
             for i, doc in enumerate(docs, 1):
-                source = doc.metadata.get("source", "未知来源")
-                context_parts.append(f"[知识库第{i}条] 来源: {source}\n{doc.page_content}")
+                m = doc.metadata
+                # 构建来源信息
+                source_info = self._build_source_info(m)
+                context_parts.append(
+                    f"[知识库第{i}条]\n"
+                    f"{source_info}\n"
+                    f"内容:\n{doc.page_content}"
+                )
             return "\n\n".join(context_parts)
         except Exception as e:
             print(f"[警告] 知识库检索失败: {e}")
             return ""
+
+    def _build_source_info(self, metadata: dict) -> str:
+        """从 metadata 构建来源描述字符串"""
+        parts = []
+        source_name = metadata.get("source_name", "")
+        author = metadata.get("author", "")
+        publisher = metadata.get("publisher", "")
+        year = metadata.get("year", "")
+        chapter = metadata.get("chapter", "")
+        url = metadata.get("url", "")
+        source_type = metadata.get("source_type", "文档")
+
+        # 来源类型映射
+        type_map = {"book": "📚", "paper": "📄", "standard": "📋", "website": "🔗", "文档": "📖"}
+        icon = type_map.get(source_type, "📖")
+
+        if source_name:
+            parts.append(f"{icon} 来源：《{source_name}》")
+        if author:
+            parts.append(f"作者：{author}")
+        if publisher:
+            parts.append(f"出版社：{publisher}")
+        if year:
+            parts.append(f"年份：{year}")
+        if chapter:
+            parts.append(f"章节：{chapter}")
+        if url:
+            parts.append(f"🔗 链接：{url}")
+
+        # 如果没有元数据，用文件路径
+        if not parts:
+            file_path = metadata.get("source", "未知来源")
+            parts.append(f"📖 来源：{file_path}")
+
+        return " | ".join(parts)
 
     async def call_llm(self, prompt: str) -> str:
         """调用 LLM 获取响应"""

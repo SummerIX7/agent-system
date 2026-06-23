@@ -1,3 +1,13 @@
+---
+title: 统计学基础
+source_type: book
+source_name: 统计学习方法
+author: 李航
+publisher: 清华大学出版社
+year: 2022
+chapter: 第1章
+---
+
 # 统计学基础
 
 ## 描述统计

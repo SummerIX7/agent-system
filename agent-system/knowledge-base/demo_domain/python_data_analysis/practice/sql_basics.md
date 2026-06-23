@@ -1,3 +1,13 @@
+---
+title: SQL 查询基础
+source_type: book
+source_name: SQL必知必会
+author: Ben Forta
+publisher: 人民邮电出版社
+year: 2020
+chapter: 全书
+---
+
 # SQL 查询基础
 
 ## 基本查询

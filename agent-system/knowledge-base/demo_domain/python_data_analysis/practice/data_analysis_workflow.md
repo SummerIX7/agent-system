@@ -1,3 +1,13 @@
+---
+title: 数据分析完整流程
+source_type: book
+source_name: Python数据分析实战
+author: Fabio Nelli
+publisher: 人民邮电出版社
+year: 2021
+chapter: 第3章
+---
+
 # 数据分析完整流程
 
 ## 流程概述
