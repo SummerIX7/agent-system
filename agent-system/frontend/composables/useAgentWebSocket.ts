@@ -1,0 +1,88 @@
+export interface AgentStatus {
+  name: string
+  status: 'idle' | 'running' | 'completed' | 'error'
+  message: string
+  progress: number
+}
+
+export function useAgentWebSocket(sessionId: string) {
+  const config = useRuntimeConfig()
+  const agents = ref<AgentStatus[]>([])
+  const isConnected = ref(false)
+  let ws: WebSocket | null = null
+
+  const connect = () => {
+    try {
+      ws = new WebSocket(`${config.public.wsBase}/ws/agent-status/${sessionId}`)
+
+      ws.onopen = () => {
+        isConnected.value = true
+      }
+
+      ws.onmessage = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data)
+          const idx = agents.value.findIndex((a) => a.name === data.agent)
+          if (idx >= 0) {
+            agents.value[idx] = {
+              ...agents.value[idx],
+              name: data.agent,
+              status: data.status,
+              message: data.message,
+              progress: data.progress,
+            }
+          } else {
+            agents.value.push({
+              name: data.agent,
+              status: data.status,
+              message: data.message,
+              progress: data.progress,
+            })
+          }
+        } catch (e) {
+          console.error('WebSocket message parse error:', e)
+        }
+      }
+
+      ws.onerror = () => {
+        isConnected.value = false
+      }
+
+      ws.onclose = () => {
+        isConnected.value = false
+        // 自动重连
+        setTimeout(() => {
+          if (!isConnected.value) {
+            connect()
+          }
+        }, 3000)
+      }
+    } catch (e) {
+      console.error('WebSocket connection error:', e)
+      isConnected.value = false
+    }
+  }
+
+  const disconnect = () => {
+    if (ws) {
+      ws.close()
+      ws = null
+    }
+  }
+
+  // 组件挂载时连接
+  onMounted(() => {
+    connect()
+  })
+
+  // 组件卸载时断开
+  onUnmounted(() => {
+    disconnect()
+  })
+
+  return {
+    agents,
+    isConnected,
+    disconnect,
+  }
+}

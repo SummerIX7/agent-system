@@ -1,0 +1,32 @@
+# Web 框架
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# 数据库
+sqlalchemy[asyncio]
+aiomysql
+alembic
+
+# 缓存/队列
+celery
+redis
+
+# LLM
+langchain
+langchain-community
+langchain-text-splitters
+langgraph
+openai
+
+# 向量数据库
+chromadb
+
+# 嵌入模型
+sentence-transformers
+torch
+
+# 工具
+python-dotenv
+httpx

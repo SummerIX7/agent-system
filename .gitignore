@@ -1,0 +1,46 @@
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+.venv/
+
+# Env
+.env
+
+# IDE
+.idea/
+
+# Node
+node_modules/
+.nuxt/
+.output/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ChromaDB
+**/chroma_db/
+
+# Build output
+**/.output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
