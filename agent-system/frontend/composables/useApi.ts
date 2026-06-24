@@ -104,5 +104,9 @@ export function useApi() {
     // 历史
     getHistory: (learnerId: number) =>
       request<any[]>(`/api/history/${learnerId}`),
+
+    // 试题
+    getQuestions: (sessionId: string) =>
+      request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
   }
 }
