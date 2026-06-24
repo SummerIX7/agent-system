@@ -64,6 +64,11 @@ async def generate_resources(
         resources.append(resource_data)
 
         # 1. 写入 MySQL
+        # 处理 sources 字段（确保是可序列化的格式）
+        sources_data = res.get("sources", None)
+        if sources_data and isinstance(sources_data, (dict, list)):
+            sources_data = json.dumps(sources_data, ensure_ascii=False)
+
         db_resource = Resource(
             learner_id=learner_id or "unknown",
             session_id=request.session_id,
@@ -71,7 +76,7 @@ async def generate_resources(
             content=res.get("content", ""),
             topic=res.get("topic", request.topic),
             difficulty=res.get("difficulty", "beginner"),
-            sources=res.get("sources", None),
+            sources=sources_data,
             review_score=res.get("review_score", None),
             review_passed="passed",
         )

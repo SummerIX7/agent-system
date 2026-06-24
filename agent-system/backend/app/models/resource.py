@@ -17,7 +17,7 @@ class Resource(Base):
     )
     session_id = Column(String(36), nullable=False, index=True, comment="会话 ID")
     resource_type = Column(
-        Enum("lecture", "guide", "test", name="resource_type_enum"),
+        Enum("lecture", "guide", "project", "test", name="resource_type_enum"),
         nullable=False,
         comment="资源类型",
     )

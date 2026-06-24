@@ -33,15 +33,23 @@ async def create_profile(
     learner_id = str(uuid.uuid4())
     session_id = str(uuid.uuid4())
 
-    # 2. 写入 MySQL
+    # 2. 写入 MySQL（JSON 字段需要序列化）
+    self_assessment = profile_input.self_assessment
+    if self_assessment and isinstance(self_assessment, dict):
+        self_assessment = json.dumps(self_assessment, ensure_ascii=False)
+
+    goals = profile_input.goals
+    if goals and isinstance(goals, list):
+        goals = json.dumps(goals, ensure_ascii=False)
+
     learner = Learner(
         id=learner_id,
         education_background=profile_input.education_background,
         major=profile_input.major,
         work_experience_years=profile_input.work_experience_years,
-        self_assessment=profile_input.self_assessment,
+        self_assessment=self_assessment,
         learning_style=profile_input.learning_style,
-        goals=profile_input.goals,
+        goals=goals,
     )
     db.add(learner)
     await db.flush()
