@@ -1,18 +1,15 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models.database import get_db
-
-# 密码加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT Bearer 方案
 security = HTTPBearer()
@@ -25,13 +22,21 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 小时
 
 
 def hash_password(password: str) -> str:
-    """密码加密"""
-    return pwd_context.hash(password)
+    """密码加密（直接使用 bcrypt）"""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """验证密码（直接使用 bcrypt）"""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
+    except Exception:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
