@@ -8,7 +8,7 @@
         </NuxtLink>
 
         <!-- 桌面端导航 -->
-        <nav class="hidden md:flex gap-6">
+        <nav class="hidden md:flex items-center gap-6">
           <NuxtLink
             v-for="item in navItems"
             :key="item.path"
@@ -18,6 +18,16 @@
           >
             {{ item.label }}
           </NuxtLink>
+
+          <!-- 用户状态 -->
+          <div v-if="isLoggedIn" class="flex items-center gap-3 ml-4 pl-4 border-l">
+            <span class="text-sm text-gray-600">{{ user?.username }}</span>
+            <UButton size="xs" variant="ghost" @click="handleLogout">退出</UButton>
+          </div>
+          <div v-else class="flex items-center gap-2 ml-4 pl-4 border-l">
+            <UButton size="xs" variant="ghost" to="/login">登录</UButton>
+            <UButton size="xs" to="/register">注册</UButton>
+          </div>
         </nav>
 
         <!-- 移动端菜单按钮 -->
@@ -42,6 +52,16 @@
           >
             {{ item.label }}
           </NuxtLink>
+          <div class="pt-2 border-t">
+            <template v-if="isLoggedIn">
+              <p class="text-sm text-gray-600 mb-2">{{ user?.username }}</p>
+              <UButton size="sm" variant="ghost" @click="handleLogout">退出登录</UButton>
+            </template>
+            <template v-else>
+              <UButton size="sm" variant="ghost" to="/login" @click="mobileMenuOpen = false">登录</UButton>
+              <UButton size="sm" to="/register" @click="mobileMenuOpen = false">注册</UButton>
+            </template>
+          </div>
         </nav>
       </div>
     </header>
@@ -59,6 +79,9 @@
 </template>
 
 <script setup lang="ts">
+const router = useRouter()
+const { user, isLoggedIn, restoreToken, logout } = useAuth()
+
 const mobileMenuOpen = ref(false)
 
 const navItems = [
@@ -70,4 +93,14 @@ const navItems = [
   { path: '/report', label: '分析报告' },
   { path: '/history', label: '历史记录' },
 ]
+
+// 页面加载时恢复 token
+onMounted(() => {
+  restoreToken()
+})
+
+const handleLogout = () => {
+  logout()
+  router.push('/login')
+}
 </script>

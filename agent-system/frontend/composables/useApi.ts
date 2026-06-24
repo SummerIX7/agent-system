@@ -9,30 +9,62 @@ import type {
 } from '~/types/api'
 
 /**
- * 后端 API 封装
+ * 后端 API 封装（带认证）
  */
 export function useApi() {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase as string
+  const { token, logout } = useAuth()
+  const router = useRouter()
 
   const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...options.headers as Record<string, string>,
+    }
+
+    // 自动添加认证头
+    if (token.value) {
+      headers['Authorization'] = `Bearer ${token.value}`
+    }
+
     const response = await fetch(`${baseURL}${url}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     })
 
+    if (response.status === 401) {
+      // token 过期或无效，跳转登录
+      logout()
+      router.push('/login')
+      throw new Error('认证已过期，请重新登录')
+    }
+
     if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`API Error ${response.status}: ${error}`)
+      const error = await response.json().catch(() => response.text())
+      throw new Error(error.detail || `API Error ${response.status}`)
     }
 
     return response.json()
   }
 
   return {
+    // 认证
+    register: (data: { username: string; password: string; email?: string }) =>
+      request<{ access_token: string; user_id: number; username: string }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    login: (data: { username: string; password: string }) =>
+      request<{ access_token: string; user_id: number; username: string }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getMe: () =>
+      request<{ id: number; username: string; email?: string }>('/api/auth/me'),
+
     // 学习者画像
     createProfile: (data: LearnerProfileInput) =>
       request<LearnerProfile>('/api/profile', {
@@ -40,8 +72,8 @@ export function useApi() {
         body: JSON.stringify(data),
       }),
 
-    getProfile: (learnerId: string) =>
-      request<LearnerProfile>(`/api/profile/${learnerId}`),
+    getMyProfile: () =>
+      request<LearnerProfile>('/api/profile/me'),
 
     // 资源生成
     generateResources: (sessionId: string, topic: string, resourceTypes?: string[], profile?: any) =>
@@ -70,7 +102,7 @@ export function useApi() {
       request<VisualizationData>(`/api/visualization/${sessionId}`),
 
     // 历史
-    getHistory: (learnerId: string) =>
+    getHistory: (learnerId: number) =>
       request<any[]>(`/api/history/${learnerId}`),
   }
 }

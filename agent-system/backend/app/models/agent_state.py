@@ -1,7 +1,6 @@
-import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, String
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
 
 from app.models.database import Base, JsonText
 
@@ -9,7 +8,7 @@ from app.models.database import Base, JsonText
 class AgentLog(Base):
     __tablename__ = "agent_logs"
 
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(36), nullable=False, index=True, comment="会话 ID")
     agent_name = Column(String(50), nullable=False, comment="Agent 名称")
     status = Column(
@@ -31,9 +30,9 @@ class AgentLog(Base):
 class FeedbackRecord(Base):
     __tablename__ = "feedback_records"
 
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(36), nullable=False, index=True, comment="会话 ID")
-    learner_id = Column(String(36), nullable=False, index=True, comment="学习者 ID")
+    learner_id = Column(Integer, ForeignKey("learners.id", ondelete="CASCADE"), nullable=False, index=True, comment="学习者 ID")
     topic = Column(String(200), nullable=False, comment="题目主题")
     question = Column(String(500), nullable=False, comment="题目内容")
     user_answer = Column(String(500), nullable=True, comment="用户答案")

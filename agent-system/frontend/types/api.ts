@@ -17,7 +17,8 @@ export interface KnowledgePoint {
 }
 
 export interface LearnerProfile {
-  id: string
+  id: number
+  session_id?: string
   education_background: string
   major: string
   work_experience_years: number

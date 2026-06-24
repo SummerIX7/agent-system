@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     MYSQL_PASSWORD: str = ""
     MYSQL_DATABASE: str = "agent_system"
 
+    # JWT
+    JWT_SECRET_KEY: str = "agent-system-secret-key-change-in-production"
+
     # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379

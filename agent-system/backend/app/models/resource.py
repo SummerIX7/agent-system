@@ -1,7 +1,6 @@
-import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, String
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base, JsonText
@@ -10,10 +9,8 @@ from app.models.database import Base, JsonText
 class Resource(Base):
     __tablename__ = "resources"
 
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    learner_id = Column(
-        String(36), ForeignKey("learners.id", ondelete="CASCADE"), nullable=False
-    )
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    learner_id = Column(Integer, ForeignKey("learners.id", ondelete="CASCADE"), nullable=False)
     session_id = Column(String(36), nullable=False, index=True, comment="会话 ID")
     resource_type = Column(
         Enum("lecture", "guide", "project", "test", name="resource_type_enum"),

@@ -34,7 +34,8 @@ class LearnerProfileInput(BaseModel):
 
 
 class LearnerProfile(BaseModel):
-    id: str
+    id: int
+    session_id: str = ""
     education_background: str
     major: str
     work_experience_years: float

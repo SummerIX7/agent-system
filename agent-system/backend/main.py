@@ -4,10 +4,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import feedback, generation, profile, visualization, ws
+from app.api import auth, feedback, generation, profile, visualization, ws
 from app.core.config import get_settings
 from app.models.database import engine, Base
 # 导入所有模型，确保被 Base 注册
+from app.models.user import User
 from app.models.learner import Learner
 from app.models.resource import Resource
 from app.models.agent_state import AgentLog, FeedbackRecord
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 
 # 挂载路由
+app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(generation.router)
 app.include_router(feedback.router)

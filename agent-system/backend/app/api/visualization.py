@@ -85,7 +85,7 @@ async def get_visualization(session_id: str):
 
 @router.get("/history/{learner_id}")
 async def get_history(
-    learner_id: str,
+    learner_id: int,
     db: AsyncSession = Depends(get_db),
 ):
     """获取学习历史记录（从数据库读取）"""

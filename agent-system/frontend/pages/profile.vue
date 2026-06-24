@@ -95,8 +95,14 @@
 const router = useRouter()
 const api = useApi()
 const toast = useToast()
+const { isLoggedIn } = useAuth()
 const { setSession, setProfile } = useSession()
 const loading = ref(false)
+
+// 未登录跳转
+if (!isLoggedIn.value) {
+  router.push('/login')
+}
 
 const skillOptions = [
   'Python 基础',
@@ -148,7 +154,7 @@ const submitProfile = async () => {
     })
 
     // 存入全局状态
-    setSession(result.id, result.id)  // session_id 暂用 learner_id
+    setSession(result.session_id || String(result.id), String(result.id))
     setProfile(result)
 
     router.push('/dashboard')
