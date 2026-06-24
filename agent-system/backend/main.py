@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api import feedback, generation, profile, visualization, ws
 from app.core.config import get_settings
@@ -41,6 +42,15 @@ app.include_router(generation.router)
 app.include_router(feedback.router)
 app.include_router(visualization.router)
 app.include_router(ws.router)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局异常处理，防止未捕获异常返回 500 HTML"""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"服务器内部错误: {type(exc).__name__}: {str(exc)}"},
+    )
 
 
 @app.get("/")

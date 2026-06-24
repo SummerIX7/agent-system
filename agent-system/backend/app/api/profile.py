@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
@@ -18,7 +18,12 @@ async def create_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """提交学习者画像，触发学情诊断"""
-    result = await diagnosis_agent.run(profile_input.model_dump())
+    try:
+        result = await diagnosis_agent.run(profile_input.model_dump())
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=f"LLM 服务不可用: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"诊断失败: {e}")
 
     profile_data = result.get("profile", {})
     learner_id = str(uuid.uuid4())

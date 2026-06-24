@@ -26,6 +26,14 @@ class DiagnosisAgent(BaseAgent):
 [知识库参考]
 {context}
 
+[难度判定标准]
+- beginner：完全零编程基础，非理工科背景，从未写过代码
+- intermediate：有编程基础（如 Python/SQL 熟练），或理工科专业，但数据分析经验较少
+- advanced：有丰富的编程和数据分析经验（3年以上），能独立完成数据项目
+- expert：统计学/数据科学专业背景，5年以上数据分析经验，熟悉机器学习
+
+注意：如果学习者有编程基础（如 Python 熟练、计算机专业），即使数据分析技能较弱，也应判定为 intermediate，因为编程基础意味着学习曲线更陡。
+
 请输出 JSON 格式的画像，包含以下字段：
 {{
     "knowledge_points": [

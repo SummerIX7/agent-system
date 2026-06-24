@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
@@ -32,12 +32,17 @@ async def generate_resources(
         "goals": profile.get("goals", []),
     }
 
-    result = await run_workflow(
-        learner_input=learner_input,
-        topic=request.topic,
-        session_id=request.session_id,
-        profile=profile,
-    )
+    try:
+        result = await run_workflow(
+            learner_input=learner_input,
+            topic=request.topic,
+            session_id=request.session_id,
+            profile=profile,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=f"LLM 服务不可用: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"资源生成失败: {e}")
 
     resources = []
     for res in result.get("final_resources", []):

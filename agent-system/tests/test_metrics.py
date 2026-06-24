@@ -8,7 +8,14 @@
 
 import json
 import asyncio
+import sys
+import os
 from pathlib import Path
+
+# 添加 backend 目录到 Python 路径
+backend_dir = Path(__file__).parent.parent / "backend"
+sys.path.insert(0, str(backend_dir))
+os.chdir(str(backend_dir))  # 切换工作目录到 backend，确保 .env 被加载
 
 # 测试数据路径
 TEST_DATA_DIR = Path(__file__).parent / "test_data"
@@ -27,13 +34,15 @@ def load_profiles() -> list[dict]:
 async def test_knowledge_accuracy():
     """
     测试知识谬误率（目标 < 5%）
-    方法：用审核 Agent 验证生成内容的准确性
+    方法：完整辩论流程 challenge → defend → judge，用裁判最终判决判定
     """
-    from app.agents.review import ReviewAgent
     from app.agents.generation import GenerationAgent
+    from app.agents.debate import DebateManager
+    from app.agents.judge import JudgeAgent
 
-    review_agent = ReviewAgent()
     gen_agent = GenerationAgent()
+    debate_mgr = DebateManager()
+    judge_agent = JudgeAgent()
     profiles = load_profiles()
 
     total_checks = 0
@@ -43,22 +52,52 @@ async def test_knowledge_accuracy():
     for profile in profiles:
         topic = "Python 数据分析基础"
         difficulty = profile.get("expected_difficulty", "beginner")
+        learner_input = {
+            "topic": topic,
+            "profile": profile,
+            "recommended_difficulty": difficulty,
+        }
 
-        # 生成内容
-        content = await gen_agent.generate_lecture_notes(topic, {"recommended_difficulty": difficulty})
+        # 1. 生成内容
+        content = await gen_agent.generate_lecture_notes(topic, learner_input)
 
-        # 审核验证
-        review_result = await review_agent.verify(content, topic)
+        # 2. 审核 Agent 质疑
+        challenge_result = await debate_mgr.challenge(content, topic, "lecture_notes")
+        issues = challenge_result.get("issues", [])
+
+        # 3. 生成 Agent 辩护
+        defend_result = await debate_mgr.defend(content, topic, issues)
+        responses = defend_result.get("responses", [])
+        revised_content = defend_result.get("revised_content", content)
+        has_revision = defend_result.get("has_revision", False)
+
+        # 4. 独立裁判判决
+        final_content = revised_content if has_revision else content
+        judge_result = await judge_agent.judge(
+            original_content=content,
+            topic=topic,
+            content_type="lecture_notes",
+            challenge_issues=issues,
+            defend_responses=responses,
+            revised_content=final_content,
+        )
+
+        passed = judge_result.get("passed", True)
+        quality_score = judge_result.get("quality_score", 0.5)
+        effective_issues = judge_result.get("effective_issues", [])
+        reason = judge_result.get("reason", "")
 
         total_checks += 1
-        if not review_result.passed:
+        if not passed:
             errors += 1
 
         results.append({
             "profile": profile["profile_name"],
-            "passed": review_result.passed,
-            "score": review_result.score,
-            "issues": review_result.issues,
+            "passed": passed,
+            "quality_score": quality_score,
+            "effective_issues_count": len(effective_issues),
+            "has_revision": has_revision,
+            "reason": reason[:100],
         })
 
     error_rate = errors / total_checks if total_checks > 0 else 0
@@ -74,10 +113,11 @@ async def test_knowledge_accuracy():
     print(f"{'='*60}")
 
     for r in results:
-        print(f"\n  [{r['profile']}] 得分: {r['score']:.2f}, 通过: {r['passed']}")
-        if r['issues']:
-            for issue in r['issues'][:3]:
-                print(f"    - {issue}")
+        status = "✅" if r['passed'] else "❌"
+        print(f"  {status} [{r['profile']}] 质量分: {r['quality_score']:.2f}, "
+              f"有效问题: {r['effective_issues_count']}, 有修正: {r['has_revision']}")
+        if not r['passed']:
+            print(f"    原因: {r['reason']}")
 
     return error_rate < 0.05
 
@@ -85,7 +125,7 @@ async def test_knowledge_accuracy():
 async def test_difficulty_match():
     """
     测试难度匹配准确率（目标 ≥ 85%）
-    方法：对比画像推荐难度与实际生成资源难度
+    方法：对比画像推荐难度与诊断 Agent 输出难度
     """
     from app.agents.diagnosis import DiagnosisAgent
 
@@ -100,8 +140,8 @@ async def test_difficulty_match():
         expected = profile.get("expected_difficulty", "beginner")
 
         # 诊断
-        diag_result = await diag_agent.run(profile)
-        actual = diag_result.get("difficulty", "beginner")
+        diag_result = await diag_agent.build_profile(profile)
+        actual = diag_result.get("recommended_difficulty", "beginner")
 
         total += 1
         is_match = expected == actual
@@ -158,9 +198,14 @@ async def test_knowledge_coverage():
     results = []
 
     for topic in core_topics:
-        content = await gen_agent.generate_lecture_notes(topic, {"recommended_difficulty": "beginner"})
-        # 简单检查：内容长度 > 200 字且包含关键词
-        is_covered = len(content) > 200 and topic.split()[0] in content
+        learner_input = {
+            "topic": topic,
+            "recommended_difficulty": "beginner",
+        }
+        content = await gen_agent.generate_lecture_notes(topic, learner_input)
+        # 检查：内容长度 > 200 字且包含主题关键词
+        keyword = topic.split()[0]
+        is_covered = len(content) > 200 and keyword in content
 
         if is_covered:
             covered += 1

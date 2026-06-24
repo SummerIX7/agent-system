@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
@@ -41,9 +41,13 @@ async def submit_feedback(
     # 生成苏格拉底式追问（答错时）
     heuristic = None
     if not is_correct:
-        heuristic = await generate_heuristic_question(
-            feedback.topic, feedback.question, feedback.correct_answer
-        )
+        try:
+            heuristic = await generate_heuristic_question(
+                feedback.topic, feedback.question, feedback.correct_answer
+            )
+        except Exception as e:
+            print(f"[警告] 启发式追问生成失败: {e}")
+            # 不影响主流程，heuristic 保持 None
 
     # 存入 store
     add_feedback(feedback.session_id, {

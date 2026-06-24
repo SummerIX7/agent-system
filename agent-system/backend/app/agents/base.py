@@ -87,10 +87,21 @@ class BaseAgent:
 
         return " | ".join(parts)
 
-    async def call_llm(self, prompt: str) -> str:
-        """调用 LLM 获取响应"""
-        response = await self.llm.ainvoke(prompt)
-        return response.content
+    async def call_llm(self, prompt: str, max_retries: int = 3) -> str:
+        """调用 LLM 获取响应，带重试机制"""
+        import asyncio
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = await self.llm.ainvoke(prompt)
+                return response.content
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # 1s, 2s, 4s
+                    print(f"[重试] LLM 调用失败 (第{attempt+1}次)，{wait_time}秒后重试: {e}")
+                    await asyncio.sleep(wait_time)
+        raise RuntimeError(f"LLM 调用失败（已重试{max_retries}次）: {last_error}")
 
     async def run(self, **kwargs) -> Any:
         """子类实现的主逻辑"""
