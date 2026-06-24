@@ -52,17 +52,23 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="text-center p-4 rounded-lg border">
           <p class="text-sm text-gray-500">知识谬误率</p>
-          <p class="text-3xl font-bold text-green-600">3.2%</p>
+          <p class="text-3xl font-bold" :class="(metrics.hallucination_rate ?? 100) < 5 ? 'text-green-600' : 'text-red-600'">
+            {{ metrics.hallucination_rate !== null ? metrics.hallucination_rate + '%' : '--' }}
+          </p>
           <p class="text-xs text-gray-400 mt-1">目标 < 5%</p>
         </div>
         <div class="text-center p-4 rounded-lg border">
           <p class="text-sm text-gray-500">难度匹配准确率</p>
-          <p class="text-3xl font-bold text-primary">87%</p>
+          <p class="text-3xl font-bold" :class="(metrics.difficulty_match_rate ?? 0) >= 85 ? 'text-primary' : 'text-red-600'">
+            {{ metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate + '%' : '--' }}
+          </p>
           <p class="text-xs text-gray-400 mt-1">目标 ≥ 85%</p>
         </div>
         <div class="text-center p-4 rounded-lg border">
           <p class="text-sm text-gray-500">知识点覆盖率</p>
-          <p class="text-3xl font-bold text-primary">92%</p>
+          <p class="text-3xl font-bold" :class="(metrics.knowledge_coverage_rate ?? 0) >= 90 ? 'text-primary' : 'text-red-600'">
+            {{ metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate + '%' : '--' }}
+          </p>
           <p class="text-xs text-gray-400 mt-1">目标 ≥ 90%</p>
         </div>
       </div>
@@ -81,6 +87,12 @@ const matchCurveData = ref({
 
 const learningPath = ref<any[]>([])
 
+const metrics = ref({
+  hallucination_rate: null as number | null,
+  difficulty_match_rate: null as number | null,
+  knowledge_coverage_rate: null as number | null,
+})
+
 onMounted(async () => {
   if (sessionId.value) {
     try {
@@ -98,6 +110,11 @@ onMounted(async () => {
                         viz.match_curve.learner_level === 'intermediate' ? 3 : 2,
           resources: viz.match_curve.resources || [],
         }
+      }
+
+      // 核心指标
+      if (viz.metrics) {
+        metrics.value = viz.metrics
       }
     } catch (err) {
       console.warn('获取报告数据失败:', err)

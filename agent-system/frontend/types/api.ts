@@ -73,6 +73,11 @@ export interface VisualizationData {
   learning_path: { title: string; completed: boolean; score?: number }[]
   match_curve: any | null
   agent_logs: any[]
+  metrics?: {
+    hallucination_rate: number | null
+    difficulty_match_rate: number | null
+    knowledge_coverage_rate: number | null
+  }
 }
 
 // === Agent 状态 ===

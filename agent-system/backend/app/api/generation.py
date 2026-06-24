@@ -56,6 +56,8 @@ async def generate_resources(
     DB_RESOURCE_TYPES = {"lecture", "guide", "project", "test"}
 
     resources = []
+    debate_results = result.get("debate_results", {})
+
     for res in result.get("final_resources", []):
         res_type = res.get("type", "")
 
@@ -69,6 +71,7 @@ async def generate_resources(
 
         # 只有标准资源类型才写入数据库
         if res_type in DB_RESOURCE_TYPES:
+            debate = debate_results.get(res_type, {})
             db_resource = Resource(
                 learner_id=learner_id or "unknown",
                 session_id=request.session_id,
@@ -77,8 +80,8 @@ async def generate_resources(
                 topic=res.get("topic", request.topic),
                 difficulty=res.get("difficulty", "beginner"),
                 sources=res.get("sources", None),
-                review_score=res.get("review_score", None),
-                review_passed="passed",
+                review_score=debate.get("quality_score", None),
+                review_passed="passed" if debate.get("passed", True) else "failed",
             )
             db.add(db_resource)
 

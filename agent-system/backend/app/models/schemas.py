@@ -100,6 +100,7 @@ class VisualizationData(BaseModel):
     learning_path: List[dict] = []
     match_curve: Optional[dict] = None
     agent_logs: List[dict] = []
+    metrics: Optional[dict] = None
 
 
 # === 学习路径 ===
