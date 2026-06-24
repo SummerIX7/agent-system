@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, String, Text
-from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base
@@ -24,7 +23,7 @@ class Resource(Base):
     content = Column(Text, nullable=False, comment="生成内容")
     topic = Column(String(200), nullable=False, comment="主题")
     difficulty = Column(String(20), nullable=True, comment="难度等级")
-    sources = Column(JSON, nullable=True, comment="知识溯源列表")
+    sources = Column(Text, nullable=True, comment="知识溯源列表（JSON 字符串）")
     review_score = Column(Float, nullable=True, comment="审核评分 0-1")
     review_passed = Column(
         Enum("pending", "passed", "failed", name="review_status_enum"),

@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, String
-from sqlalchemy.dialects.mysql import JSON
+from sqlalchemy import Column, DateTime, Enum, Float, String, Text
 
 from app.models.database import Base
 
@@ -21,8 +20,8 @@ class AgentLog(Base):
     )
     message = Column(String(500), nullable=True, comment="状态消息")
     progress = Column(Float, default=0, comment="进度 0-100")
-    input_data = Column(JSON, nullable=True, comment="输入数据")
-    output_data = Column(JSON, nullable=True, comment="输出数据")
+    input_data = Column(Text, nullable=True, comment="输入数据（JSON 字符串）")
+    output_data = Column(Text, nullable=True, comment="输出数据（JSON 字符串）")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):

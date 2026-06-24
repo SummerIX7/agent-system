@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Float, String, Text
-from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base
@@ -15,9 +14,9 @@ class Learner(Base):
     education_background = Column(String(50), nullable=False, comment="学历背景")
     major = Column(String(100), nullable=False, comment="专业方向")
     work_experience_years = Column(Float, default=0, comment="工作年限")
-    self_assessment = Column(JSON, nullable=True, comment="技能自评 {skill: level}")
+    self_assessment = Column(Text, nullable=True, comment="技能自评（JSON 字符串）")
     learning_style = Column(String(20), nullable=True, comment="学习风格: visual/theory/practice")
-    goals = Column(JSON, nullable=True, comment="学习目标列表")
+    goals = Column(Text, nullable=True, comment="学习目标列表（JSON 字符串）")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
