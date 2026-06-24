@@ -9,18 +9,18 @@ settings = get_settings()
 
 
 class JsonText(TypeDecorator):
-    """自定义类型：Python dict/list ↔ MySQL TEXT（JSON 字符串）"""
+    """自定义类型：Python dict/list ↔ MySQL TEXT（JSON 字符串），字符串直接透传"""
     impl = Text
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
-        """写入数据库时：dict/list → JSON 字符串"""
-        if value is not None:
+        """写入数据库时：dict/list → JSON 字符串，字符串直接返回"""
+        if value is not None and isinstance(value, (dict, list)):
             return json.dumps(value, ensure_ascii=False)
         return value
 
     def process_result_value(self, value, dialect):
-        """读取数据库时：JSON 字符串 → dict/list"""
+        """读取数据库时：JSON 字符串 → dict/list，普通字符串直接返回"""
         if value is not None:
             try:
                 return json.loads(value)

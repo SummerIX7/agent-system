@@ -62,20 +62,12 @@ async def generate_resources(
         )
         resources.append(resource_data)
 
-        # 1. 写入 MySQL
-        # content 可能是字符串（讲义等）或 dict（试题、学习路径），需要统一处理
-        raw_content = res.get("content", "")
-        if isinstance(raw_content, (dict, list)):
-            import json
-            content_str = json.dumps(raw_content, ensure_ascii=False)
-        else:
-            content_str = str(raw_content)
-
+        # 1. 写入 MySQL（JsonText 自动处理 dict/list 序列化）
         db_resource = Resource(
             learner_id=learner_id or "unknown",
             session_id=request.session_id,
             resource_type=res.get("type", "lecture"),
-            content=content_str,
+            content=res.get("content", ""),
             topic=res.get("topic", request.topic),
             difficulty=res.get("difficulty", "beginner"),
             sources=res.get("sources", None),

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, String, Text
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base, JsonText
@@ -20,7 +20,7 @@ class Resource(Base):
         nullable=False,
         comment="资源类型",
     )
-    content = Column(Text, nullable=False, comment="生成内容")
+    content = Column(JsonText, nullable=False, comment="生成内容")
     topic = Column(String(200), nullable=False, comment="主题")
     difficulty = Column(String(20), nullable=True, comment="难度等级")
     sources = Column(JsonText, nullable=True, comment="知识溯源列表")
