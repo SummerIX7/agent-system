@@ -1,0 +1,30 @@
+{
+  "profile_name": "有编程基础",
+  "description": "计算机专业，有 Python 基础，想系统学习数据分析",
+  "education_background": "本科",
+  "major": "计算机科学",
+  "work_experience_years": 1,
+  "self_assessment": {
+    "Python 基础": "熟练",
+    "NumPy": "了解基础",
+    "Pandas": "了解基础",
+    "Matplotlib": "不了解",
+    "统计学基础": "了解基础",
+    "SQL 数据库": "熟练",
+    "数据清洗": "了解基础",
+    "机器学习基础": "不了解"
+  },
+  "learning_style": "practice",
+  "goals": [
+    "掌握数据分析全流程",
+    "提升 Pandas 数据处理能力",
+    "学会数据可视化",
+    "了解机器学习基础"
+  ],
+  "expected_difficulty": "intermediate",
+  "expected_blind_spots": [
+    "Matplotlib 高级图表",
+    "Pandas 高级操作（透视表、时间序列）",
+    "统计学假设检验"
+  ]
+}

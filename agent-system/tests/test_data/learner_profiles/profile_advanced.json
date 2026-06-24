@@ -1,0 +1,30 @@
+{
+  "profile_name": "有数据分析经验",
+  "description": "统计学硕士，有 5 年数据分析经验，想深入机器学习和性能优化",
+  "education_background": "硕士",
+  "major": "统计学",
+  "work_experience_years": 5,
+  "self_assessment": {
+    "Python 基础": "精通",
+    "NumPy": "熟练",
+    "Pandas": "熟练",
+    "Matplotlib": "熟练",
+    "统计学基础": "精通",
+    "SQL 数据库": "精通",
+    "数据清洗": "熟练",
+    "机器学习基础": "了解基础"
+  },
+  "learning_style": "theory",
+  "goals": [
+    "深入机器学习算法原理",
+    "优化大规模数据处理性能",
+    "掌握深度学习基础",
+    "提升数据建模能力"
+  ],
+  "expected_difficulty": "advanced",
+  "expected_blind_spots": [
+    "机器学习算法原理",
+    "深度学习框架使用",
+    "大规模数据处理优化"
+  ]
+}

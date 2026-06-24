@@ -1,0 +1,30 @@
+{
+  "profile_name": "零基础学习者",
+  "description": "非技术背景，完全没有编程经验，想转行数据分析",
+  "education_background": "大专",
+  "major": "市场营销",
+  "work_experience_years": 3,
+  "self_assessment": {
+    "Python 基础": "不了解",
+    "NumPy": "不了解",
+    "Pandas": "不了解",
+    "Matplotlib": "不了解",
+    "统计学基础": "了解基础",
+    "SQL 数据库": "了解基础",
+    "数据清洗": "不了解",
+    "机器学习基础": "不了解"
+  },
+  "learning_style": "visual",
+  "goals": [
+    "转行数据分析",
+    "学会用 Python 处理 Excel 数据",
+    "能独立完成数据分析报告"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_blind_spots": [
+    "Python 基础语法",
+    "NumPy 数组操作",
+    "Pandas DataFrame 操作",
+    "数据可视化基础"
+  ]
+}
