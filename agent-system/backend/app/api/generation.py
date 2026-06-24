@@ -52,31 +52,37 @@ async def generate_resources(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"资源生成失败: {e}")
 
+    # 允许写入数据库的资源类型（与 Enum 定义一致）
+    DB_RESOURCE_TYPES = {"lecture", "guide", "project", "test"}
+
     resources = []
     for res in result.get("final_resources", []):
+        res_type = res.get("type", "")
+
         resource_data = ResourceOutput(
-            type=res.get("type", ""),
+            type=res_type,
             content=res.get("content", ""),
             topic=res.get("topic", request.topic),
             difficulty=res.get("difficulty", "beginner"),
         )
         resources.append(resource_data)
 
-        # 1. 写入 MySQL（JsonText 自动处理 dict/list 序列化）
-        db_resource = Resource(
-            learner_id=learner_id or "unknown",
-            session_id=request.session_id,
-            resource_type=res.get("type", "lecture"),
-            content=res.get("content", ""),
-            topic=res.get("topic", request.topic),
-            difficulty=res.get("difficulty", "beginner"),
-            sources=res.get("sources", None),
-            review_score=res.get("review_score", None),
-            review_passed="passed",
-        )
-        db.add(db_resource)
+        # 只有标准资源类型才写入数据库
+        if res_type in DB_RESOURCE_TYPES:
+            db_resource = Resource(
+                learner_id=learner_id or "unknown",
+                session_id=request.session_id,
+                resource_type=res_type,
+                content=res.get("content", ""),
+                topic=res.get("topic", request.topic),
+                difficulty=res.get("difficulty", "beginner"),
+                sources=res.get("sources", None),
+                review_score=res.get("review_score", None),
+                review_passed="passed",
+            )
+            db.add(db_resource)
 
-        # 2. 同时存入内存 store（兼容旧逻辑）
+        # 所有资源都存入内存 store（包括 learning_path）
         add_resource(request.session_id, resource_data.model_dump())
 
     await db.flush()
