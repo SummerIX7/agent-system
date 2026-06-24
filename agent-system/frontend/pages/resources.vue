@@ -155,8 +155,9 @@ onMounted(async () => {
         }))
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     console.warn('获取资源失败:', err)
+    // 资源页面加载失败不弹 toast，显示空状态即可
   } finally {
     loading.value = false
   }

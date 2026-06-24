@@ -6,13 +6,39 @@
         <NuxtLink to="/" class="text-xl font-bold text-primary">
           多智能体协同决策系统
         </NuxtLink>
-        <nav class="flex gap-6">
+
+        <!-- 桌面端导航 -->
+        <nav class="hidden md:flex gap-6">
           <NuxtLink
             v-for="item in navItems"
             :key="item.path"
             :to="item.path"
             class="text-sm font-medium text-gray-600 hover:text-primary transition-colors"
             active-class="text-primary"
+          >
+            {{ item.label }}
+          </NuxtLink>
+        </nav>
+
+        <!-- 移动端菜单按钮 -->
+        <UButton
+          class="md:hidden"
+          variant="ghost"
+          icon="i-heroicons-bars-3"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        />
+      </div>
+
+      <!-- 移动端导航菜单 -->
+      <div v-if="mobileMenuOpen" class="md:hidden border-t border-gray-100 bg-white">
+        <nav class="container mx-auto px-4 py-3 space-y-2">
+          <NuxtLink
+            v-for="item in navItems"
+            :key="item.path"
+            :to="item.path"
+            class="block py-2 text-sm font-medium text-gray-600 hover:text-primary transition-colors"
+            active-class="text-primary"
+            @click="mobileMenuOpen = false"
           >
             {{ item.label }}
           </NuxtLink>
@@ -33,6 +59,8 @@
 </template>
 
 <script setup lang="ts">
+const mobileMenuOpen = ref(false)
+
 const navItems = [
   { path: '/profile', label: '学习者画像' },
   { path: '/dashboard', label: '学情诊断' },

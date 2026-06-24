@@ -94,6 +94,7 @@
 <script setup lang="ts">
 const router = useRouter()
 const api = useApi()
+const toast = useToast()
 const { setSession, setProfile } = useSession()
 const loading = ref(false)
 
@@ -127,7 +128,11 @@ const removeGoal = (index: number) => {
 
 const submitProfile = async () => {
   if (!formState.education_background || !formState.major) {
-    alert('请填写学历背景和专业方向')
+    toast.add({
+      title: '请填写必填项',
+      description: '学历背景和专业方向为必填',
+      color: 'orange',
+    })
     return
   }
 
@@ -149,7 +154,11 @@ const submitProfile = async () => {
     router.push('/dashboard')
   } catch (err: any) {
     console.error('提交失败:', err)
-    alert(`提交失败: ${err.message}`)
+    toast.add({
+      title: '提交失败',
+      description: err.message || '请稍后重试',
+      color: 'red',
+    })
   } finally {
     loading.value = false
   }
