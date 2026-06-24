@@ -13,17 +13,24 @@
       </span>
     </div>
 
-    <!-- 生成进度提示 -->
+    <!-- 真实进度条 -->
     <div v-if="generating" class="mt-6">
       <UCard>
         <div class="flex items-center gap-4">
-          <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin text-primary" />
+          <UIcon
+            :name="currentProgress >= 100 ? 'i-heroicons-check-circle' : 'i-heroicons-arrow-path'"
+            class="w-6 h-6"
+            :class="currentProgress >= 100 ? 'text-green-500' : 'animate-spin text-primary'"
+          />
           <div class="flex-1">
-            <p class="font-medium">正在生成个性化资源...</p>
-            <p class="text-sm text-gray-500 mt-1">{{ progressMessage }}</p>
+            <p class="font-medium">
+              {{ currentProgress >= 100 ? '生成完成！' : '正在生成个性化资源...' }}
+            </p>
+            <p class="text-sm text-gray-500 mt-1">{{ currentMessage }}</p>
           </div>
+          <span class="text-lg font-bold text-primary">{{ Math.round(currentProgress) }}%</span>
         </div>
-        <UProgress :value="progress" class="mt-3" />
+        <UProgress :value="currentProgress" class="mt-3" />
       </UCard>
     </div>
 
@@ -31,12 +38,12 @@
     <div class="mt-8 flex flex-wrap justify-center gap-4">
       <UButton
         :disabled="!sessionId || generating"
-        :loading="generating"
+        :loading="generating && currentProgress < 100"
         @click="startGenerate"
       >
-        {{ generating ? '正在生成...' : '触发资源生成' }}
+        {{ generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : '触发资源生成' }}
       </UButton>
-      <UButton to="/resources" variant="outline" :disabled="generating">
+      <UButton to="/resources" variant="outline" :disabled="generating && currentProgress < 100">
         查看生成结果
       </UButton>
     </div>
@@ -48,50 +55,59 @@ const { sessionId, profile } = useSession()
 const api = useApi()
 const toast = useToast()
 
+// 真实进度和消息（来自 WebSocket）
+const currentProgress = ref(0)
+const currentMessage = ref('准备中...')
+const generating = ref(false)
+
 // WebSocket 连接
 const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
-// 如果没有 WebSocket 数据，显示 6 个 Agent 初始状态
+// 初始化 6 个 Agent 状态
 if (agents.value.length === 0) {
   agents.value = [
     { name: '学情分析 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '路径规划 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '知识生成 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '审核纠偏 Agent', status: 'idle', message: '等待启动', progress: 0 },
+    { name: '裁判 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '试题生成 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '决策调度 Agent', status: 'idle', message: '等待启动', progress: 0 },
   ]
 }
 
-const generating = ref(false)
-const progress = ref(0)
-const progressMessage = ref('准备中...')
+// 监听 WebSocket 消息，更新真实进度
+watch(() => agents.value, (newAgents) => {
+  // 找到当前最高进度
+  let maxProgress = 0
+  let latestMessage = ''
 
-// 模拟进度更新
-const progressMessages = [
-  '学情分析 Agent 正在构建学习者画像...',
-  '路径规划 Agent 正在规划学习路径...',
-  '知识生成 Agent 正在生成个性化内容...',
-  '审核纠偏 Agent 正在验证内容准确性...',
-  '试题生成 Agent 正在生成练习题...',
-  '决策调度 Agent 正在整合结果...',
-]
+  for (const agent of newAgents) {
+    if (agent.progress > maxProgress) {
+      maxProgress = agent.progress
+      latestMessage = agent.message
+    }
+    // 如果有正在运行的 agent，显示其消息
+    if (agent.status === 'running') {
+      latestMessage = agent.message
+    }
+  }
+
+  currentProgress.value = maxProgress
+  if (latestMessage) {
+    currentMessage.value = latestMessage
+  }
+}, { deep: true })
 
 const startGenerate = async () => {
   if (!sessionId.value) return
 
   generating.value = true
-  progress.value = 0
-  progressMessage.value = progressMessages[0]
+  currentProgress.value = 0
+  currentMessage.value = '启动工作流...'
 
-  // 模拟进度更新
-  const progressInterval = setInterval(() => {
-    if (progress.value < 90) {
-      progress.value += 15
-      const msgIndex = Math.min(Math.floor(progress.value / 18), progressMessages.length - 1)
-      progressMessage.value = progressMessages[msgIndex]
-    }
-  }, 2000)
+  // 重置所有 Agent 状态为 idle
+  agents.value = agents.value.map(a => ({ ...a, status: 'idle' as const, message: '等待启动', progress: 0 }))
 
   try {
     const result = await api.generateResources(
@@ -100,8 +116,10 @@ const startGenerate = async () => {
       ['lecture', 'guide', 'project'],
       profile.value || {}
     )
-    progress.value = 100
-    progressMessage.value = '生成完成！'
+
+    // 确保进度显示 100%
+    currentProgress.value = 100
+    currentMessage.value = `已生成 ${result.length} 个资源`
 
     toast.add({
       title: '生成成功',
@@ -116,8 +134,10 @@ const startGenerate = async () => {
       color: 'red',
     })
   } finally {
-    clearInterval(progressInterval)
-    generating.value = false
+    // 延迟关闭，让用户看到 100% 完成状态
+    setTimeout(() => {
+      generating.value = false
+    }, 2000)
   }
 }
 </script>

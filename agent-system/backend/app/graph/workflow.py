@@ -96,7 +96,8 @@ async def generate_node(state: AgentState) -> dict:
     generated["project"] = await generation_agent.generate_project_case(topic, profile)
     logs.append("项目案例生成完成")
 
-    _broadcast(session_id, "知识生成 Agent", "completed", "三种资源生成完成", 60)
+    # 注意：不在这里标记完成，因为还需要辩论验证
+    _broadcast(session_id, "知识生成 Agent", "running", "内容已生成，等待辩论验证...", 58)
 
     return {
         "generated_content": generated,
@@ -115,11 +116,12 @@ async def debate_node(state: AgentState) -> dict:
     debate_results = {}
     all_rounds = []
 
-    _broadcast(session_id, "审核纠偏 Agent", "running", "启动辩论机制...", 65)
+    _broadcast(session_id, "审核纠偏 Agent", "running", "启动辩论机制...", 62)
 
     for content_type, content in generated.items():
+        progress = 62 + len(debate_results) * 3
         _broadcast(session_id, "审核纠偏 Agent", "running",
-                   f"正在辩论: {content_type}...", 65 + len(debate_results) * 5)
+                   f"正在审核: {content_type}...", progress)
 
         # 跳过非文本内容
         if content_type == "test":
@@ -167,8 +169,12 @@ async def debate_node(state: AgentState) -> dict:
 
     if not all_passed:
         _broadcast(session_id, "裁判 Agent", "completed", f"判决：有内容未通过（第{new_retry}次），将重新生成", 85)
+        _broadcast(session_id, "审核纠偏 Agent", "completed", f"辩论结束：未通过，需重新生成", 82)
+        _broadcast(session_id, "知识生成 Agent", "error", "内容未通过验证，需重新生成", 60)
     else:
         _broadcast(session_id, "裁判 Agent", "completed", "判决：所有内容通过", 85)
+        _broadcast(session_id, "审核纠偏 Agent", "completed", "辩论结束：所有内容通过验证", 82)
+        _broadcast(session_id, "知识生成 Agent", "completed", "内容生成并通过验证", 65)
 
     return {
         "debate_results": debate_results,
@@ -215,7 +221,9 @@ async def decide_node(state: AgentState) -> str:
         _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成", 100)
         return "complete"
     else:
-        _broadcast(session_id, "决策调度 Agent", "running", f"辩论未通过（第{retry_count}次），重新生成...", 30)
+        _broadcast(session_id, "决策调度 Agent", "running", f"辩论未通过（第{retry_count}次），触发重新生成...", 25)
+        # 重置相关 Agent 状态，准备重试
+        _broadcast(session_id, "知识生成 Agent", "running", "重新生成内容...", 30)
         return "retry"
 
 
