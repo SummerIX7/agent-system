@@ -1,8 +1,11 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
 from app.models.schemas import GenerateRequest, ResourceOutput
+from app.models.resource import Resource
 from app.graph.workflow import run_workflow
 from app.core.store import add_resource, get_session
 
@@ -32,6 +35,12 @@ async def generate_resources(
         "goals": profile.get("goals", []),
     }
 
+    # 查找 learner_id（从 store 或 session）
+    learner_id = profile.get("id", "")
+    if not learner_id:
+        session = get_session(request.session_id)
+        learner_id = session.get("learner_id", "")
+
     try:
         result = await run_workflow(
             learner_input=learner_input,
@@ -46,17 +55,32 @@ async def generate_resources(
 
     resources = []
     for res in result.get("final_resources", []):
-        resource = ResourceOutput(
+        resource_data = ResourceOutput(
             type=res.get("type", ""),
             content=res.get("content", ""),
             topic=res.get("topic", request.topic),
             difficulty=res.get("difficulty", "beginner"),
         )
-        resources.append(resource)
+        resources.append(resource_data)
 
-        # 存入 store
-        add_resource(request.session_id, resource.model_dump())
+        # 1. 写入 MySQL
+        db_resource = Resource(
+            learner_id=learner_id or "unknown",
+            session_id=request.session_id,
+            resource_type=res.get("type", "lecture"),
+            content=res.get("content", ""),
+            topic=res.get("topic", request.topic),
+            difficulty=res.get("difficulty", "beginner"),
+            sources=res.get("sources", None),
+            review_score=res.get("review_score", None),
+            review_passed="passed",
+        )
+        db.add(db_resource)
 
+        # 2. 同时存入内存 store（兼容旧逻辑）
+        add_resource(request.session_id, resource_data.model_dump())
+
+    await db.flush()
     return resources
 
 
@@ -65,7 +89,24 @@ async def get_resources(
     session_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取指定会话的生成资源"""
+    """获取指定会话的生成资源（优先从数据库读取）"""
+    # 先从 MySQL 查询
+    stmt = select(Resource).where(Resource.session_id == session_id)
+    result = await db.execute(stmt)
+    db_resources = result.scalars().all()
+
+    if db_resources:
+        return [
+            ResourceOutput(
+                type=r.resource_type,
+                content=r.content,
+                topic=r.topic,
+                difficulty=r.difficulty or "beginner",
+            )
+            for r in db_resources
+        ]
+
+    # 降级：从内存 store 读取
     session = get_session(session_id)
     return [
         ResourceOutput(

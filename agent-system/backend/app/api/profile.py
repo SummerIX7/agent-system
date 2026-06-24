@@ -1,11 +1,14 @@
 import uuid
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
 from app.models.schemas import LearnerProfileInput, LearnerProfile
+from app.models.learner import Learner
 from app.agents.diagnosis import DiagnosisAgent
-from app.core.store import update_session, get_session
+from app.core.store import update_session
 
 router = APIRouter(prefix="/api/profile", tags=["学习者画像"])
 
@@ -18,6 +21,7 @@ async def create_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """提交学习者画像，触发学情诊断"""
+    # 1. 调用诊断 Agent
     try:
         result = await diagnosis_agent.run(profile_input.model_dump())
     except RuntimeError as e:
@@ -29,7 +33,20 @@ async def create_profile(
     learner_id = str(uuid.uuid4())
     session_id = str(uuid.uuid4())
 
-    # 存入 store
+    # 2. 写入 MySQL
+    learner = Learner(
+        id=learner_id,
+        education_background=profile_input.education_background,
+        major=profile_input.major,
+        work_experience_years=profile_input.work_experience_years,
+        self_assessment=profile_input.self_assessment,
+        learning_style=profile_input.learning_style,
+        goals=profile_input.goals,
+    )
+    db.add(learner)
+    await db.flush()
+
+    # 3. 同时存入内存 store（用于 WebSocket 等实时功能）
     update_session(session_id, {
         "learner_id": learner_id,
         "profile": {
@@ -43,6 +60,7 @@ async def create_profile(
         },
     })
 
+    # 4. 返回结果
     return LearnerProfile(
         id=learner_id,
         education_background=profile_input.education_background,
@@ -67,37 +85,41 @@ async def get_profile(
     learner_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取学习者画像"""
-    # 从 store 查找
-    for session in get_session.__wrapped__() if hasattr(get_session, '__wrapped__') else []:
-        pass
+    """获取学习者画像（从数据库读取）"""
+    # 从 MySQL 查询
+    stmt = select(Learner).where(Learner.id == learner_id)
+    result = await db.execute(stmt)
+    learner = result.scalar_one_or_none()
 
-    # 简单遍历查找
+    if not learner:
+        raise HTTPException(status_code=404, detail="学习者不存在")
+
+    # 尝试从内存 store 获取诊断结果（知识盲区等）
     from app.core.store import _sessions
+    knowledge_points = []
+    blind_spots = []
+    overall_level = "beginner"
+    recommended_difficulty = "beginner"
+
     for sid, session in _sessions.items():
         if session.get("profile", {}).get("id") == learner_id:
             p = session["profile"]
-            return LearnerProfile(
-                id=learner_id,
-                education_background=p.get("education_background", ""),
-                major=p.get("major", ""),
-                work_experience_years=p.get("work_experience_years", 0),
-                self_assessment=p.get("self_assessment", {}),
-                learning_style=p.get("learning_style", "practice"),
-                goals=p.get("goals", []),
-                knowledge_points=p.get("knowledge_points", []),
-                blind_spots=p.get("blind_spots", []),
-                overall_level=p.get("overall_level", "beginner"),
-                recommended_difficulty=p.get("recommended_difficulty", "beginner"),
-            )
+            knowledge_points = p.get("knowledge_points", [])
+            blind_spots = p.get("blind_spots", [])
+            overall_level = p.get("overall_level", "beginner")
+            recommended_difficulty = p.get("recommended_difficulty", "beginner")
+            break
 
-    # 未找到返回默认
     return LearnerProfile(
-        id=learner_id,
-        education_background="未知",
-        major="未知",
-        work_experience_years=0,
-        self_assessment={},
-        learning_style="practice",
-        goals=[],
+        id=learner.id,
+        education_background=learner.education_background,
+        major=learner.major,
+        work_experience_years=learner.work_experience_years,
+        self_assessment=learner.self_assessment or {},
+        learning_style=learner.learning_style or "practice",
+        goals=learner.goals or [],
+        knowledge_points=knowledge_points,
+        blind_spots=blind_spots,
+        overall_level=overall_level,
+        recommended_difficulty=recommended_difficulty,
     )

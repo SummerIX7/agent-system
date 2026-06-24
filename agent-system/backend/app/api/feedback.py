@@ -3,8 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
 from app.models.schemas import FeedbackInput, FeedbackResponse
+from app.models.agent_state import FeedbackRecord
 from app.core.llm import get_llm
-from app.core.store import add_feedback
+from app.core.store import add_feedback, get_session
 
 router = APIRouter(prefix="/api/feedback", tags=["交互反馈"])
 
@@ -49,7 +50,25 @@ async def submit_feedback(
             print(f"[警告] 启发式追问生成失败: {e}")
             # 不影响主流程，heuristic 保持 None
 
-    # 存入 store
+    # 获取 learner_id
+    session = get_session(feedback.session_id)
+    learner_id = session.get("learner_id", "")
+
+    # 1. 写入 MySQL
+    record = FeedbackRecord(
+        session_id=feedback.session_id,
+        learner_id=learner_id or "unknown",
+        topic=feedback.topic,
+        question=feedback.question,
+        user_answer=feedback.user_answer,
+        correct_answer=feedback.correct_answer,
+        is_correct=correctness,
+        heuristic_question=heuristic,
+    )
+    db.add(record)
+    await db.flush()
+
+    # 2. 同时存入内存 store
     add_feedback(feedback.session_id, {
         "topic": feedback.topic,
         "question": feedback.question,

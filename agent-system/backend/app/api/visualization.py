@@ -1,7 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import List, Optional
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.database import get_db
 from app.core.store import get_session
 
 router = APIRouter(prefix="/api", tags=["可视化数据"])
@@ -81,38 +84,54 @@ async def get_visualization(session_id: str):
 
 
 @router.get("/history/{learner_id}")
-async def get_history(learner_id: str):
-    """获取学习历史记录"""
-    from app.core.store import _sessions
+async def get_history(
+    learner_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取学习历史记录（从数据库读取）"""
+    from app.models.agent_state import FeedbackRecord
+    from app.models.resource import Resource
+    from app.models.learner import Learner
 
     history = []
-    for sid, session in _sessions.items():
-        if session.get("learner_id") == learner_id or session.get("profile", {}).get("id") == learner_id:
-            # 画像记录
-            if session.get("profile"):
-                history.append({
-                    "title": "完成学情诊断",
-                    "date": session.get("created_at", ""),
-                    "description": f"识别了 {len(session['profile'].get('knowledge_points', []))} 个知识点",
-                    "tags": ["画像构建", "学情诊断"],
-                })
 
-            # 资源生成记录
-            for res in session.get("resources", []):
-                history.append({
-                    "title": f"生成{res.get('type', '')}",
-                    "date": res.get("created_at", ""),
-                    "description": f"主题: {res.get('topic', '')}",
-                    "tags": ["资源生成", res.get("type", "")],
-                })
+    # 查找学习者
+    stmt = select(Learner).where(Learner.id == learner_id)
+    result = await db.execute(stmt)
+    learner = result.scalar_one_or_none()
 
-            # 反馈记录
-            for fb in session.get("feedback", []):
-                history.append({
-                    "title": f"答题 {'✓' if fb.get('is_correct') else '✗'}",
-                    "date": fb.get("created_at", ""),
-                    "description": fb.get("question", ""),
-                    "tags": ["反馈", "正确" if fb.get("is_correct") else "错误"],
-                })
+    if learner:
+        history.append({
+            "title": "完成学情诊断",
+            "date": learner.created_at.isoformat() if learner.created_at else "",
+            "description": f"学历: {learner.education_background}, 专业: {learner.major}",
+            "tags": ["画像构建", "学情诊断"],
+        })
 
+    # 资源生成记录
+    stmt = select(Resource).where(Resource.learner_id == learner_id)
+    result = await db.execute(stmt)
+    resources = result.scalars().all()
+    for res in resources:
+        history.append({
+            "title": f"生成{res.resource_type}",
+            "date": res.created_at.isoformat() if res.created_at else "",
+            "description": f"主题: {res.topic}",
+            "tags": ["资源生成", res.resource_type],
+        })
+
+    # 反馈记录
+    stmt = select(FeedbackRecord).where(FeedbackRecord.learner_id == learner_id)
+    result = await db.execute(stmt)
+    feedbacks = result.scalars().all()
+    for fb in feedbacks:
+        history.append({
+            "title": f"答题 {'✓' if fb.is_correct else '✗'}",
+            "date": fb.created_at.isoformat() if fb.created_at else "",
+            "description": fb.question,
+            "tags": ["反馈", "正确" if fb.is_correct else "错误"],
+        })
+
+    # 按时间排序
+    history.sort(key=lambda x: x.get("date", ""), reverse=True)
     return history

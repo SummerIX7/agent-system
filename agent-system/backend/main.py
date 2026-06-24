@@ -6,13 +6,20 @@ from fastapi.responses import JSONResponse
 
 from app.api import feedback, generation, profile, visualization, ws
 from app.core.config import get_settings
-from app.models.database import engine
+from app.models.database import engine, Base
+# 导入所有模型，确保被 Base 注册
+from app.models.learner import Learner
+from app.models.resource import Resource
+from app.models.agent_state import AgentLog, FeedbackRecord
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时：可以在这里初始化数据库连接池等
+    # 启动时：创建数据库表（如果不存在）
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("[启动] 数据库表已就绪")
     yield
     # 关闭时：清理资源
     await engine.dispose()
