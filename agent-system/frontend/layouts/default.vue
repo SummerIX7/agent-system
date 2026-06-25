@@ -94,9 +94,9 @@ const navItems = [
   { path: '/history', label: '历史记录' },
 ]
 
-// 页面加载时恢复 token
-onMounted(() => {
-  restoreToken()
+// 页面加载时恢复 token 和用户信息
+onMounted(async () => {
+  await restoreToken()
 })
 
 const handleLogout = () => {

@@ -1,4 +1,3 @@
-import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +36,7 @@ async def create_profile(
         raise HTTPException(status_code=500, detail=f"诊断失败: {e}")
 
     profile_data = diag_result.get("profile", {})
-    session_id = str(uuid.uuid4())
+    session_id = f"user-{current_user.id}"
 
     if existing_learner:
         # 更新已有画像
@@ -47,6 +46,11 @@ async def create_profile(
         existing_learner.self_assessment = profile_input.self_assessment
         existing_learner.learning_style = profile_input.learning_style
         existing_learner.goals = profile_input.goals
+        # 写入诊断结果
+        existing_learner.knowledge_points = profile_data.get("knowledge_points", [])
+        existing_learner.blind_spots = profile_data.get("blind_spots", [])
+        existing_learner.overall_level = profile_data.get("overall_level", "beginner")
+        existing_learner.recommended_difficulty = profile_data.get("recommended_difficulty", "beginner")
         learner = existing_learner
     else:
         # 创建新画像
@@ -58,6 +62,11 @@ async def create_profile(
             self_assessment=profile_input.self_assessment,
             learning_style=profile_input.learning_style,
             goals=profile_input.goals,
+            # 写入诊断结果
+            knowledge_points=profile_data.get("knowledge_points", []),
+            blind_spots=profile_data.get("blind_spots", []),
+            overall_level=profile_data.get("overall_level", "beginner"),
+            recommended_difficulty=profile_data.get("recommended_difficulty", "beginner"),
         )
         db.add(learner)
 
@@ -111,21 +120,23 @@ async def get_my_profile(
     if not learner:
         raise HTTPException(status_code=404, detail="尚未创建学习者画像")
 
-    # 从内存 store 获取诊断结果
-    from app.core.store import _sessions
-    knowledge_points = []
-    blind_spots = []
-    overall_level = "beginner"
-    recommended_difficulty = "beginner"
+    # 优先从数据库读取诊断结果
+    knowledge_points = learner.knowledge_points or []
+    blind_spots = learner.blind_spots or []
+    overall_level = learner.overall_level or "beginner"
+    recommended_difficulty = learner.recommended_difficulty or "beginner"
 
-    for sid, session in _sessions.items():
-        if session.get("profile", {}).get("id") == learner.id:
-            p = session["profile"]
-            knowledge_points = p.get("knowledge_points", [])
-            blind_spots = p.get("blind_spots", [])
-            overall_level = p.get("overall_level", "beginner")
-            recommended_difficulty = p.get("recommended_difficulty", "beginner")
-            break
+    # 如果数据库没有诊断结果，从内存 store 降级读取
+    if not knowledge_points:
+        from app.core.store import _sessions
+        for sid, session in _sessions.items():
+            if session.get("profile", {}).get("id") == learner.id:
+                p = session["profile"]
+                knowledge_points = p.get("knowledge_points", [])
+                blind_spots = p.get("blind_spots", [])
+                overall_level = p.get("overall_level", "beginner")
+                recommended_difficulty = p.get("recommended_difficulty", "beginner")
+                break
 
     return LearnerProfile(
         id=learner.id,

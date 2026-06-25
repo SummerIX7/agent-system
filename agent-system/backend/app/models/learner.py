@@ -17,6 +17,13 @@ class Learner(Base):
     self_assessment = Column(JsonText, nullable=True, comment="技能自评")
     learning_style = Column(String(20), nullable=True, comment="学习风格: visual/theory/practice")
     goals = Column(JsonText, nullable=True, comment="学习目标列表")
+
+    # 诊断结果字段
+    knowledge_points = Column(JsonText, nullable=True, comment="知识点评分列表 [{name, score, level, confidence}]")
+    blind_spots = Column(JsonText, nullable=True, comment="知识盲区列表")
+    overall_level = Column(String(20), nullable=True, comment="整体水平: beginner/intermediate/advanced/expert")
+    recommended_difficulty = Column(String(20), nullable=True, comment="推荐难度: beginner/intermediate/advanced/expert")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

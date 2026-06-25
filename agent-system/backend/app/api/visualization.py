@@ -38,8 +38,46 @@ async def get_visualization(
     db: AsyncSession = Depends(get_db),
 ):
     """获取可视化数据（雷达图、盲区、匹配曲线、核心指标）"""
+    from app.models.learner import Learner
+
     session = get_session(session_id)
     profile = session.get("profile", {})
+
+    # 如果内存 store 中没有诊断数据，从数据库降级读取
+    if not profile.get("knowledge_points"):
+        learner = None
+
+        # 方式 1：通过 session 中的 learner_id 查找
+        learner_id = session.get("learner_id")
+        if learner_id:
+            stmt_lp = select(Learner).where(Learner.id == learner_id)
+            result_lp = await db.execute(stmt_lp)
+            learner = result_lp.scalar_one_or_none()
+
+        # 方式 2：通过 session_id 格式推断（"user-{user_id}"）
+        if not learner and session_id.startswith("user-"):
+            try:
+                user_id = int(session_id.split("-", 1)[1])
+                stmt_lp = select(Learner).where(Learner.user_id == user_id)
+                result_lp = await db.execute(stmt_lp)
+                learner = result_lp.scalar_one_or_none()
+            except (ValueError, IndexError):
+                pass
+
+        # 方式 3：兜底 — 查找有诊断数据的 Learner
+        if not learner:
+            stmt_lp = select(Learner).where(Learner.knowledge_points.isnot(None))
+            result_lp = await db.execute(stmt_lp)
+            learner = result_lp.scalars().first()
+
+        if learner and learner.knowledge_points:
+            profile = {
+                **profile,
+                "knowledge_points": learner.knowledge_points,
+                "blind_spots": learner.blind_spots or [],
+                "overall_level": learner.overall_level or "beginner",
+                "recommended_difficulty": learner.recommended_difficulty or "beginner",
+            }
 
     # 从画像中提取知识点
     knowledge_points = [

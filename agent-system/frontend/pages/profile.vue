@@ -85,7 +85,7 @@
     <!-- 提交按钮 -->
     <div class="mt-8 text-center">
       <UButton size="lg" :loading="loading" @click="submitProfile">
-        提交画像，开始诊断
+        {{ profileLoaded ? '更新画像，重新诊断' : '提交画像，开始诊断' }}
       </UButton>
     </div>
   </div>
@@ -95,14 +95,39 @@
 const router = useRouter()
 const api = useApi()
 const toast = useToast()
-const { isLoggedIn } = useAuth()
+const { isLoggedIn, isLoading: authLoading } = useAuth()
 const { setSession, setProfile } = useSession()
 const loading = ref(false)
+const profileLoaded = ref(false)
 
-// 未登录跳转
-if (!isLoggedIn.value) {
-  router.push('/login')
-}
+// 等认证状态恢复后再判断
+watch(authLoading, async (val) => {
+  if (!val && !isLoggedIn.value) {
+    router.push('/login')
+  }
+}, { immediate: true })
+
+// 登录后自动加载已有画像
+onMounted(async () => {
+  if (!isLoggedIn.value) return
+  try {
+    const existing = await api.getMyProfile()
+    if (existing) {
+      setSession(existing.session_id || `user-${existing.id}`, String(existing.id))
+      setProfile(existing)
+      // 预填表单
+      formState.education_background = existing.education_background || ''
+      formState.major = existing.major || ''
+      formState.work_experience_years = existing.work_experience_years || 0
+      formState.learning_style = existing.learning_style || ''
+      formState.self_assessment = existing.self_assessment || {}
+      formState.goals = existing.goals?.length ? existing.goals : ['']
+      profileLoaded.value = true
+    }
+  } catch {
+    // 404 = 没有画像，正常情况
+  }
+})
 
 const skillOptions = [
   'Python 基础',
@@ -154,7 +179,7 @@ const submitProfile = async () => {
     })
 
     // 存入全局状态
-    setSession(result.session_id || String(result.id), String(result.id))
+    setSession(result.session_id || `user-${result.id}`, String(result.id))
     setProfile(result)
 
     router.push('/dashboard')

@@ -4,16 +4,35 @@
 export function useAuth() {
   const token = useState<string>('auth_token', () => '')
   const user = useState<{ id: number; username: string } | null>('auth_user', () => null)
+  const isLoading = useState<boolean>('auth_loading', () => true)
 
   const isLoggedIn = computed(() => !!token.value)
 
-  // 从 localStorage 恢复 token
-  const restoreToken = () => {
+  // 从 localStorage 恢复 token 和用户信息
+  const restoreToken = async () => {
     if (import.meta.client) {
       const saved = localStorage.getItem('auth_token')
       if (saved) {
         token.value = saved
+        // 恢复用户信息
+        try {
+          const config = useRuntimeConfig()
+          const response = await fetch(`${config.public.apiBase}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${saved}` },
+          })
+          if (response.ok) {
+            const data = await response.json()
+            user.value = { id: data.id, username: data.username }
+          } else {
+            // token 过期，清除
+            token.value = ''
+            localStorage.removeItem('auth_token')
+          }
+        } catch {
+          // 网络错误，保留 token 但不设 user
+        }
       }
+      isLoading.value = false
     }
   }
 
@@ -43,6 +62,7 @@ export function useAuth() {
     token,
     user,
     isLoggedIn,
+    isLoading,
     restoreToken,
     setToken,
     setUser,
