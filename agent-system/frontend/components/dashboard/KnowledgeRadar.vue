@@ -1,6 +1,7 @@
 <template>
   <div class="w-full h-96">
-    <VChart :option="chartOption" autoresize />
+    <VChart v-if="isValidData" :option="chartOption" autoresize />
+    <p v-else class="text-gray-400 text-center py-12">暂无有效数据</p>
   </div>
 </template>
 
@@ -26,6 +27,12 @@ interface KnowledgePoint {
 const props = defineProps<{
   knowledgePoints: KnowledgePoint[]
 }>()
+
+const isValidData = computed(() => {
+  return Array.isArray(props.knowledgePoints) &&
+    props.knowledgePoints.length > 0 &&
+    props.knowledgePoints.every((kp) => kp && kp.name && typeof kp.score === 'number')
+})
 
 const chartOption = computed(() => ({
   title: {

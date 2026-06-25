@@ -8,7 +8,12 @@
         <template #header>
           <h2 class="text-lg font-semibold">知识掌握雷达图</h2>
         </template>
-        <DashboardKnowledgeRadar :knowledge-points="knowledgePoints" />
+        <DashboardKnowledgeRadar
+          v-if="knowledgePoints.length > 0"
+          :key="radarKey"
+          :knowledge-points="knowledgePoints"
+        />
+        <p v-else class="text-gray-400 text-center py-12">暂无诊断数据</p>
       </UCard>
 
       <!-- 知识盲区 -->
@@ -39,7 +44,7 @@
       <template #header>
         <h2 class="text-lg font-semibold">能力维度分析</h2>
       </template>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div v-if="knowledgePoints.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div
           v-for="kp in knowledgePoints"
           :key="kp.name"
@@ -50,6 +55,7 @@
           <UBadge class="mt-2" variant="subtle">{{ kp.level }}</UBadge>
         </div>
       </div>
+      <p v-else class="text-gray-400 text-center py-8">暂无能力维度数据</p>
     </UCard>
 
     <!-- 操作按钮 -->
@@ -70,26 +76,43 @@ const { sessionId, profile } = useSession()
 
 const knowledgePoints = ref<any[]>([])
 const blindSpots = ref<any[]>([])
+const radarKey = ref(0)
 
-// 从全局状态获取画像数据
-if (profile.value?.knowledge_points) {
-  knowledgePoints.value = profile.value.knowledge_points
-  blindSpots.value = (profile.value.blind_spots || []).map((bs: string) => ({
-    name: bs,
-    severity: 0.7,
-  }))
+const sanitizeKnowledgePoints = (kps: any[]): any[] => {
+  if (!Array.isArray(kps)) return []
+  return kps
+    .filter((kp) => kp && typeof kp === 'object' && kp.name)
+    .map((kp) => ({
+      name: String(kp.name),
+      score: typeof kp.score === 'number' ? kp.score : Number(kp.score) || 0,
+      level: kp.level || 'beginner',
+    }))
 }
 
-// 尝试从后端获取最新可视化数据
 onMounted(async () => {
+  // 先从全局 profile 加载
+  if (profile.value?.knowledge_points?.length) {
+    knowledgePoints.value = sanitizeKnowledgePoints(profile.value.knowledge_points)
+    blindSpots.value = (profile.value.blind_spots || []).map((bs: any) => {
+      if (typeof bs === 'string') return { name: bs, severity: 0.7 }
+      return { name: bs.name || '未知', severity: bs.severity || 0.7 }
+    })
+    radarKey.value++
+  }
+
+  // 再从后端获取最新数据
   if (sessionId.value) {
     try {
       const viz = await api.getVisualization(sessionId.value)
       if (viz.knowledge_points?.length) {
-        knowledgePoints.value = viz.knowledge_points
+        knowledgePoints.value = sanitizeKnowledgePoints(viz.knowledge_points)
+        radarKey.value++
       }
       if (viz.blind_spots?.length) {
-        blindSpots.value = viz.blind_spots
+        blindSpots.value = viz.blind_spots.map((bs: any) => ({
+          name: bs.name || '未知',
+          severity: typeof bs.severity === 'number' ? bs.severity : 0.7,
+        }))
       }
     } catch (err) {
       console.warn('获取可视化数据失败，使用画像数据:', err)
