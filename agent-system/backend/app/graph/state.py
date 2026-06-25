@@ -19,6 +19,12 @@ class AgentState(TypedDict, total=False):
     # ③ 知识生成
     generated_content: dict      # 生成的资源 {lecture/guide/project: content}
 
+    # ③½ 预审
+    review_results: dict         # 预审结果 {type: ReviewResult}
+
+    # ③½ 预审
+    review_results: dict         # 预审结果 {type: ReviewResult}
+
     # ④ 审核纠偏（辩论）
     debate_results: dict         # 辩论结果 {type: DebateResult}
     debate_rounds: list          # 辩论记录

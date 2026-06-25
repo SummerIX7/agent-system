@@ -7,12 +7,14 @@ from app.agents.debate import DebateManager
 from app.agents.judge import JudgeAgent
 from app.agents.question_generator import QuestionGeneratorAgent
 from app.agents.orchestrator import DecisionOrchestrator
+from app.agents.review import ReviewAgent
 from app.graph.state import AgentState
 
 # Agent 实例
 diagnosis_agent = DiagnosisAgent()
 path_planner = PathPlannerAgent()
 generation_agent = GenerationAgent()
+review_agent = ReviewAgent()
 debate_manager = DebateManager()
 judge_agent = JudgeAgent()
 question_generator = QuestionGeneratorAgent()
@@ -106,6 +108,51 @@ async def generate_node(state: AgentState) -> dict:
 
 
 # ──────────────────────────────────────────────
+# ③½ 预审 Agent（辩论前的快速筛查）
+# ──────────────────────────────────────────────
+async def review_node(state: AgentState) -> dict:
+    session_id = state.get("session_id", "")
+    topic = state.get("topic", "")
+    generated = state.get("generated_content", {})
+    review_results = {}
+
+    _broadcast(session_id, "预审 Agent", "running", "启动双视角预审...", 59)
+
+    for content_type, content in generated.items():
+        if content_type == "test":
+            review_results[content_type] = {"passed": True, "score": 1.0, "issues": [], "skipped": True}
+            continue
+
+        _broadcast(session_id, "预审 Agent", "running",
+                   f"预审: {content_type}...", 59 + len(review_results))
+
+        try:
+            result = await review_agent.debate_verify(content, topic)
+            review_results[content_type] = {
+                "passed": result.passed,
+                "score": result.score,
+                "issues": result.issues,
+                "suggestions": result.suggestions,
+            }
+        except Exception as e:
+            review_results[content_type] = {
+                "passed": True,
+                "score": 0.5,
+                "issues": [f"预审异常: {str(e)}"],
+                "suggestions": [],
+            }
+
+    all_passed = all(r.get("passed", False) for r in review_results.values())
+    _broadcast(session_id, "预审 Agent", "completed",
+               f"预审完成：{'全部通过' if all_passed else '有内容需重点审查'}", 61)
+
+    return {
+        "review_results": review_results,
+        "decision_log": [f"③½ 预审完成（{'通过' if all_passed else '需重点审查'}）"],
+    }
+
+
+# ──────────────────────────────────────────────
 # ④ 审核纠偏 Agent（辩论 + 独立裁判）
 # ──────────────────────────────────────────────
 async def debate_node(state: AgentState) -> dict:
@@ -131,6 +178,21 @@ async def debate_node(state: AgentState) -> dict:
         # 达到最大重试次数，强制通过
         if retry_count >= 3:
             debate_results[content_type] = {"passed": True, "reason": "达到最大重试次数，强制通过", "final_content": content}
+            continue
+
+        # 获取预审结果
+        review = state.get("review_results", {}).get(content_type, {})
+        review_score = review.get("score", 1.0)
+
+        # 如果预审分数极低（< 0.4），直接打回，跳过辩论
+        if review_score < 0.4:
+            debate_results[content_type] = {
+                "passed": False,
+                "adopted_side": "reviewer",
+                "reason": f"预审严重不合格（score={review_score:.2f}），跳过辩论直接打回",
+                "quality_score": review_score,
+                "final_content": content,
+            }
             continue
 
         # 第1-2轮：辩论（审核质疑 → 生成反驳）
@@ -265,6 +327,8 @@ async def finalize_node(state: AgentState) -> dict:
 
     return {
         "final_resources": final_resources,
+        "learning_path": state.get("learning_path", {}),
+        "review_results": state.get("review_results", {}),
         "decision_log": ["⑥ 工作流完成"],
     }
 
@@ -275,10 +339,11 @@ async def finalize_node(state: AgentState) -> dict:
 def build_workflow() -> StateGraph:
     workflow = StateGraph(AgentState)
 
-    # 6 个主节点 + finalize
+    # 7 个主节点 + finalize
     workflow.add_node("analyze", analyze_node)            # ① 学情分析
     workflow.add_node("plan_path", plan_path_node)        # ② 路径规划
     workflow.add_node("generate", generate_node)          # ③ 知识生成
+    workflow.add_node("review", review_node)              # ③½ 预审
     workflow.add_node("debate", debate_node)              # ④ 审核纠偏（辩论）
     workflow.add_node("gen_questions", gen_questions_node) # ⑤ 试题生成
     workflow.add_node("finalize", finalize_node)          # 最终输出
@@ -287,7 +352,8 @@ def build_workflow() -> StateGraph:
     workflow.set_entry_point("analyze")
     workflow.add_edge("analyze", "plan_path")
     workflow.add_edge("plan_path", "generate")
-    workflow.add_edge("generate", "debate")
+    workflow.add_edge("generate", "review")
+    workflow.add_edge("review", "debate")
 
     # 辩论后条件路由
     workflow.add_conditional_edges(

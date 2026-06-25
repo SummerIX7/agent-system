@@ -63,12 +63,13 @@ const generating = ref(false)
 // WebSocket 连接
 const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
-// 初始化 6 个 Agent 状态
+// 初始化 8 个 Agent 状态
 if (agents.value.length === 0) {
   agents.value = [
     { name: '学情分析 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '路径规划 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '知识生成 Agent', status: 'idle', message: '等待启动', progress: 0 },
+    { name: '预审 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '审核纠偏 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '裁判 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '试题生成 Agent', status: 'idle', message: '等待启动', progress: 0 },
