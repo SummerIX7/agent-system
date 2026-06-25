@@ -95,14 +95,63 @@ async def get_visualization(
         for bs in profile.get("blind_spots", [])
     ]
 
-    # 生成学习路径（基于知识点掌握度）
+    # 学习路径：优先从 Learner 表读取 PathPlannerAgent 的真实输出
+    learning_path_data = None
+    learner_id = session.get("learner_id")
+    if learner_id:
+        from app.models.learner import Learner as LearnerModel
+        stmt_path = select(LearnerModel).where(LearnerModel.id == learner_id)
+        result_path = await db.execute(stmt_path)
+        learner_record = result_path.scalar_one_or_none()
+        if learner_record and learner_record.learning_path:
+            learning_path_data = learner_record.learning_path
+
+    # 降级：从 session_id 推断
+    if not learning_path_data and session_id.startswith("user-"):
+        try:
+            user_id = int(session_id.split("-", 1)[1])
+            stmt_path = select(LearnerModel).where(LearnerModel.user_id == user_id)
+            result_path = await db.execute(stmt_path)
+            learner_record = result_path.scalar_one_or_none()
+            if learner_record and learner_record.learning_path:
+                learning_path_data = learner_record.learning_path
+        except (ValueError, IndexError):
+            pass
+
+    # 降级：从内存 store 中的 resources 查找
+    if not learning_path_data:
+        for res in session.get("resources", []):
+            if res.get("type") == "learning_path":
+                learning_path_data = res.get("content", {})
+                break
+
+    # 构建前端需要的学习路径列表
     learning_path = []
-    for kp in profile.get("knowledge_points", []):
-        learning_path.append({
-            "title": kp.get("name", ""),
-            "completed": kp.get("score", 0) >= 60,
-            "score": kp.get("score", 0),
-        })
+    if learning_path_data and learning_path_data.get("path"):
+        for stage in learning_path_data["path"]:
+            learning_path.append({
+                "stage": stage.get("stage", 0),
+                "title": stage.get("title", ""),
+                "topics": stage.get("topics", []),
+                "estimated_hours": stage.get("estimated_hours", 0),
+                "difficulty": stage.get("difficulty", "beginner"),
+                "prerequisites": stage.get("prerequisites", []),
+                "resources_type": stage.get("resources_type", []),
+                "completed": False,
+            })
+    else:
+        # 兜底：从知识点生成简化路径
+        for kp in profile.get("knowledge_points", []):
+            learning_path.append({
+                "stage": 0,
+                "title": kp.get("name", ""),
+                "topics": [kp.get("name", "")],
+                "estimated_hours": 0,
+                "difficulty": kp.get("level", "beginner"),
+                "prerequisites": [],
+                "resources_type": [],
+                "completed": kp.get("score", 0) >= 60,
+            })
 
     # 匹配曲线数据
     match_curve = None
@@ -168,6 +217,11 @@ async def get_visualization(
             "difficulty_match_rate": difficulty_match_rate,
             "knowledge_coverage_rate": knowledge_coverage_rate,
         },
+        learning_path_meta={
+            "total_estimated_hours": learning_path_data.get("total_estimated_hours", 0),
+            "current_stage": learning_path_data.get("current_stage", 1),
+            "recommended_order": learning_path_data.get("recommended_order", ""),
+        } if learning_path_data else None,
     )
 
 

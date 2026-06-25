@@ -44,3 +44,7 @@ Thumbs.db
 # Lock files
 pnpm-lock.yaml
 package-lock.json
+
+# Prototype & Origin (静态原型和独立前端，不纳入版本管理)
+prototype/
+origin/

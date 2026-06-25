@@ -31,5 +31,12 @@ def get_llm(provider: str | None = None, temperature: float = 0.7) -> ChatOpenAI
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             temperature=temperature,
         )
+    elif provider == "minimax":
+        return ChatOpenAI(
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY,
+            base_url="https://api.minimaxi.com/v1",
+            temperature=temperature,
+        )
     else:
         raise ValueError(f"不支持的 LLM 提供商: {provider}")

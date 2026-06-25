@@ -150,4 +150,5 @@ async def get_my_profile(
         blind_spots=blind_spots,
         overall_level=overall_level,
         recommended_difficulty=recommended_difficulty,
+        learning_path=learner.learning_path or None,
     )

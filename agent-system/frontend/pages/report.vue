@@ -15,6 +15,9 @@
       <UCard>
         <template #header>
           <h2 class="text-lg font-semibold">学习路径规划</h2>
+          <p v-if="learningPathMeta.total_estimated_hours" class="text-sm text-gray-500 mt-1">
+            总预估学时：{{ learningPathMeta.total_estimated_hours }} 小时
+          </p>
         </template>
         <div class="space-y-4">
           <div v-for="(step, index) in learningPath" :key="index" class="flex gap-4">
@@ -23,20 +26,35 @@
                 class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
                 :class="step.completed ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'"
               >
-                {{ index + 1 }}
+                {{ step.stage || index + 1 }}
               </div>
               <div v-if="index < learningPath.length - 1" class="w-0.5 h-full bg-gray-200 mt-1" />
             </div>
-            <div class="pb-4">
-              <p class="font-semibold" :class="step.completed ? 'text-green-700' : ''">
-                {{ step.title }}
+            <div class="pb-4 flex-1">
+              <div class="flex items-center gap-2">
+                <p class="font-semibold" :class="step.completed ? 'text-green-700' : ''">
+                  {{ step.title }}
+                </p>
+                <UBadge v-if="step.difficulty" variant="subtle" size="xs">
+                  {{ step.difficulty }}
+                </UBadge>
+                <UBadge v-if="step.completed" color="green" variant="subtle">
+                  已掌握
+                </UBadge>
+              </div>
+              <p v-if="step.topics?.length" class="text-sm text-gray-500 mt-1">
+                知识点：{{ step.topics.join('、') }}
               </p>
+              <div class="flex gap-3 mt-1 text-xs text-gray-400">
+                <span v-if="step.estimated_hours">⏱ {{ step.estimated_hours }} 小时</span>
+                <span v-if="step.prerequisites?.length">🔗 前置：{{ step.prerequisites.join('、') }}</span>
+                <span v-if="step.resources_type?.length">
+                  📚 {{ step.resources_type.map((t: string) => ({lecture:'讲义',guide:'实验',project:'项目',test:'试题'}[t] || t)).join('、') }}
+                </span>
+              </div>
               <p v-if="step.score !== undefined" class="text-sm text-gray-500 mt-1">
                 掌握度: {{ step.score.toFixed(0) }}分
               </p>
-              <UBadge v-if="step.completed" color="green" variant="subtle" class="mt-1">
-                已掌握
-              </UBadge>
             </div>
           </div>
         </div>
@@ -86,6 +104,11 @@ const matchCurveData = ref({
 })
 
 const learningPath = ref<any[]>([])
+const learningPathMeta = ref({
+  total_estimated_hours: 0,
+  current_stage: 1,
+  recommended_order: '',
+})
 
 const metrics = ref({
   hallucination_rate: null as number | null,
@@ -101,6 +124,9 @@ onMounted(async () => {
       // 学习路径
       if (viz.learning_path?.length) {
         learningPath.value = viz.learning_path
+      }
+      if (viz.learning_path_meta) {
+        learningPathMeta.value = viz.learning_path_meta
       }
 
       // 匹配曲线

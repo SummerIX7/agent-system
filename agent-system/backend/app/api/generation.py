@@ -88,6 +88,16 @@ async def generate_resources(
         # 所有资源都存入内存 store（包括 learning_path）
         add_resource(request.session_id, resource_data.model_dump())
 
+    # 将学习路径持久化到 Learner 表
+    learning_path_data = result.get("learning_path", {})
+    if learning_path_data and learner_id:
+        from app.models.learner import Learner as LearnerModel
+        stmt_lp = select(LearnerModel).where(LearnerModel.id == learner_id)
+        result_lp = await db.execute(stmt_lp)
+        learner_record = result_lp.scalar_one_or_none()
+        if learner_record:
+            learner_record.learning_path = learning_path_data
+
     await db.flush()
     return resources
 

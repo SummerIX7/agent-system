@@ -23,6 +23,7 @@ class Learner(Base):
     blind_spots = Column(JsonText, nullable=True, comment="知识盲区列表")
     overall_level = Column(String(20), nullable=True, comment="整体水平: beginner/intermediate/advanced/expert")
     recommended_difficulty = Column(String(20), nullable=True, comment="推荐难度: beginner/intermediate/advanced/expert")
+    learning_path = Column(JsonText, nullable=True, comment="学习路径 [{stage, title, topics, estimated_hours, difficulty, prerequisites, resources_type}]")
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

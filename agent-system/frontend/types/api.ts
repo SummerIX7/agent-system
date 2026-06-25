@@ -78,6 +78,11 @@ export interface VisualizationData {
     difficulty_match_rate: number | null
     knowledge_coverage_rate: number | null
   }
+  learning_path_meta?: {
+    total_estimated_hours: number
+    current_stage: number
+    recommended_order: string
+  } | null
 }
 
 // === Agent 状态 ===

@@ -46,6 +46,7 @@ class LearnerProfile(BaseModel):
     blind_spots: List[str] = []
     overall_level: str = "beginner"
     recommended_difficulty: str = "beginner"
+    learning_path: Optional[dict] = None
 
 
 # === 资源生成 ===
@@ -101,6 +102,7 @@ class VisualizationData(BaseModel):
     match_curve: Optional[dict] = None
     agent_logs: List[dict] = []
     metrics: Optional[dict] = None
+    learning_path_meta: Optional[dict] = None
 
 
 # === 学习路径 ===
