@@ -57,10 +57,38 @@
               <p class="font-semibold mb-1">{{ isCorrect ? '✅ 回答正确！' : '❌ 回答错误' }}</p>
               <p class="text-sm">{{ currentQuestion.explanation }}</p>
 
-              <!-- 苏格拉底式追问 -->
-              <div v-if="!isCorrect && heuristicQuestion" class="mt-3 p-3 bg-white rounded border">
-                <p class="text-sm font-medium text-blue-800">💡 思考一下：</p>
-                <p class="text-sm mt-1">{{ heuristicQuestion }}</p>
+              <!-- 苏格拉底式追问（多轮） -->
+              <div v-if="!isCorrect && (heuristicQuestion || revealAnswer)" class="mt-3 space-y-3">
+                <!-- 追问历史 -->
+                <div v-for="(h, idx) in socraticHistory" :key="idx" class="p-3 bg-white rounded border">
+                  <p class="text-sm font-medium text-blue-800">💡 第 {{ h.round }} 轮提示：</p>
+                  <p class="text-sm mt-1">{{ h.question }}</p>
+                  <p class="text-sm mt-1 text-gray-600">你的回答：{{ h.answer }}</p>
+                </div>
+
+                <!-- 当前追问 -->
+                <div v-if="heuristicQuestion && !revealAnswer" class="p-3 bg-white rounded border">
+                  <p class="text-sm font-medium text-blue-800">💡 第 {{ socraticRound }} 轮思考：</p>
+                  <p class="text-sm mt-1">{{ heuristicQuestion }}</p>
+
+                  <!-- 追问回答输入框 -->
+                  <div class="mt-3 flex gap-2">
+                    <UInput
+                      v-model="socraticInput"
+                      placeholder="输入你的思考..."
+                      class="flex-1"
+                      @keyup.enter="submitSocraticAnswer"
+                    />
+                    <UButton size="sm" @click="submitSocraticAnswer">提交</UButton>
+                  </div>
+                </div>
+
+                <!-- 揭示答案 -->
+                <div v-if="revealAnswer" class="p-3 bg-yellow-50 rounded border border-yellow-200">
+                  <p class="text-sm font-medium text-yellow-800">📌 正确答案：</p>
+                  <p class="text-sm mt-1 font-semibold">{{ currentQuestion.correctAnswer }}</p>
+                  <p class="text-sm mt-1 text-gray-600">{{ currentQuestion.explanation }}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -131,6 +159,12 @@ const showFeedback = ref(false)
 const isCorrect = ref(false)
 const heuristicQuestion = ref('')
 
+// === 多轮追问状态 ===
+const socraticRound = ref(1)
+const socraticHistory = ref<{round: number, question: string, answer: string}[]>([])
+const socraticInput = ref('')
+const revealAnswer = ref(false)
+
 // === 计算属性 ===
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const correctCount = computed(() => questions.value.filter(q => q.answered && q.selectedIndex === q.correctIndex).length)
@@ -146,11 +180,9 @@ const stripOptionPrefix = (option: string) => {
 /** 将后端 correct_answer 转为数字索引 */
 const resolveCorrectIndex = (q: any): number => {
   const answer = q.correct_answer || ''
-  // 如果是字母（A/B/C/D），转为索引
   if (/^[A-D]$/.test(answer)) {
     return answer.charCodeAt(0) - 65
   }
-  // 如果是选项文本，找匹配的索引（去掉前缀后比较）
   const stripped = answer.replace(/^[A-Da-d][.\s、]+/, '')
   const idx = q.options?.findIndex((opt: string) => {
     const optStripped = stripOptionPrefix(opt)
@@ -187,6 +219,55 @@ const fetchQuestions = async () => {
   }
 }
 
+// === 追问 API 调用 ===
+const fetchHeuristic = async (round: number, prevContext: string, optionIndex?: number) => {
+  try {
+    const result = await api.submitFeedback({
+      session_id: sessionId.value || 'demo',
+      topic: currentQuestion.value.topic || 'Python 数据分析',
+      question: currentQuestion.value.question,
+      user_answer: optionIndex !== undefined
+        ? String.fromCharCode(65 + optionIndex)
+        : socraticInput.value,
+      correct_answer: currentQuestion.value.correctAnswer,
+      round,
+      heuristic_context: prevContext,
+    })
+
+    socraticRound.value = round
+    revealAnswer.value = result.reveal_answer || false
+
+    if (result.heuristic_question) {
+      heuristicQuestion.value = result.heuristic_question
+    }
+
+    if (result.reveal_answer) {
+      heuristicQuestion.value = ''
+      answered.value = true
+    }
+  } catch {
+    heuristicQuestion.value = '试着从函数参数的角度思考一下。'
+  }
+}
+
+// === 追问回答提交 ===
+const submitSocraticAnswer = async () => {
+  if (!socraticInput.value.trim()) return
+
+  socraticHistory.value.push({
+    round: socraticRound.value,
+    question: heuristicQuestion.value,
+    answer: socraticInput.value,
+  })
+
+  const prevContext = socraticHistory.value
+    .map(h => `问：${h.question}\n答：${h.answer}`)
+    .join('\n')
+
+  socraticInput.value = ''
+  await fetchHeuristic(socraticRound.value + 1, prevContext)
+}
+
 // === 答题逻辑 ===
 const optionClass = (index: number) => {
   if (!showFeedback.value) {
@@ -207,23 +288,14 @@ const selectOption = async (index: number) => {
   if (answered.value) return
   currentQuestion.value.selectedIndex = index
   currentQuestion.value.answered = true
-  answered.value = true
-  showFeedback.value = true
   isCorrect.value = index === currentQuestion.value.correctIndex
 
   if (!isCorrect.value) {
-    try {
-      const result = await api.submitFeedback({
-        session_id: sessionId.value || 'demo',
-        topic: 'Python 数据分析',
-        question: currentQuestion.value.question,
-        user_answer: String.fromCharCode(65 + index),
-        correct_answer: currentQuestion.value.correctAnswer,
-      })
-      heuristicQuestion.value = result.heuristic_question || '试着从函数参数的角度思考一下。'
-    } catch {
-      heuristicQuestion.value = '试着从函数参数的角度思考一下。'
-    }
+    showFeedback.value = true
+    await fetchHeuristic(1, '', index)
+  } else {
+    showFeedback.value = true
+    answered.value = true
   }
 }
 
@@ -248,6 +320,11 @@ const resetState = () => {
   showFeedback.value = answered.value
   isCorrect.value = currentQuestion.value?.selectedIndex === currentQuestion.value?.correctIndex
   heuristicQuestion.value = ''
+  // 重置追问状态
+  socraticRound.value = 1
+  socraticHistory.value = []
+  socraticInput.value = ''
+  revealAnswer.value = false
 }
 
 // === 初始化 ===

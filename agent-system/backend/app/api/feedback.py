@@ -10,19 +10,38 @@ from app.core.store import add_feedback, get_session
 router = APIRouter(prefix="/api/feedback", tags=["交互反馈"])
 
 
-async def generate_heuristic_question(topic: str, question: str, correct_answer: str) -> str:
-    """生成苏格拉底式追问"""
+async def generate_heuristic_question(
+    topic: str,
+    question: str,
+    correct_answer: str,
+    round: int = 1,
+    previous_context: str = "",
+) -> str:
+    """生成苏格拉底式追问（支持多轮，逐层降级）"""
     llm = get_llm()
-    prompt = f"""基于以下题目，生成一个启发式追问，引导学习者自己思考出正确答案，而不是直接告诉答案。
+
+    if round == 1:
+        style = "通过提问引导学习者从不同角度思考，不要说出答案"
+    elif round == 2:
+        style = "用生活中的类比或比喻来启发学习者，让抽象概念变得具体，仍然不要直接说出答案"
+    else:
+        style = "直接给出提示线索，明确指出正确答案的关键原因"
+
+    context_part = ""
+    if previous_context:
+        context_part = f"\n[之前的追问] {previous_context}\n学习者仍然没有理解，请换一个角度。"
+
+    prompt = f"""基于以下题目，生成一个启发式追问（第 {round} 轮）。
 
 [主题] {topic}
 [题目] {question}
 [正确答案] {correct_answer}
+[追问风格] {style}
+{context_part}
 
 要求：
-1. 不要直接说出正确答案
-2. 通过提问引导学习者从不同角度思考
-3. 简洁明了，一句话即可
+1. 简洁明了，一到两句话
+2. 第 {round} 轮追问，难度逐轮降低
 
 只输出追问内容，不要其他文字。"""
 
@@ -35,26 +54,33 @@ async def submit_feedback(
     feedback: FeedbackInput,
     db: AsyncSession = Depends(get_db),
 ):
-    """提交答题反馈，触发动态调整"""
+    """提交答题反馈，支持多轮苏格拉底式追问"""
+    MAX_ROUNDS = 3
     is_correct = feedback.user_answer.strip().lower() == feedback.correct_answer.strip().lower()
     correctness = 1.0 if is_correct else 0.0
-
-    # 生成苏格拉底式追问（答错时）
+    current_round = feedback.round
+    reveal = False
     heuristic = None
-    if not is_correct:
-        try:
-            heuristic = await generate_heuristic_question(
-                feedback.topic, feedback.question, feedback.correct_answer
-            )
-        except Exception as e:
-            print(f"[警告] 启发式追问生成失败: {e}")
-            # 不影响主流程，heuristic 保持 None
 
-    # 获取 learner_id
+    if not is_correct:
+        if current_round >= MAX_ROUNDS:
+            reveal = True
+            heuristic = None
+        else:
+            try:
+                heuristic = await generate_heuristic_question(
+                    feedback.topic,
+                    feedback.question,
+                    feedback.correct_answer,
+                    round=current_round,
+                    previous_context=feedback.heuristic_context,
+                )
+            except Exception as e:
+                print(f"[警告] 启发式追问生成失败: {e}")
+
     session = get_session(feedback.session_id)
     learner_id = session.get("learner_id", "")
 
-    # 1. 写入 MySQL
     record = FeedbackRecord(
         session_id=feedback.session_id,
         learner_id=learner_id or "unknown",
@@ -68,7 +94,6 @@ async def submit_feedback(
     db.add(record)
     await db.flush()
 
-    # 2. 同时存入内存 store
     add_feedback(feedback.session_id, {
         "topic": feedback.topic,
         "question": feedback.question,
@@ -77,6 +102,7 @@ async def submit_feedback(
         "is_correct": is_correct,
         "correctness": correctness,
         "heuristic_question": heuristic,
+        "round": current_round,
     })
 
     return FeedbackResponse(
@@ -85,4 +111,6 @@ async def submit_feedback(
         heuristic_question=heuristic,
         topic=feedback.topic,
         correctness=correctness,
+        round=current_round,
+        reveal_answer=reveal,
     )

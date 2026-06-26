@@ -83,6 +83,8 @@ class FeedbackInput(BaseModel):
     question: str
     user_answer: str
     correct_answer: str
+    round: int = 1                    # 当前追问轮次（1=首次答错，2/3=追问轮）
+    heuristic_context: str = ""       # 之前的追问内容（用于上下文连贯）
 
 
 class FeedbackResponse(BaseModel):
@@ -91,6 +93,8 @@ class FeedbackResponse(BaseModel):
     heuristic_question: Optional[str] = None
     topic: str
     correctness: float
+    round: int = 1                    # 当前轮次
+    reveal_answer: bool = False       # 是否应展示正确答案（达到最大轮次时为 True）
 
 
 # === 可视化 ===
