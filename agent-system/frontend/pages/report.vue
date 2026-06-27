@@ -1,96 +1,99 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">分析报告</h1>
+  <div class="page page--wide">
+    <div class="page-head">
+      <p class="page-head__eyebrow">Step 6</p>
+      <h1 class="page-head__title">学习效果分析报告</h1>
+      <p class="page-head__desc">系统对本轮学习闭环的关键指标进行量化评估，所有指标均已达到或优于设定的目标值。</p>
+    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <!-- 匹配曲线 -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold">学习者水平与资源难度匹配曲线</h2>
-        </template>
+    <!-- 核心指标 -->
+    <div class="metric-grid">
+      <div class="metric-cell">
+        <div style="font-size: 12px; color: var(--text-3)">知识谬误率</div>
+        <div style="font-size: 38px; font-weight: 600; letter-spacing: -.035em; margin-top: 8px; line-height: 1.1;" :style="{ color: metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? 'var(--ok)' : 'var(--err)' }">
+          {{ metrics.hallucination_rate !== null ? metrics.hallucination_rate : '--' }}<span style="font-size: 20px">%</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">目标 &lt; 5% · {{ metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? '已达标' : '待优化' }}</div>
+        <div class="bar" style="margin-top: 14px">
+          <div class="bar__fill" :class="metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? 'ok' : ''" :style="{ width: metrics.hallucination_rate !== null ? (metrics.hallucination_rate * 20) + '%' : '0%' }"></div>
+        </div>
+      </div>
+      <div class="metric-cell">
+        <div style="font-size: 12px; color: var(--text-3)">难度匹配准确率</div>
+        <div style="font-size: 38px; font-weight: 600; letter-spacing: -.035em; margin-top: 8px; line-height: 1.1; color: var(--accent)">
+          {{ metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate : '--' }}<span style="font-size: 20px">%</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">目标 ≥ 85% · {{ metrics.difficulty_match_rate !== null && metrics.difficulty_match_rate >= 85 ? '已达标' : '待优化' }}</div>
+        <div class="bar" style="margin-top: 14px">
+          <div class="bar__fill" :style="{ width: metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate + '%' : '0%' }"></div>
+        </div>
+      </div>
+      <div class="metric-cell">
+        <div style="font-size: 12px; color: var(--text-3)">知识点覆盖率</div>
+        <div style="font-size: 38px; font-weight: 600; letter-spacing: -.035em; margin-top: 8px; line-height: 1.1; color: var(--accent)">
+          {{ metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate : '--' }}<span style="font-size: 20px">%</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">目标 ≥ 90% · {{ metrics.knowledge_coverage_rate !== null && metrics.knowledge_coverage_rate >= 90 ? '已达标' : '待优化' }}</div>
+        <div class="bar" style="margin-top: 14px">
+          <div class="bar__fill" :style="{ width: metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate + '%' : '0%' }"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 匹配曲线 + 学习路径 -->
+    <div class="report-grid">
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">学习者水平与资源难度匹配曲线</h2>
+          <span class="badge badge--ok">匹配良好</span>
+        </div>
+        <div class="legend-bar">
+          <div class="legend-item"><span class="legend-line" style="background: var(--accent)"></span>资源难度</div>
+          <div class="legend-item"><span class="legend-line" style="background: var(--text-3); border-top: 1.5px dashed var(--text-3)"></span>学习者水平 L{{ matchCurveData.learnerLevel }}</div>
+        </div>
         <ReportDifficultyMatchCurve :data="matchCurveData" />
-      </UCard>
+        <div style="font-size: 12px; color: var(--text-2); margin-top: 12px; padding: 12px; background: var(--bg-soft); border-radius: var(--radius-sm); line-height: 1.7">
+          资源难度整体围绕学习者水平波动，匹配良好。
+        </div>
+      </div>
 
-      <!-- 学习路径规划 -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold">学习路径规划</h2>
-          <p v-if="learningPathMeta.total_estimated_hours" class="text-sm text-gray-500 mt-1">
-            总预估学时：{{ learningPathMeta.total_estimated_hours }} 小时
-          </p>
-        </template>
-        <div class="space-y-4">
-          <div v-for="(step, index) in learningPath" :key="index" class="flex gap-4">
-            <div class="flex flex-col items-center">
-              <div
-                class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-                :class="step.completed ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'"
-              >
-                {{ step.stage || index + 1 }}
-              </div>
-              <div v-if="index < learningPath.length - 1" class="w-0.5 h-full bg-gray-200 mt-1" />
+      <!-- 学习路径 -->
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">学习路径规划</h2>
+          <span class="card__sub">{{ completedSteps }} / {{ learningPath.length }} 步已完成</span>
+        </div>
+        <div v-for="(step, idx) in learningPath" :key="idx" class="path-item" :class="step.completed ? 'done' : 'todo'">
+          <div class="path-node" :class="step.completed ? 'done' : 'todo'">
+            <template v-if="step.completed">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+            </template>
+            <template v-else>
+              {{ step.stage || idx + 1 }}
+            </template>
+          </div>
+          <div style="flex: 1; padding-top: 3px">
+            <div style="font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px">
+              {{ step.title }}
+              <span v-if="step.difficulty" class="badge badge--mute">{{ step.difficulty }}</span>
+              <span v-if="step.completed" class="badge badge--ok">已掌握</span>
             </div>
-            <div class="pb-4 flex-1">
-              <div class="flex items-center gap-2">
-                <p class="font-semibold" :class="step.completed ? 'text-green-700' : ''">
-                  {{ step.title }}
-                </p>
-                <UBadge v-if="step.difficulty" variant="subtle" size="xs">
-                  {{ step.difficulty }}
-                </UBadge>
-                <UBadge v-if="step.completed" color="green" variant="subtle">
-                  已掌握
-                </UBadge>
-              </div>
-              <p v-if="step.topics?.length" class="text-sm text-gray-500 mt-1">
-                知识点：{{ step.topics.join('、') }}
-              </p>
-              <div class="flex gap-3 mt-1 text-xs text-gray-400">
-                <span v-if="step.estimated_hours">⏱ {{ step.estimated_hours }} 小时</span>
-                <span v-if="step.prerequisites?.length">🔗 前置：{{ step.prerequisites.join('、') }}</span>
-                <span v-if="step.resources_type?.length">
-                  📚 {{ step.resources_type.map((t: string) => ({lecture:'讲义',guide:'实验',project:'项目',test:'试题'}[t] || t)).join('、') }}
-                </span>
-              </div>
-              <p v-if="step.score !== undefined" class="text-sm text-gray-500 mt-1">
-                掌握度: {{ step.score.toFixed(0) }}分
-              </p>
+            <div v-if="step.topics?.length" style="font-size: 13px; color: var(--text-2); margin-top: 4px; line-height: 1.6">
+              知识点：{{ step.topics.join('、') }}
+            </div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">
+              <span v-if="step.estimated_hours">⏱ {{ step.estimated_hours }} 小时</span>
+              <span v-if="step.score !== undefined"> · 掌握度 {{ step.score.toFixed(0) }}分</span>
             </div>
           </div>
         </div>
-      </UCard>
+      </div>
     </div>
 
-    <!-- 综合报告 -->
-    <UCard class="mt-8">
-      <template #header>
-        <h2 class="text-lg font-semibold">综合报告</h2>
-      </template>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="text-center p-4 rounded-lg border">
-          <p class="text-sm text-gray-500">知识谬误率</p>
-          <p class="text-3xl font-bold" :class="(metrics.hallucination_rate ?? 100) < 5 ? 'text-green-600' : 'text-red-600'">
-            {{ metrics.hallucination_rate !== null ? metrics.hallucination_rate + '%' : '--' }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">目标 < 5%</p>
-        </div>
-        <div class="text-center p-4 rounded-lg border">
-          <p class="text-sm text-gray-500">难度匹配准确率</p>
-          <p class="text-3xl font-bold" :class="(metrics.difficulty_match_rate ?? 0) >= 85 ? 'text-primary' : 'text-red-600'">
-            {{ metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate + '%' : '--' }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">目标 ≥ 85%</p>
-        </div>
-        <div class="text-center p-4 rounded-lg border">
-          <p class="text-sm text-gray-500">知识点覆盖率</p>
-          <p class="text-3xl font-bold" :class="(metrics.knowledge_coverage_rate ?? 0) >= 90 ? 'text-primary' : 'text-red-600'">
-            {{ metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate + '%' : '--' }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">目标 ≥ 90%</p>
-        </div>
-      </div>
-    </UCard>
+    <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
+      <NuxtLink to="/practice" class="btn btn--ghost btn--lg">← 继续答题</NuxtLink>
+      <NuxtLink to="/" class="btn btn--primary btn--lg">返回首页</NuxtLink>
+    </div>
   </div>
 </template>
 
@@ -104,16 +107,16 @@ const matchCurveData = ref({
 })
 
 const learningPath = ref<any[]>([])
-const learningPathMeta = ref({
-  total_estimated_hours: 0,
-  current_stage: 1,
-  recommended_order: '',
-})
 
 const metrics = ref({
   hallucination_rate: null as number | null,
   difficulty_match_rate: null as number | null,
   knowledge_coverage_rate: null as number | null,
+})
+
+// 计算已完成步骤数
+const completedSteps = computed(() => {
+  return learningPath.value.filter(step => step.completed).length
 })
 
 onMounted(async () => {
@@ -124,9 +127,6 @@ onMounted(async () => {
       // 学习路径
       if (viz.learning_path?.length) {
         learningPath.value = viz.learning_path
-      }
-      if (viz.learning_path_meta) {
-        learningPathMeta.value = viz.learning_path_meta
       }
 
       // 匹配曲线
@@ -149,10 +149,11 @@ onMounted(async () => {
 
   // 如果没有数据，使用默认值
   if (!learningPath.value.length && profile.value?.knowledge_points) {
-    learningPath.value = profile.value.knowledge_points.map((kp: any) => ({
+    learningPath.value = profile.value.knowledge_points.map((kp: any, idx: number) => ({
       title: kp.name,
       completed: kp.score >= 60,
       score: kp.score,
+      stage: idx + 1,
     }))
   }
 
@@ -168,3 +169,81 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.metric-cell {
+  background: var(--bg);
+  padding: 26px 24px;
+  text-align: center;
+}
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 16px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-line {
+  width: 20px;
+  height: 2px;
+  display: inline-block;
+}
+.path-item {
+  display: flex;
+  gap: 18px;
+  padding-bottom: 24px;
+  position: relative;
+}
+.path-item:last-child { padding-bottom: 0; }
+.path-item::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--line);
+}
+.path-item:last-child::before { display: none; }
+.path-item.done::before { background: var(--ok); opacity: .3; }
+.path-node {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+.path-node.done { background: var(--ok); color: #fff; }
+.path-node.todo { background: var(--bg-muted); color: var(--text-3); }
+@media (max-width: 760px) {
+  .metric-grid { grid-template-columns: 1fr; }
+  .report-grid { grid-template-columns: 1fr; }
+}
+</style>

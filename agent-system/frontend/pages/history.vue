@@ -1,46 +1,46 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">历史记录</h1>
+  <div class="page page--wide">
+    <div class="page-head">
+      <p class="page-head__eyebrow">历史记录</p>
+      <h1 class="page-head__title">学习历程与画像演变</h1>
+      <p class="page-head__desc">查看您的学习历史和画像变化轨迹。</p>
+    </div>
 
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">学习历程与画像演变</h2>
-      </template>
-
+    <div class="card">
       <div v-if="loading" class="text-center py-8">
-        <UIcon name="i-heroicons-arrow-path" class="w-6 h-6 animate-spin text-primary mx-auto" />
-        <p class="mt-2 text-gray-500">加载中...</p>
+        <div class="animate-spin" style="width: 24px; height: 24px; margin: 0 auto; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%;"></div>
+        <p class="mt-4 text-text-2">加载中...</p>
       </div>
 
-      <div v-else-if="historyRecords.length === 0" class="text-center py-8 text-gray-500">
+      <div v-else-if="historyRecords.length === 0" class="text-center py-8 text-text-3">
         暂无学习记录
       </div>
 
-      <div v-else class="space-y-6">
+      <div v-else class="history-list">
         <div
           v-for="(record, index) in historyRecords"
           :key="index"
-          class="flex gap-4 p-4 rounded-lg border hover:bg-gray-50 transition-colors"
+          class="history-item"
         >
-          <div class="flex flex-col items-center">
-            <div class="w-3 h-3 rounded-full bg-primary mt-1" />
-            <div v-if="index < historyRecords.length - 1" class="w-0.5 h-full bg-gray-200 mt-1" />
+          <div class="history-dot">
+            <div class="history-dot__circle"></div>
+            <div v-if="index < historyRecords.length - 1" class="history-dot__line"></div>
           </div>
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <p class="font-semibold">{{ record.title }}</p>
-              <span class="text-sm text-gray-400">{{ record.date }}</span>
+          <div class="history-content">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <p style="font-weight: 600;">{{ record.title }}</p>
+              <span class="text-text-3 text-xs">{{ record.date }}</span>
             </div>
-            <p class="text-sm text-gray-500 mt-1">{{ record.description }}</p>
-            <div class="flex gap-2 mt-2">
-              <UBadge v-for="tag in record.tags" :key="tag" variant="subtle" size="sm">
+            <p class="text-text-2 text-sm mt-1">{{ record.description }}</p>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <span v-for="tag in record.tags" :key="tag" class="badge badge--mute">
                 {{ tag }}
-              </UBadge>
+              </span>
             </div>
           </div>
         </div>
       </div>
-    </UCard>
+    </div>
   </div>
 </template>
 
@@ -76,3 +76,56 @@ onMounted(async () => {
   loading.value = false
 })
 </script>
+
+<style scoped>
+.history-list {
+  display: flex;
+  flex-direction: column;
+}
+.history-item {
+  display: flex;
+  gap: 18px;
+  padding: 18px 0;
+}
+.history-item:first-child {
+  padding-top: 0;
+}
+.history-item:last-child {
+  padding-bottom: 0;
+}
+.history-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.history-dot__circle {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.history-dot__line {
+  width: 2px;
+  flex: 1;
+  background: var(--line);
+  margin-top: 4px;
+}
+.history-content {
+  flex: 1;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.history-item:last-child .history-content {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>

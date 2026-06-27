@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/api/auth", tags=["用户认证"])
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    email: str = None
+    email: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -38,7 +40,7 @@ class TokenResponse(BaseModel):
 class UserInfo(BaseModel):
     id: int
     username: str
-    email: str = None
+    email: Optional[str] = None
 
 
 # ========== 注册 ==========

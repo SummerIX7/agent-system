@@ -1,92 +1,88 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">学习者画像输入</h1>
+  <div class="page">
+    <div class="page-head">
+      <p class="page-head__eyebrow">Step 1</p>
+      <h1 class="page-head__title">学习者画像</h1>
+      <p class="page-head__desc">请填写您的学习背景和目标，以便系统为您生成个性化学习资源。画像越准确，学情诊断与资源生成就越贴合您的实际水平。</p>
+    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <!-- 基本信息表单 -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold">基本信息</h2>
-        </template>
-
-        <UForm :state="formState" class="space-y-4">
-          <UFormGroup label="学历背景" name="education_background">
-            <USelect
-              v-model="formState.education_background"
-              :options="['高中', '大专', '本科', '硕士', '博士']"
-              placeholder="请选择学历背景"
-            />
-          </UFormGroup>
-
-          <UFormGroup label="专业方向" name="major">
-            <UInput v-model="formState.major" placeholder="如：机械工程、数控技术、模具设计" />
-          </UFormGroup>
-
-          <UFormGroup label="工作经验（年）" name="work_experience_years">
-            <UInput
-              v-model="formState.work_experience_years"
-              type="number"
-              placeholder="0"
-            />
-          </UFormGroup>
-
-          <UFormGroup label="学习风格" name="learning_style">
-            <USelect
-              v-model="formState.learning_style"
-              :options="[
-                { label: '视觉型', value: 'visual' },
-                { label: '理论型', value: 'theory' },
-                { label: '实践型', value: 'practice' },
-              ]"
-              option-attribute="label"
-              value-attribute="value"
-              placeholder="请选择学习风格"
-            />
-          </UFormGroup>
-        </UForm>
-      </UCard>
-
-      <!-- 自评表单 -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold">技能自评</h2>
-        </template>
-
-        <div class="space-y-4">
-          <div v-for="skill in skillOptions" :key="skill" class="flex items-center justify-between">
-            <span class="text-sm font-medium">{{ skill }}</span>
-            <USelect
-              v-model="formState.self_assessment[skill]"
-              :options="['不了解', '了解基础', '熟练', '精通']"
-              class="w-40"
-            />
-          </div>
+    <div class="profile-grid">
+      <!-- 基本信息 -->
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">基本信息</h2>
         </div>
-      </UCard>
+
+        <div class="field">
+          <label class="field__label">学历背景 <span style="color: var(--err)">*</span></label>
+          <select v-model="formState.education_background" class="select">
+            <option value="">请选择</option>
+            <option value="高中">高中</option>
+            <option value="大专">大专</option>
+            <option value="本科">本科</option>
+            <option value="硕士">硕士</option>
+            <option value="博士">博士</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field__label">专业方向 <span style="color: var(--err)">*</span></label>
+          <input v-model="formState.major" class="input" placeholder="如：机械工程、数控技术、模具设计">
+        </div>
+
+        <div class="field">
+          <label class="field__label">工作经验（年）</label>
+          <input v-model.number="formState.work_experience_years" class="input" type="number" placeholder="0">
+        </div>
+
+        <div class="field" style="margin-bottom: 0">
+          <label class="field__label">学习风格</label>
+          <select v-model="formState.learning_style" class="select">
+            <option value="">请选择</option>
+            <option value="visual">视觉型</option>
+            <option value="theory">理论型</option>
+            <option value="practice">实践型</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 技能自评 -->
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">技能自评</h2>
+          <span class="card__sub">如实评估，系统将据此定位盲区</span>
+        </div>
+        <div v-for="skill in skillOptions" :key="skill" class="skill-row">
+          <div>
+            <div style="font-size: 13.5px; font-weight: 500">{{ skill }}</div>
+          </div>
+          <select v-model="formState.self_assessment[skill]" class="select" style="width: 130px; padding: 7px 10px; font-size: 13px">
+            <option value="">请选择</option>
+            <option value="不了解">不了解</option>
+            <option value="了解基础">了解基础</option>
+            <option value="熟练">熟练</option>
+            <option value="精通">精通</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <!-- 学习目标 -->
-    <UCard class="mt-8">
-      <template #header>
-        <h2 class="text-lg font-semibold">学习目标</h2>
-      </template>
-
-      <div class="space-y-3">
-        <div v-for="(goal, index) in formState.goals" :key="index" class="flex gap-2">
-          <UInput v-model="formState.goals[index]" placeholder="请输入学习目标" class="flex-1" />
-          <UButton color="red" variant="ghost" icon="i-heroicons-trash" @click="removeGoal(index)" />
-        </div>
-        <UButton variant="ghost" icon="i-heroicons-plus" @click="addGoal">
-          添加目标
-        </UButton>
+    <div class="card" style="margin-top: 24px">
+      <div class="card__head">
+        <h2 class="card__title">学习目标</h2>
+        <button class="btn btn--text btn--sm" @click="addGoal">+ 添加目标</button>
       </div>
-    </UCard>
+      <div v-for="(goal, idx) in formState.goals" :key="idx" class="goal-row">
+        <input v-model="formState.goals[idx]" class="input" style="flex: 1" placeholder="请输入学习目标">
+        <button class="btn btn--ghost btn--sm" @click="removeGoal(idx)">删除</button>
+      </div>
+    </div>
 
-    <!-- 提交按钮 -->
-    <div class="mt-8 text-center">
-      <UButton size="lg" :loading="loading" @click="submitProfile">
-        {{ profileLoaded ? '更新画像，重新诊断' : '提交画像，开始诊断' }}
-      </UButton>
+    <div style="text-align: center; margin-top: 32px">
+      <button class="btn btn--primary btn--lg" :disabled="loading" @click="submitProfile">
+        {{ profileLoaded ? '更新画像，重新诊断' : '提交画像，开始诊断' }} →
+      </button>
     </div>
   </div>
 </template>
@@ -182,6 +178,7 @@ const submitProfile = async () => {
     setSession(result.session_id || `user-${result.id}`, String(result.id))
     setProfile(result)
 
+    toast.add({ title: '画像已提交，正在启动学情诊断...', color: 'primary' })
     router.push('/dashboard')
   } catch (err: any) {
     console.error('提交失败:', err)
@@ -195,3 +192,29 @@ const submitProfile = async () => {
   }
 }
 </script>
+
+<style scoped>
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.skill-row:last-child {
+  border-bottom: none;
+}
+.goal-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+@media (max-width: 760px) {
+  .profile-grid { grid-template-columns: 1fr; }
+}
+</style>

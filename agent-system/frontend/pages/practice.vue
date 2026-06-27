@@ -1,134 +1,130 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">反馈交互</h1>
+  <div class="page page--wide">
+    <div class="page-head">
+      <p class="page-head__eyebrow">Step 5</p>
+      <h1 class="page-head__title">分阶试题 · 答题反馈</h1>
+      <p class="page-head__desc">答题正确直接进入下一题；答错时系统会通过苏格拉底式追问引导你思考，并将反馈用于动态调整学习路径。</p>
+    </div>
 
     <!-- 加载中 -->
     <div v-if="loading" class="flex flex-col items-center justify-center py-20">
-      <UIcon name="i-heroicons-arrow-path" class="w-12 h-12 text-primary animate-spin mb-4" />
-      <p class="text-gray-500">正在生成试题，请稍候...</p>
+      <div class="animate-spin" style="width: 48px; height: 48px; border: 4px solid var(--line); border-top-color: var(--accent); border-radius: 50%;"></div>
+      <p class="mt-4 text-text-2">正在生成试题，请稍候...</p>
     </div>
 
     <!-- 加载失败 -->
     <div v-else-if="loadError" class="flex flex-col items-center justify-center py-20">
-      <UIcon name="i-heroicons-exclamation-triangle" class="w-12 h-12 text-red-400 mb-4" />
-      <p class="text-red-500 mb-4">{{ loadError }}</p>
-      <UButton @click="fetchQuestions">重新加载</UButton>
+      <p class="text-err mb-4">{{ loadError }}</p>
+      <button class="btn btn--primary" @click="fetchQuestions">重新加载</button>
     </div>
 
     <!-- 无试题 -->
     <div v-else-if="questions.length === 0" class="flex flex-col items-center justify-center py-20">
-      <UIcon name="i-heroicons-document-text" class="w-12 h-12 text-gray-300 mb-4" />
-      <p class="text-gray-500 mb-4">暂无试题</p>
-      <UButton @click="fetchQuestions">生成试题</UButton>
+      <p class="text-text-3 mb-4">暂无试题</p>
+      <button class="btn btn--primary" @click="fetchQuestions">生成试题</button>
     </div>
 
     <!-- 答题区域 -->
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- 答题区域 -->
-      <div class="lg:col-span-2">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">当前题目</h2>
-              <UBadge>第 {{ currentIndex + 1 }} / {{ questions.length }} 题</UBadge>
+    <div v-else class="quiz-grid">
+      <!-- 答题区 -->
+      <div class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-family: var(--mono); font-size: 12px; color: var(--text-3)">第 {{ currentIndex + 1 }} / {{ questions.length }} 题</span>
+          <span class="badge badge--accent">{{ currentQuestion.question_type === 'multiple_choice' ? '选择题' : currentQuestion.question_type === 'true_false' ? '判断题' : '实操题' }}</span>
+        </div>
+
+        <div style="font-size: 18px; font-weight: 600; line-height: 1.5; margin: 18px 0 24px; letter-spacing: -.01em">
+          {{ currentQuestion.question }}
+        </div>
+
+        <div
+          v-for="(opt, idx) in currentQuestion.options"
+          :key="idx"
+          class="opt-big"
+          :class="optionClass(idx)"
+          @click="selectOption(idx)"
+        >
+          <div class="opt-big__key" :class="optionClass(idx)">{{ String.fromCharCode(65 + idx) }}</div>
+          <div style="font-size: 14px">{{ stripOptionPrefix(opt) }}</div>
+        </div>
+
+        <!-- 反馈区 -->
+        <div v-if="showFeedback" class="feedback-box" :class="isCorrect ? 'ok' : 'err'">
+          <div style="font-weight: 600; margin-bottom: 6px">{{ isCorrect ? '回答正确！' : '回答错误' }}</div>
+
+          <!-- 答对 或 追问耗尽时显示解析 -->
+          <div v-if="answered">{{ currentQuestion.explanation }}</div>
+
+          <!-- 苏格拉底式追问提示 -->
+          <div v-if="!isCorrect && !answered" class="socratic-box">
+            <div v-for="(h, idx) in socraticHistory" :key="idx" style="padding: 10px 0" :style="{ borderBottom: idx < socraticHistory.length - 1 ? '1px solid var(--line)' : 'none' }">
+              <div style="font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px">💡 提示（第 {{ h.round }} 轮）：</div>
+              <div>{{ h.hint }}</div>
             </div>
-          </template>
-
-          <div class="space-y-6">
-            <p class="text-lg">{{ currentQuestion.question }}</p>
-
-            <div class="space-y-3">
-              <div
-                v-for="(option, index) in currentQuestion.options"
-                :key="index"
-                class="flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all"
-                :class="optionClass(index)"
-                @click="selectOption(index)"
-              >
-                <span class="w-8 h-8 flex items-center justify-center rounded-full border font-medium">
-                  {{ String.fromCharCode(65 + index) }}
-                </span>
-                <span>{{ stripOptionPrefix(option) }}</span>
-              </div>
+            <div v-if="socraticLoading" class="flex items-center gap-2 text-sm text-text-3 mt-2">
+              <div class="animate-spin" style="width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%;"></div>
+              正在生成提示...
             </div>
-
-            <!-- 反馈区域 -->
-            <div v-if="showFeedback" class="p-4 rounded-lg" :class="feedbackClass">
-              <p class="font-semibold mb-1">{{ isCorrect ? '✅ 回答正确！' : '❌ 回答错误' }}</p>
-
-              <!-- 答对 或 追问耗尽时显示解析 -->
-              <p v-if="answered" class="text-sm">{{ currentQuestion.explanation }}</p>
-
-              <!-- 苏格拉底式追问提示 -->
-              <div v-if="!isCorrect && !answered" class="mt-3 space-y-2">
-                <div v-for="(h, idx) in socraticHistory" :key="idx"
-                     class="p-3 bg-white rounded border"
-                     :class="idx === socraticHistory.length - 1 ? 'border-blue-300' : ''">
-                  <p class="text-sm font-medium text-blue-800">💡 提示（第 {{ h.round }} 轮）：</p>
-                  <p class="text-sm mt-1">{{ h.hint }}</p>
-                </div>
-                <div v-if="socraticLoading" class="flex items-center gap-2 text-sm text-gray-500">
-                  <UIcon name="i-heroicons-arrow-path" class="w-4 h-4 animate-spin" />
-                  正在生成提示...
-                </div>
-                <p class="text-sm text-primary font-medium mt-2">
-                  👆 请阅读提示后，重新选择一个答案
-                </p>
-              </div>
-
-              <!-- 揭示答案（追问耗尽） -->
-              <div v-if="revealAnswer" class="mt-3 p-3 bg-yellow-50 rounded border border-yellow-200">
-                <p class="text-sm font-medium text-yellow-800">📌 正确答案：{{ currentQuestion.correctAnswer }}</p>
-                <p class="text-sm mt-1 text-gray-600">{{ currentQuestion.explanation }}</p>
-              </div>
-            </div>
+            <p class="text-sm text-accent font-medium mt-2">
+              👆 请阅读提示后，重新选择一个答案
+            </p>
           </div>
 
-          <template #footer>
-            <div class="flex justify-between">
-              <UButton variant="ghost" :disabled="currentIndex === 0" @click="prevQuestion">
-                上一题
-              </UButton>
-              <UButton :disabled="!answered" @click="nextQuestion">
-                {{ currentIndex === questions.length - 1 ? '查看报告' : '下一题' }}
-              </UButton>
-            </div>
-          </template>
-        </UCard>
+          <!-- 揭示答案（追问耗尽） -->
+          <div v-if="revealAnswer" style="margin-top: 12px; padding: 12px; background: var(--warn-soft); border-radius: var(--radius-sm); border: 1px solid #FDE68A;">
+            <p class="text-sm font-medium" style="color: var(--warn)">📌 正确答案：{{ currentQuestion.correctAnswer }}</p>
+            <p class="text-sm mt-1 text-text-2">{{ currentQuestion.explanation }}</p>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line)">
+          <button class="btn btn--ghost" :disabled="currentIndex === 0" @click="prevQuestion">← 上一题</button>
+          <button class="btn btn--primary" :disabled="!answered" @click="nextQuestion">
+            {{ currentIndex === questions.length - 1 ? '查看报告' : '下一题 →' }}
+          </button>
+        </div>
       </div>
 
-      <!-- 答题统计 -->
+      <!-- 统计区 -->
       <div>
-        <UCard>
-          <template #header>
-            <h2 class="text-lg font-semibold">答题统计</h2>
-          </template>
-
-          <div class="space-y-4">
-            <div class="text-center">
-              <p class="text-3xl font-bold text-primary">{{ correctCount }}/{{ questions.length }}</p>
-              <p class="text-sm text-gray-500">正确率 {{ questions.length ? (correctCount / questions.length * 100).toFixed(0) : 0 }}%</p>
+        <div class="card" style="margin-bottom: 24px">
+          <div class="card__head"><div class="card__title">答题统计</div></div>
+          <div style="text-align: center; padding: 8px 0">
+            <div style="font-size: 36px; font-weight: 600; letter-spacing: -.03em; color: var(--accent)">
+              {{ correctCount }}<span style="font-size: 18px; color: var(--text-3)">/{{ questions.length }}</span>
             </div>
-
-            <UProgress :value="questions.length ? (correctCount / questions.length) * 100 : 0" color="green" />
-
-            <div class="grid grid-cols-2 gap-2 text-center text-sm">
-              <div class="p-2 rounded bg-green-50">
-                <p class="font-bold text-green-700">{{ correctCount }}</p>
-                <p class="text-green-600">正确</p>
-              </div>
-              <div class="p-2 rounded bg-red-50">
-                <p class="font-bold text-red-700">{{ wrongCount }}</p>
-                <p class="text-red-600">错误</p>
-              </div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">
+              正确率 {{ questions.length ? (correctCount / questions.length * 100).toFixed(0) : 0 }}%
             </div>
-
-            <!-- 重新生成按钮 -->
-            <UButton block variant="outline" @click="fetchQuestions" :loading="loading">
-              重新生成试题
-            </UButton>
           </div>
-        </UCard>
+          <div class="bar" style="margin-top: 16px">
+            <div class="bar__fill ok" :style="{ width: questions.length ? (correctCount / questions.length * 100) + '%' : '0%' }"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px">
+            <div class="mini-stat ok">
+              <span style="font-size: 13px; color: var(--ok)">正确</span>
+              <span style="font-size: 20px; font-weight: 600; font-family: var(--mono); color: var(--ok)">{{ correctCount }}</span>
+            </div>
+            <div class="mini-stat err">
+              <span style="font-size: 13px; color: var(--err)">错误</span>
+              <span style="font-size: 20px; font-weight: 600; font-family: var(--mono); color: var(--err)">{{ wrongCount }}</span>
+            </div>
+          </div>
+          <!-- 重新生成按钮 -->
+          <button class="btn btn--ghost" style="width: 100%; margin-top: 16px;" @click="fetchQuestions">
+            重新生成试题
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card__head"><div class="card__title">动态调整记录</div></div>
+          <div style="font-size: 13px; color: var(--text-2); line-height: 1.8">
+            <div v-for="(record, idx) in adjustRecords" :key="idx" style="padding: 10px 0" :style="{ borderBottom: idx < adjustRecords.length - 1 ? '1px solid var(--line)' : 'none' }">
+              <span class="badge" :class="record.badgeClass">{{ record.label }}</span>
+              {{ record.text }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -145,13 +141,12 @@ const loading = ref(true)
 const loadError = ref('')
 const questions = ref<any[]>([])
 const currentIndex = ref(0)
-const answered = ref(false)         // true = 本题最终锁定（答对 或 追问耗尽）
+const answered = ref(false)
 const showFeedback = ref(false)
 const isCorrect = ref(false)
-const heuristicQuestion = ref('')
 
 // === 多轮追问状态 ===
-const socraticRound = ref(0)        // 0 = 还没触发追问，1/2/3 = 追问轮次
+const socraticRound = ref(0)
 const socraticHistory = ref<{round: number, hint: string}[]>([])
 const revealAnswer = ref(false)
 const socraticLoading = ref(false)
@@ -161,19 +156,34 @@ const currentQuestion = computed(() => questions.value[currentIndex.value])
 const correctCount = computed(() => questions.value.filter(q => q.finalCorrect === true).length)
 const wrongCount = computed(() => questions.value.filter(q => q.answered && q.finalCorrect === false).length)
 
-// 是否处于追问状态（答错了但还没锁定）
-const inSocraticMode = computed(() =>
-  showFeedback.value && !isCorrect.value && !revealAnswer.value
-)
+// 动态调整记录
+const adjustRecords = computed(() => {
+  const records: {label: string, badgeClass: string, text: string}[] = []
+  questions.value.forEach((q, idx) => {
+    if (q.answered) {
+      if (q.finalCorrect) {
+        records.push({
+          label: `第 ${idx + 1} 题`,
+          badgeClass: 'badge--ok',
+          text: '答对 → 维持当前难度',
+        })
+      } else {
+        records.push({
+          label: `第 ${idx + 1} 题`,
+          badgeClass: 'badge--warn',
+          text: '答错 → 触发苏格拉底追问，推荐复习',
+        })
+      }
+    }
+  })
+  return records
+})
 
 // === 辅助函数 ===
-
-/** 去掉选项前面的 A. B. C. D. 前缀 */
 const stripOptionPrefix = (option: string) => {
   return option.replace(/^[A-Da-d][.\s、]+/, '')
 }
 
-/** 将后端 correct_answer 转为数字索引 */
 const resolveCorrectIndex = (q: any): number => {
   const answer = q.correct_answer || ''
   if (/^[A-D]$/.test(answer)) {
@@ -203,7 +213,7 @@ const fetchQuestions = async () => {
       correctIndex: resolveCorrectIndex(q),
       selectedIndex: -1,
       answered: false,
-      finalCorrect: null,   // null=未作答, true=最终答对, false=最终答错
+      finalCorrect: null,
       correctAnswer: q.correct_answer || '',
     }))
     currentIndex.value = 0
@@ -234,23 +244,17 @@ const fetchHeuristic = async (round: number, optionIndex: number) => {
     revealAnswer.value = result.reveal_answer || false
 
     if (result.heuristic_question) {
-      heuristicQuestion.value = result.heuristic_question
       socraticHistory.value.push({ round, hint: result.heuristic_question })
     }
 
     if (result.reveal_answer) {
-      // 追问耗尽，揭示答案，锁定本题
-      heuristicQuestion.value = ''
       lockQuestion(false)
     }
   } catch (err) {
     console.error('追问 API 失败:', err)
-    // API 失败时也给一个通用提示，不要卡死
     const fallbackHint = `提示：正确答案是 ${currentQuestion.value.correctAnswer}，看看解析吧。`
-    heuristicQuestion.value = fallbackHint
     socraticHistory.value.push({ round, hint: fallbackHint })
     socraticRound.value = round
-    // API 失败也揭示答案
     revealAnswer.value = true
     lockQuestion(false)
   } finally {
@@ -258,7 +262,7 @@ const fetchHeuristic = async (round: number, optionIndex: number) => {
   }
 }
 
-// === 锁定本题（答对或追问耗尽） ===
+// === 锁定本题 ===
 const lockQuestion = (correct: boolean) => {
   answered.value = true
   currentQuestion.value.answered = true
@@ -269,9 +273,7 @@ const lockQuestion = (correct: boolean) => {
 
 // === 选项点击 ===
 const selectOption = async (index: number) => {
-  // 已锁定的题不可再选
   if (answered.value) return
-  // 追问加载中不可选
   if (socraticLoading.value) return
 
   const correct = index === currentQuestion.value.correctIndex
@@ -280,10 +282,8 @@ const selectOption = async (index: number) => {
   isCorrect.value = correct
 
   if (correct) {
-    // 答对了，锁定
     lockQuestion(true)
   } else {
-    // 答错了，发起追问
     const nextRound = socraticRound.value + 1
     await fetchHeuristic(nextRound, index)
   }
@@ -291,25 +291,18 @@ const selectOption = async (index: number) => {
 
 // === 选项样式 ===
 const optionClass = (index: number) => {
-  // 锁定后：显示最终结果
   if (answered.value) {
-    if (index === currentQuestion.value.correctIndex) return 'border-green-400 bg-green-50'
-    if (index === currentQuestion.value.selectedIndex && !isCorrect.value) return 'border-red-400 bg-red-50'
-    return 'border-gray-200 opacity-60'
+    if (index === currentQuestion.value.correctIndex) return 'correct'
+    if (index === currentQuestion.value.selectedIndex && !isCorrect.value) return 'wrong'
+    return ''
   }
-  // 追问中：高亮当前选中的（用户可以重新选）
-  if (showFeedback.value && inSocraticMode.value) {
-    if (index === currentQuestion.value.selectedIndex) return 'border-red-400 bg-red-50'
-    return 'border-gray-200 hover:border-primary hover:bg-primary/5 cursor-pointer'
+  if (showFeedback.value && !isCorrect.value && !revealAnswer.value) {
+    if (index === currentQuestion.value.selectedIndex) return 'wrong'
+    return ''
   }
-  // 未作答
-  if (currentQuestion.value.selectedIndex === index) return 'border-primary bg-primary/5'
-  return 'border-gray-200 hover:border-gray-300 cursor-pointer'
+  if (currentQuestion.value.selectedIndex === index) return 'selected'
+  return ''
 }
-
-const feedbackClass = computed(() =>
-  isCorrect.value ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-)
 
 // === 翻页 ===
 const prevQuestion = () => {
@@ -333,7 +326,6 @@ const resetState = () => {
   answered.value = q?.answered ?? false
   showFeedback.value = q?.answered ?? false
   isCorrect.value = q?.finalCorrect ?? false
-  heuristicQuestion.value = ''
   socraticRound.value = 0
   socraticHistory.value = []
   revealAnswer.value = false
@@ -353,3 +345,77 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.quiz-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+.opt-big {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.opt-big:hover { border-color: var(--text-3); }
+.opt-big.correct { border-color: var(--ok); background: var(--ok-soft); }
+.opt-big.wrong { border-color: var(--err); background: var(--err-soft); }
+.opt-big.selected { border-color: var(--accent); background: var(--accent-soft); }
+.opt-big__key {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all .15s;
+}
+.opt-big.correct .opt-big__key { background: var(--ok); color: #fff; border-color: var(--ok); }
+.opt-big.wrong .opt-big__key { background: var(--err); color: #fff; border-color: var(--err); }
+.opt-big.selected .opt-big__key { background: var(--accent); color: #fff; border-color: var(--accent); }
+.feedback-box {
+  margin-top: 20px;
+  padding: 18px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.feedback-box.ok { background: var(--ok-soft); border: 1px solid #A7F3D0; }
+.feedback-box.err { background: var(--err-soft); border: 1px solid #FECACA; }
+.socratic-box {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.mini-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+}
+.mini-stat.ok { background: var(--ok-soft); }
+.mini-stat.err { background: var(--err-soft); }
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 900px) {
+  .quiz-grid { grid-template-columns: 1fr; }
+}
+</style>

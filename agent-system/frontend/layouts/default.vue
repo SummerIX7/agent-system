@@ -1,79 +1,93 @@
 <template>
-  <div class="min-h-screen flex flex-col">
-    <!-- 顶部导航栏 -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div class="container mx-auto px-4 h-16 flex items-center justify-between">
-        <NuxtLink to="/" class="text-xl font-bold text-primary">
-          多智能体协同决策系统
+  <div class="min-h-screen flex flex-col" style="font-family: var(--font)">
+    <!-- 毛玻璃导航栏 -->
+    <header class="topnav">
+      <NuxtLink to="/" class="topnav__brand">
+        <span class="dot" style="background: var(--accent); width: 7px; height: 7px; border-radius: 50%"></span>
+        领域知识个性化生成系统
+      </NuxtLink>
+
+      <!-- 桌面端导航 -->
+      <nav class="topnav__items hidden md:flex">
+        <NuxtLink
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="topnav__link"
+          active-class="active"
+        >
+          {{ item.label }}
         </NuxtLink>
+      </nav>
 
-        <!-- 桌面端导航 -->
-        <nav class="hidden md:flex items-center gap-6">
-          <NuxtLink
-            v-for="item in navItems"
-            :key="item.path"
-            :to="item.path"
-            class="text-sm font-medium text-gray-600 hover:text-primary transition-colors"
-            active-class="text-primary"
-          >
-            {{ item.label }}
-          </NuxtLink>
-
-          <!-- 用户状态 -->
-          <div v-if="isLoggedIn" class="flex items-center gap-3 ml-4 pl-4 border-l">
-            <span class="text-sm text-gray-600">{{ user?.username }}</span>
-            <UButton size="xs" variant="ghost" @click="handleLogout">退出</UButton>
+      <div class="topnav__right">
+        <!-- 认证状态：登录/注册 或 用户头像+退出 -->
+        <template v-if="isLoggedIn">
+          <div class="topnav__user">
+            <span class="topnav__avatar">{{ userInitial }}</span>
+            <span>{{ user?.username }}</span>
           </div>
-          <div v-else class="flex items-center gap-2 ml-4 pl-4 border-l">
-            <UButton size="xs" variant="ghost" to="/login">登录</UButton>
-            <UButton size="xs" to="/register">注册</UButton>
-          </div>
-        </nav>
+          <button class="btn btn--ghost btn--sm" @click="handleLogout">退出</button>
+        </template>
+        <template v-else>
+          <NuxtLink to="/login" class="btn btn--ghost btn--sm">登录</NuxtLink>
+          <NuxtLink to="/register" class="btn btn--primary btn--sm">注册</NuxtLink>
+        </template>
 
         <!-- 移动端菜单按钮 -->
-        <UButton
-          class="md:hidden"
-          variant="ghost"
-          icon="i-heroicons-bars-3"
+        <button
+          class="md:hidden btn btn--ghost btn--sm"
           @click="mobileMenuOpen = !mobileMenuOpen"
-        />
-      </div>
-
-      <!-- 移动端导航菜单 -->
-      <div v-if="mobileMenuOpen" class="md:hidden border-t border-gray-100 bg-white">
-        <nav class="container mx-auto px-4 py-3 space-y-2">
-          <NuxtLink
-            v-for="item in navItems"
-            :key="item.path"
-            :to="item.path"
-            class="block py-2 text-sm font-medium text-gray-600 hover:text-primary transition-colors"
-            active-class="text-primary"
-            @click="mobileMenuOpen = false"
-          >
-            {{ item.label }}
-          </NuxtLink>
-          <div class="pt-2 border-t">
-            <template v-if="isLoggedIn">
-              <p class="text-sm text-gray-600 mb-2">{{ user?.username }}</p>
-              <UButton size="sm" variant="ghost" @click="handleLogout">退出登录</UButton>
-            </template>
-            <template v-else>
-              <UButton size="sm" variant="ghost" to="/login" @click="mobileMenuOpen = false">登录</UButton>
-              <UButton size="sm" to="/register" @click="mobileMenuOpen = false">注册</UButton>
-            </template>
-          </div>
-        </nav>
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
       </div>
     </header>
+
+    <!-- 移动端导航菜单 -->
+    <div v-if="mobileMenuOpen" class="md:hidden border-b border-line bg-white">
+      <nav class="px-4 py-3 space-y-1">
+        <NuxtLink
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="block py-2 px-3 text-sm rounded-md hover:bg-bg-muted transition-colors"
+          active-class="text-accent bg-accent-soft"
+          @click="mobileMenuOpen = false"
+        >
+          {{ item.label }}
+        </NuxtLink>
+        <div class="pt-2 mt-2 border-t border-line">
+          <template v-if="isLoggedIn">
+            <p class="px-3 py-2 text-sm text-text-2">{{ user?.username }}</p>
+            <button class="w-full text-left px-3 py-2 text-sm text-err hover:bg-err-soft rounded-md" @click="handleLogout">
+              退出登录
+            </button>
+          </template>
+          <template v-else>
+            <NuxtLink to="/login" class="block px-3 py-2 text-sm hover:bg-bg-muted rounded-md" @click="mobileMenuOpen = false">
+              登录
+            </NuxtLink>
+            <NuxtLink to="/register" class="block px-3 py-2 text-sm text-accent hover:bg-accent-soft rounded-md" @click="mobileMenuOpen = false">
+              注册
+            </NuxtLink>
+          </template>
+        </div>
+      </nav>
+    </div>
 
     <!-- 主内容区 -->
     <main class="flex-1">
       <slot />
     </main>
 
-    <!-- 底部 -->
-    <footer class="bg-gray-50 border-t border-gray-200 py-4 text-center text-sm text-gray-500">
-      领域知识个性化生成与多智能体协同决策系统 © 2026
+    <!-- 底部版权 -->
+    <footer class="py-6 text-center text-text-3 text-xs border-t border-line">
+      © 2026 领域知识个性化生成与多智能体协同决策系统
     </footer>
   </div>
 </template>
@@ -85,6 +99,7 @@ const { user, isLoggedIn, restoreToken, logout } = useAuth()
 const mobileMenuOpen = ref(false)
 
 const navItems = [
+  { path: '/', label: '首页' },
   { path: '/profile', label: '学习者画像' },
   { path: '/dashboard', label: '学情诊断' },
   { path: '/workflow', label: 'Agent 协同' },
@@ -94,6 +109,11 @@ const navItems = [
   { path: '/history', label: '历史记录' },
 ]
 
+// 用户名首字母（用于头像显示）
+const userInitial = computed(() => {
+  return user.value?.username?.charAt(0)?.toUpperCase() || 'U'
+})
+
 // 页面加载时恢复 token 和用户信息
 onMounted(async () => {
   await restoreToken()
@@ -101,6 +121,7 @@ onMounted(async () => {
 
 const handleLogout = () => {
   logout()
+  mobileMenuOpen.value = false
   router.push('/login')
 }
 </script>

@@ -1,71 +1,104 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">学情诊断仪表盘</h1>
+  <div class="page page--wide">
+    <div class="page-head">
+      <p class="page-head__eyebrow">Step 2</p>
+      <h1 class="page-head__title">学情诊断仪表盘</h1>
+      <p class="page-head__desc">基于您提交的学习者画像，系统将为您生成个性化学习路径。</p>
+    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <!-- 知识雷达图 -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold">知识掌握雷达图</h2>
-        </template>
-        <DashboardKnowledgeRadar
-          v-if="knowledgePoints.length > 0"
-          :key="radarKey"
-          :knowledge-points="knowledgePoints"
-        />
-        <p v-else class="text-gray-400 text-center py-12">暂无诊断数据</p>
-      </UCard>
-
-      <!-- 知识盲区 -->
-      <UCard>
-        <template #header>
-          <h2 class="text-lg font-semibold">知识盲区定位</h2>
-        </template>
-        <div class="space-y-3">
-          <div
-            v-for="spot in blindSpots"
-            :key="spot.name"
-            class="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-200"
-          >
-            <span class="font-medium text-red-800">{{ spot.name }}</span>
-            <UBadge :color="spot.severity > 0.7 ? 'red' : 'orange'">
-              严重度 {{ (spot.severity * 100).toFixed(0) }}%
-            </UBadge>
-          </div>
-          <p v-if="blindSpots.length === 0" class="text-gray-500 text-center py-4">
-            暂无检测到的知识盲区
-          </p>
+    <!-- 统计指标 -->
+    <div class="stats-row">
+      <div class="stat-cell">
+        <div style="font-size: 12px; color: var(--text-3)">总体掌握度</div>
+        <div style="font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin-top: 8px">
+          {{ overallMastery }}<span style="font-size: 16px; color: var(--text-3)">分</span>
         </div>
-      </UCard>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">{{ masteryLevel }}</div>
+      </div>
+      <div class="stat-cell">
+        <div style="font-size: 12px; color: var(--text-3)">已覆盖知识点</div>
+        <div style="font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin-top: 8px">{{ knowledgePoints.length }}</div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">CNC数控加工领域</div>
+      </div>
+      <div class="stat-cell">
+        <div style="font-size: 12px; color: var(--text-3)">知识盲区</div>
+        <div style="font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin-top: 8px; color: var(--err)">{{ blindSpots.length }}</div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">需重点学习</div>
+      </div>
+      <div class="stat-cell">
+        <div style="font-size: 12px; color: var(--text-3)">推荐难度等级</div>
+        <div style="font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin-top: 8px">{{ recommendedLevel }}</div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">{{ levelDesc }}</div>
+      </div>
+    </div>
+
+    <!-- 雷达图 + 知识盲区 -->
+    <div class="dashboard-grid">
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">知识掌握雷达图</h2>
+          <span class="badge badge--mute">{{ knowledgePoints.length }} 维度</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; padding: 8px 0 4px">
+          <DashboardKnowledgeRadar
+            v-if="knowledgePoints.length > 0"
+            :key="radarKey"
+            :knowledge-points="knowledgePoints"
+          />
+          <p v-else class="text-text-3 text-center py-12">暂无诊断数据</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head">
+          <h2 class="card__title">知识盲区定位</h2>
+          <span class="badge badge--err">{{ blindSpots.length }} 项待提升</span>
+        </div>
+        <div v-for="spot in blindSpots" :key="spot.name" class="blind-item">
+          <div style="flex: 1">
+            <div style="font-size: 14px; font-weight: 500">{{ spot.name }}</div>
+            <div class="bar" style="margin-top: 8px">
+              <div
+                class="bar__fill"
+                :style="{ width: (spot.severity * 100) + '%', background: spot.severity > 0.7 ? 'var(--err)' : 'var(--warn)' }"
+              ></div>
+            </div>
+          </div>
+          <div style="font-size: 13px; font-weight: 600; font-family: var(--mono); width: 44px; text-align: right" :style="{ color: spot.severity > 0.7 ? 'var(--err)' : 'var(--warn)' }">
+            {{ (spot.severity * 100).toFixed(0) }}%
+          </div>
+        </div>
+        <p v-if="blindSpots.length === 0" class="text-text-3 text-center py-4">暂无检测到的知识盲区</p>
+        <div v-if="blindSpots.length > 0" style="margin-top: 20px; padding: 14px; background: var(--accent-soft); border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-2); line-height: 1.7">
+          <strong style="color: var(--accent)">诊断建议</strong>：盲区集中在相关知识领域，建议优先学习基础内容，再向进阶过渡。
+        </div>
+      </div>
     </div>
 
     <!-- 能力维度分析 -->
-    <UCard class="mt-8">
-      <template #header>
-        <h2 class="text-lg font-semibold">能力维度分析</h2>
-      </template>
-      <div v-if="knowledgePoints.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div
-          v-for="kp in knowledgePoints"
-          :key="kp.name"
-          class="text-center p-4 rounded-lg border"
-        >
-          <p class="text-sm text-gray-500">{{ kp.name }}</p>
-          <p class="text-2xl font-bold mt-1">{{ kp.score.toFixed(0) }}</p>
-          <UBadge class="mt-2" variant="subtle">{{ kp.level }}</UBadge>
+    <div class="card" style="margin-top: 24px">
+      <div class="card__head">
+        <h2 class="card__title">能力维度分析</h2>
+        <span class="card__sub">点击维度可查看对应学习资源</span>
+      </div>
+      <div v-for="kp in knowledgePoints" :key="kp.name" class="ability-row">
+        <div style="font-size: 13px; font-weight: 500; width: 110px">{{ kp.name }}</div>
+        <div style="flex: 1">
+          <div class="bar">
+            <div class="bar__fill" :class="getBarClass(kp.score)" :style="{ width: kp.score + '%' }"></div>
+          </div>
+        </div>
+        <div style="font-size: 14px; font-weight: 600; font-family: var(--mono); width: 36px; text-align: right">{{ kp.score.toFixed(0) }}</div>
+        <div style="width: 56px; text-align: right">
+          <span class="badge" :class="getBadgeClass(kp.score)">{{ kp.level }}</span>
         </div>
       </div>
-      <p v-else class="text-gray-400 text-center py-8">暂无能力维度数据</p>
-    </UCard>
+      <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-8">暂无能力维度数据</p>
+    </div>
 
-    <!-- 操作按钮 -->
-    <div class="mt-8 flex justify-center gap-4">
-      <UButton to="/workflow" size="lg">
-        查看 Agent 协同过程
-      </UButton>
-      <UButton to="/resources" variant="outline" size="lg">
-        查看生成资源
-      </UButton>
+    <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
+      <NuxtLink to="/workflow" class="btn btn--primary btn--lg">查看 Agent 协同过程 →</NuxtLink>
+      <NuxtLink to="/resources" class="btn btn--ghost btn--lg">查看生成资源</NuxtLink>
     </div>
   </div>
 </template>
@@ -78,6 +111,39 @@ const knowledgePoints = ref<any[]>([])
 const blindSpots = ref<any[]>([])
 const radarKey = ref(0)
 
+// 计算总体掌握度
+const overallMastery = computed(() => {
+  if (knowledgePoints.value.length === 0) return 0
+  const sum = knowledgePoints.value.reduce((acc, kp) => acc + kp.score, 0)
+  return Math.round(sum / knowledgePoints.value.length)
+})
+
+// 掌握度等级
+const masteryLevel = computed(() => {
+  const score = overallMastery.value
+  if (score >= 80) return '优秀 · 继续保持'
+  if (score >= 60) return '中级 · 建议巩固基础'
+  if (score >= 40) return '初级 · 需要加强学习'
+  return '入门 · 建议系统学习'
+})
+
+// 推荐难度等级
+const recommendedLevel = computed(() => {
+  const score = overallMastery.value
+  if (score >= 80) return 'L4'
+  if (score >= 60) return 'L3'
+  if (score >= 40) return 'L2'
+  return 'L1'
+})
+
+const levelDesc = computed(() => {
+  const level = recommendedLevel.value
+  if (level === 'L4') return '高级 · 挑战型任务'
+  if (level === 'L3') return '进阶 · 巩固提升'
+  if (level === 'L2') return '初级 → 进阶过渡'
+  return '入门 · 基础学习'
+})
+
 const sanitizeKnowledgePoints = (kps: any[]): any[] => {
   if (!Array.isArray(kps)) return []
   return kps
@@ -87,6 +153,20 @@ const sanitizeKnowledgePoints = (kps: any[]): any[] => {
       score: typeof kp.score === 'number' ? kp.score : Number(kp.score) || 0,
       level: kp.level || 'beginner',
     }))
+}
+
+// 获取进度条样式类
+const getBarClass = (score: number): string => {
+  if (score >= 70) return 'ok'
+  if (score >= 50) return 'warn'
+  return ''
+}
+
+// 获取徽章样式类
+const getBadgeClass = (score: number): string => {
+  if (score >= 70) return 'badge--ok'
+  if (score >= 50) return 'badge--warn'
+  return 'badge--err'
 }
 
 onMounted(async () => {
@@ -120,3 +200,49 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.stat-cell {
+  background: var(--bg);
+  padding: 22px 24px;
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.blind-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.blind-item:last-of-type {
+  border-bottom: none;
+}
+.ability-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ability-row:last-child {
+  border-bottom: none;
+}
+@media (max-width: 760px) {
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+</style>

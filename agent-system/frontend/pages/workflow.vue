@@ -1,51 +1,75 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Agent 协同可视化</h1>
+  <div class="page page--wide">
+    <div class="page-head">
+      <p class="page-head__eyebrow">Step 3</p>
+      <h1 class="page-head__title">Agent 协同</h1>
+      <p class="page-head__desc">实时查看7个AI Agent的协同工作状态，从决策调度到试题生成的完整流程。</p>
+    </div>
 
-    <AgentViewAgentFlowChart :agents="agents" />
-
-    <div class="mt-4 flex items-center gap-4">
-      <UBadge :color="isConnected ? 'green' : 'red'" variant="subtle">
-        {{ isConnected ? '已连接' : '未连接' }}
-      </UBadge>
-      <span class="text-sm text-gray-500">
-        Session: {{ sessionId || '未设置' }}
+    <!-- 连接状态 -->
+    <div class="conn-bar">
+      <span :class="['dot', isConnected ? 'dot--ok' : 'dot--err']" style="width: 8px; height: 8px"></span>
+      <span :style="{ color: isConnected ? 'var(--ok)' : 'var(--err)', fontWeight: 500 }">
+        {{ isConnected ? '实时已连接' : '未连接' }}
+      </span>
+      <span class="muted">·</span>
+      <span class="t2">Session: <span class="mono">{{ sessionId || '未设置' }}</span></span>
+      <span style="margin-left: auto" :class="['badge', generating ? (currentProgress >= 100 ? 'badge--ok' : 'badge--accent') : 'badge--mute']">
+        {{ generating ? (currentProgress >= 100 ? '生成完成' : '生成中...') : '等待触发' }}
       </span>
     </div>
 
-    <!-- 真实进度条 -->
-    <div v-if="generating" class="mt-6">
-      <UCard>
-        <div class="flex items-center gap-4">
-          <UIcon
-            :name="currentProgress >= 100 ? 'i-heroicons-check-circle' : 'i-heroicons-arrow-path'"
-            class="w-6 h-6"
-            :class="currentProgress >= 100 ? 'text-green-500' : 'animate-spin text-primary'"
-          />
-          <div class="flex-1">
-            <p class="font-medium">
-              {{ currentProgress >= 100 ? '生成完成！' : '正在生成个性化资源...' }}
-            </p>
-            <p class="text-sm text-gray-500 mt-1">{{ currentMessage }}</p>
-          </div>
-          <span class="text-lg font-bold text-primary">{{ Math.round(currentProgress) }}%</span>
+    <!-- 生成进度 -->
+    <div v-if="generating" class="gen-box">
+      <div class="gen-box__icon">
+        <svg v-if="currentProgress >= 100" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="animate-spin"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>
+      </div>
+      <div style="flex: 1">
+        <div style="font-size: 14px; font-weight: 600">
+          {{ currentProgress >= 100 ? '生成完成！' : '正在生成个性化资源...' }}
         </div>
-        <UProgress :value="currentProgress" class="mt-3" />
-      </UCard>
+        <div style="font-size: 13px; color: var(--text-2); margin-top: 4px">{{ currentMessage }}</div>
+      </div>
+      <div style="font-size: 22px; font-weight: 600; font-family: var(--mono); color: var(--accent)">{{ Math.round(currentProgress) }}%</div>
     </div>
 
-    <!-- 操作按钮 -->
-    <div class="mt-8 flex flex-wrap justify-center gap-4">
-      <UButton
+    <!-- Agent 状态列表 -->
+    <div class="agent-grid">
+      <div
+        v-for="(agent, idx) in agents"
+        :key="idx"
+        class="agent-card"
+        :class="agent.status"
+      >
+        <div class="agent-card__icon" :class="agent.status">
+          {{ String(idx + 1).padStart(2, '0') }}
+        </div>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px">
+            {{ agent.name }}
+            <span :class="['badge', getStatusBadgeClass(agent.status)]">{{ getStatusText(agent.status) }}</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-2); margin-top: 3px">{{ agent.message }}</div>
+        </div>
+        <div style="width: 130px; flex-shrink: 0">
+          <div class="bar"><div class="bar__fill" :class="getBarClass(agent.status)" :style="{ width: agent.progress + '%' }"></div></div>
+          <div style="font-size: 12px; color: var(--text-3); text-align: right; margin-top: 4px; font-family: var(--mono)">{{ agent.progress }}%</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
+      <button
+        class="btn btn--primary btn--lg"
         :disabled="!sessionId || generating"
-        :loading="generating && currentProgress < 100"
         @click="startGenerate"
       >
         {{ generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : '触发资源生成' }}
-      </UButton>
-      <UButton to="/resources" variant="outline" :disabled="generating && currentProgress < 100">
-        查看生成结果
-      </UButton>
+      </button>
+      <NuxtLink to="/resources" class="btn btn--ghost btn--lg" :class="{ 'opacity-50 pointer-events-none': generating && currentProgress < 100 }">
+        查看生成结果 →
+      </NuxtLink>
     </div>
   </div>
 </template>
@@ -77,9 +101,37 @@ if (agents.value.length === 0) {
   ]
 }
 
+// 获取状态徽章样式
+const getStatusBadgeClass = (status: string): string => {
+  const map: Record<string, string> = {
+    idle: 'badge--mute',
+    running: 'badge--accent',
+    completed: 'badge--ok',
+    error: 'badge--err',
+  }
+  return map[status] || 'badge--mute'
+}
+
+// 获取状态文本
+const getStatusText = (status: string): string => {
+  const map: Record<string, string> = {
+    idle: '等待中',
+    running: '运行中',
+    completed: '已完成',
+    error: '出错',
+  }
+  return map[status] || '未知'
+}
+
+// 获取进度条样式
+const getBarClass = (status: string): string => {
+  if (status === 'completed') return 'ok'
+  if (status === 'running') return ''
+  return ''
+}
+
 // 监听 WebSocket 消息，更新真实进度
 watch(() => agents.value, (newAgents) => {
-  // 找到当前最高进度
   let maxProgress = 0
   let latestMessage = ''
 
@@ -88,7 +140,6 @@ watch(() => agents.value, (newAgents) => {
       maxProgress = agent.progress
       latestMessage = agent.message
     }
-    // 如果有正在运行的 agent，显示其消息
     if (agent.status === 'running') {
       latestMessage = agent.message
     }
@@ -118,7 +169,6 @@ const startGenerate = async () => {
       profile.value || {}
     )
 
-    // 确保进度显示 100%
     currentProgress.value = 100
     currentMessage.value = `已生成 ${result.length} 个资源`
 
@@ -135,10 +185,97 @@ const startGenerate = async () => {
       color: 'red',
     })
   } finally {
-    // 延迟关闭，让用户看到 100% 完成状态
     setTimeout(() => {
       generating.value = false
     }, 2000)
   }
 }
 </script>
+
+<style scoped>
+.conn-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 32px;
+  font-size: 13px;
+}
+.gen-box {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+}
+.gen-box__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color .15s, background .15s;
+}
+.agent-card:hover {
+  border-color: var(--line-2);
+  background: var(--bg-soft);
+}
+.agent-card.running {
+  border-color: #C7D2FE;
+  background: var(--accent-soft);
+}
+.agent-card.completed {
+  border-color: #A7F3D0;
+  background: var(--ok-soft);
+}
+.agent-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.agent-card__icon.idle { background: var(--bg-muted); color: var(--text-3); }
+.agent-card__icon.running { background: #fff; color: var(--accent); }
+.agent-card__icon.completed { background: var(--ok-soft); color: var(--ok); }
+.agent-card__icon.error { background: var(--err-soft); color: var(--err); }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 760px) {
+  .agent-grid { grid-template-columns: 1fr; }
+}
+</style>
