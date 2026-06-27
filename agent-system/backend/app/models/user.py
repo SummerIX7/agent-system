@@ -1,10 +1,15 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base
+
+
+def _utcnow() -> datetime:
+    """返回当前 UTC 时间"""
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -14,8 +19,8 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True, comment="用户名")
     password_hash = Column(String(255), nullable=False, comment="密码哈希")
     email = Column(String(100), nullable=True, comment="邮箱")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     # 关联：一个用户对应一个画像
     learner = relationship("Learner", back_populates="user", uselist=False, lazy="selectin")

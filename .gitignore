@@ -31,6 +31,10 @@ dist/
 # ChromaDB
 **/chroma_db/
 
+# AI Assistant
+.claude/
+.workbuddy/
+
 # Build output
 **/.output/
 
@@ -48,3 +52,6 @@ package-lock.json
 # Prototype & Origin (静态原型和独立前端，不纳入版本管理)
 prototype/
 origin/
+
+# Docs (文档暂不提交，后续再加)
+docs/

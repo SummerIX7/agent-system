@@ -20,13 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """添加 learning_path 字段到 learners 表"""
-    bind = op.get_bind()
-    bind.execute(sa.text(
-        "ALTER TABLE learners ADD COLUMN learning_path JSON DEFAULT NULL COMMENT '学习路径'"
-    ))
+    op.add_column("learners", sa.Column("learning_path", sa.JSON, nullable=True, comment="学习路径"))
 
 
 def downgrade() -> None:
     """移除 learning_path 字段"""
-    bind = op.get_bind()
-    bind.execute(sa.text("ALTER TABLE learners DROP COLUMN learning_path"))
+    op.drop_column("learners", "learning_path")

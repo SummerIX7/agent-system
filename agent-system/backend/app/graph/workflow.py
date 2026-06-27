@@ -20,6 +20,9 @@ judge_agent = JudgeAgent()
 question_generator = QuestionGeneratorAgent()
 orchestrator = DecisionOrchestrator()
 
+# 最大重试次数
+MAX_RETRIES = 3
+
 
 def _broadcast(session_id: str, agent: str, status: str, message: str, progress: float = 0):
     """广播 Agent 状态"""
@@ -175,9 +178,16 @@ async def debate_node(state: AgentState) -> dict:
             debate_results[content_type] = {"passed": True, "reason": "试题不参与辩论", "final_content": content}
             continue
 
-        # 达到最大重试次数，强制通过
-        if retry_count >= 3:
-            debate_results[content_type] = {"passed": True, "reason": "达到最大重试次数，强制通过", "final_content": content}
+        # 达到最大重试次数，不再强制通过，标记为降级处理
+        if retry_count >= MAX_RETRIES:
+            debate_results[content_type] = {
+                "passed": False,
+                "adopted_side": "challenger",
+                "reason": f"超过最大重试次数({MAX_RETRIES})，内容未通过质量审核",
+                "quality_score": 0,
+                "final_content": content,
+                "degraded": True,
+            }
             continue
 
         # 获取预审结果
@@ -278,9 +288,15 @@ async def decide_node(state: AgentState) -> str:
     retry_count = state.get("retry_count", 0)
 
     all_passed = all(r.get("passed", False) for r in debate_results.values())
+    has_degraded = any(d.get("degraded", False) for d in debate_results.values())
 
-    if all_passed or retry_count >= 3:
-        _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成", 100)
+    if all_passed:
+        # 辩论通过，完成工作流
+        _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成：所有内容通过质量审核", 100)
+        return "complete"
+    elif has_degraded or retry_count >= MAX_RETRIES:
+        # 超过最大重试次数或有降级标记，走降级完成路径
+        _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成（降级）：内容未通过质量审核", 100)
         return "complete"
     else:
         _broadcast(session_id, "决策调度 Agent", "running", f"辩论未通过（第{retry_count}次），触发重新生成...", 25)
@@ -294,16 +310,37 @@ async def decide_node(state: AgentState) -> str:
 # ──────────────────────────────────────────────
 async def finalize_node(state: AgentState) -> dict:
     final_resources = []
-
-    # 使用辩论通过的最终内容
+    topic = state.get("topic", "")
+    difficulty = state.get("difficulty", "beginner")
     debate_results = state.get("debate_results", {})
-    for content_type, debate in debate_results.items():
+
+    # 检查是否有降级内容（超过最大重试次数仍未通过）
+    has_degraded = any(d.get("degraded", False) for d in debate_results.values())
+
+    if has_degraded:
+        # 降级处理：提供友好的降级提示内容
+        degraded_content = (
+            f"抱歉，关于「{topic}」的个性化内容生成未通过质量审核。\n\n"
+            "系统已多次尝试优化，但仍未能达到质量标准。建议：\n"
+            "1. 更换学习主题\n"
+            "2. 联系管理员添加更多领域知识库资料\n"
+            "3. 尝试更具体的子主题"
+        )
         final_resources.append({
-            "type": content_type,
-            "content": debate.get("final_content", ""),
-            "topic": state.get("topic", ""),
-            "difficulty": state.get("difficulty", "beginner"),
+            "type": "lecture",
+            "content": degraded_content,
+            "topic": topic,
+            "difficulty": difficulty,
         })
+    else:
+        # 正常处理：使用辩论通过的最终内容
+        for content_type, debate in debate_results.items():
+            final_resources.append({
+                "type": content_type,
+                "content": debate.get("final_content", ""),
+                "topic": topic,
+                "difficulty": difficulty,
+            })
 
     # 添加试题
     question_set = state.get("question_set", {})

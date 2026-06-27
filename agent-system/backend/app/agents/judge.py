@@ -1,6 +1,9 @@
 import json
+import logging
 
 from app.agents.base import BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 class JudgeAgent(BaseAgent):
@@ -57,16 +60,109 @@ class JudgeAgent(BaseAgent):
         try:
             result = json.loads(response.strip().strip("```json").strip("```"))
         except json.JSONDecodeError:
-            # 解析失败时默认通过，避免阻塞流程
+            # 解析失败时默认不通过，记录原始响应用于调试
+            logger.warning(f"裁判 JSON 解析失败，原始响应: {response[:500]}")
             result = {
-                "passed": True,
-                "adopted_side": "defender",
-                "reason": "裁判解析失败，默认通过",
-                "quality_score": 0.7,
-                "effective_issues": [],
-                "overruled_issues": challenge_issues,
+                "passed": False,
+                "adopted_side": "challenger",
+                "reason": "裁判解析失败，默认不通过（原始响应无法解析为有效 JSON）",
+                "quality_score": 0,
+                "effective_issues": challenge_issues,
+                "overruled_issues": [],
+                "raw_response": response[:500],
             }
+
+        # P1-2: 回归验证 — 判决通过且有修正时，验证修正是否真正解决了问题
+        if result.get("passed") and revised_content != original_content:
+            try:
+                regress_result = await self._regression_check(
+                    revised_content,
+                    result.get("effective_issues", []),
+                    topic
+                )
+                if not regress_result.get("verified", False):
+                    result["passed"] = False
+                    result["reason"] += f"\n修正回归验证未通过：{regress_result.get('reason', '未知原因')}"
+                    result["regression_failure"] = regress_result
+                    logger.info(f"裁判回归验证未通过: {regress_result.get('reason')}")
+            except Exception as e:
+                logger.warning(f"回归验证过程出错: {e}")
+                # 回归验证出错不影响原判决
+
         return result
+
+    async def _regression_check(self, content: str, fixed_issues: list, topic: str) -> dict:
+        """
+        验证修正是否真正解决了问题。
+        对每个 effective_issue 对应的内容段落进行 RAG 检索比对。
+
+        Args:
+            content: 修正后的内容
+            fixed_issues: 声称已修复的问题列表
+            topic: 内容主题
+
+        Returns:
+            verified: bool 是否验证通过
+            checks: list 每个问题的验证详情
+            reason: str 验证失败原因
+        """
+        if not fixed_issues:
+            return {"verified": True, "checks": [], "reason": "无需验证的问题"}
+
+        context = self.retrieve_context(topic, k=5)
+
+        prompt = f"""以下是修正后的内容。请验证之前发现的问题是否已被正确修复。
+
+[修正后的内容]
+{content[:2000]}
+
+[之前发现并声称已修复的问题]
+{json.dumps(fixed_issues, ensure_ascii=False)}
+
+[知识库参考]
+{context[:1500]}
+
+[验证要求]
+1. 逐条判断每个问题是否确实被修复
+2. 对照知识库验证修正后的内容是否准确
+3. 如果某个问题未被修复或修复后引入新错误，标记为 verified=False
+
+以 JSON 返回：
+{{
+    "verified": true/false,
+    "checks": [
+        {{"issue": "问题描述", "fixed": true/false, "reason": "判定理由"}}
+    ],
+    "reason": "整体验证结论"
+}}
+
+只输出 JSON，不要其他文字。"""
+
+        response = await self.call_llm(prompt)
+
+        try:
+            cleaned = response.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+
+            result = json.loads(cleaned)
+            return {
+                "verified": result.get("verified", False),
+                "checks": result.get("checks", []),
+                "reason": result.get("reason", ""),
+            }
+        except json.JSONDecodeError:
+            logger.warning(f"回归验证 JSON 解析失败")
+            return {
+                "verified": False,
+                "checks": [],
+                "reason": "回归验证响应解析失败",
+            }
 
     async def run(self, original_content: str = "", topic: str = "", content_type: str = "",
                   challenge_issues: list = None, defend_responses: list = None,

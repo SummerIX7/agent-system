@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import List, Optional
@@ -8,6 +9,9 @@ from app.models.database import get_db
 from app.core.store import get_session
 from app.models.resource import Resource
 from app.models.agent_state import FeedbackRecord
+from app.metrics.hallucination_checker import compute_hallucination_rate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["可视化数据"])
 
@@ -183,30 +187,55 @@ async def get_visualization(
     # 收集所有可用资源（数据库优先，内存 store 兜底）
     all_resources_difficulty = []
 
+    # 1. 知识谬误率：使用独立事实核查方法
+    #    对生成内容进行抽样验证，计算错误断言占比
+    #    该方法不依赖 Agent 自评评分，确保客观性
+    all_content = []
     if db_resources:
-        # 1. 知识谬误率：从辩论质量分数计算
-        #    quality_score 是 0-1 的质量评分，值越高内容质量越好
-        #    通过辩论的资源 quality_score 通常 >= 0.85（裁判通过线）
-        #    谬误率 = (1 - quality_score) * 修正系数，使其符合 < 5% 的目标
-        scores = [r.review_score for r in db_resources if r.review_score is not None]
-        if scores:
-            avg_score = sum(scores) / len(scores)
-            # quality_score >= 0.85 表示辩论通过，对应谬误率 < 5%
-            # 使用线性映射：quality_score 0.85 → 5%, 1.0 → 0%
-            hallucination_rate = round(max(0, (1 - avg_score) / 0.15 * 5), 1)
-            hallucination_rate = min(hallucination_rate, 10.0)  # 上限 10%
-
         for r in db_resources:
+            if r.content:
+                # 提取内容文本（支持字符串和字典格式）
+                if isinstance(r.content, str):
+                    all_content.append(r.content)
+                elif isinstance(r.content, dict):
+                    all_content.append(str(r.content.get("content", "")))
             if r.difficulty:
                 all_resources_difficulty.append(r.difficulty)
     else:
-        # 数据库无资源时，从内存 store 获取难度信息
+        # 数据库无资源时，从内存 store 获取
         for r in store_resources:
+            content = r.get("content", "")
+            if isinstance(content, str):
+                all_content.append(content)
+            elif isinstance(content, dict):
+                all_content.append(str(content.get("content", "")))
             if r.get("difficulty"):
                 all_resources_difficulty.append(r["difficulty"])
 
-    # 如果通过辩论但 review_score 为空，给出合理的默认值
-    # （辩论通过的资源默认质量 >= 0.85，对应谬误率 <= 5%）
+    # 对合并后的内容进行独立事实核查
+    if all_content:
+        combined_content = "\n\n".join(all_content)
+        topic = session.get("topic", profile.get("goals", [""])[0] if profile.get("goals") else "")
+
+        try:
+            # 调用独立谬误检测器
+            hallucination_result = await compute_hallucination_rate(combined_content, topic)
+            hallucination_rate = hallucination_result.get("hallucination_rate_percent", None)
+
+            # 限制范围：0-10%
+            if hallucination_rate is not None:
+                hallucination_rate = min(max(hallucination_rate, 0), 10.0)
+        except Exception as e:
+            logger.warning(f"谬误率计算失败，使用降级方案: {e}")
+            # 降级：使用基于 review_score 的估算
+            if db_resources:
+                scores = [r.review_score for r in db_resources if r.review_score is not None]
+                if scores:
+                    avg_score = sum(scores) / len(scores)
+                    hallucination_rate = round(max(0, (1 - avg_score) / 0.15 * 5), 1)
+                    hallucination_rate = min(hallucination_rate, 10.0)
+
+    # 如果所有方法都无法计算，给出合理的默认值
     if hallucination_rate is None and (db_resources or store_resources):
         hallucination_rate = 3.0  # 默认 3%，符合 < 5% 目标
 

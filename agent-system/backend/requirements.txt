@@ -10,7 +10,6 @@ aiomysql
 alembic
 
 # 缓存/队列
-celery
 redis
 
 # LLM

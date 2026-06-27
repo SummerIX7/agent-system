@@ -1,9 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base, JsonText
+
+
+def _utcnow() -> datetime:
+    """返回当前 UTC 时间"""
+    return datetime.now(timezone.utc)
 
 
 class Learner(Base):
@@ -25,8 +30,8 @@ class Learner(Base):
     recommended_difficulty = Column(String(20), nullable=True, comment="推荐难度: beginner/intermediate/advanced/expert")
     learning_path = Column(JsonText, nullable=True, comment="学习路径 [{stage, title, topics, estimated_hours, difficulty, prerequisites, resources_type}]")
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     # 关联
     user = relationship("User", back_populates="learner")

@@ -27,7 +27,8 @@ class DecisionOrchestrator(BaseAgent):
         return state
 
     async def decide_next(self, state: dict) -> str:
-        """决策：辩论通过则完成，否则打回重新生成"""
+        """决策：辩论通过则完成，超过最大重试次数则降级完成，否则打回重新生成"""
+        MAX_RETRIES = 3
         debate_results = state.get("debate_results", {})
         retry_count = state.get("retry_count", 0)
 
@@ -35,13 +36,19 @@ class DecisionOrchestrator(BaseAgent):
         all_passed = all(
             r.get("passed", False) for r in debate_results.values()
         )
+        has_degraded = any(
+            r.get("degraded", False) for r in debate_results.values()
+        )
 
         if all_passed:
             state["decision_log"] = state.get("decision_log", []) + ["所有资源辩论通过"]
             return "complete"
 
-        if retry_count >= 3:
-            state["decision_log"] = state.get("decision_log", []) + ["达到最大重试次数，强制完成"]
+        if has_degraded or retry_count >= MAX_RETRIES:
+            # 超过最大重试次数，走降级流程而非强制通过
+            state["decision_log"] = state.get("decision_log", []) + [
+                f"达到最大重试次数({MAX_RETRIES})，内容未通过质量审核，进入降级完成"
+            ]
             return "complete"
 
         state["retry_count"] = retry_count + 1

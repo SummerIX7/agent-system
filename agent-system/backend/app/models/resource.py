@@ -1,9 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.models.database import Base, JsonText
+
+
+def _utcnow() -> datetime:
+    """返回当前 UTC 时间"""
+    return datetime.now(timezone.utc)
 
 
 class Resource(Base):
@@ -27,8 +32,8 @@ class Resource(Base):
         default="pending",
         comment="审核状态",
     )
-    retry_count = Column(Float, default=0, comment="重试次数")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    retry_count = Column(Integer, default=0, comment="重试次数")
+    created_at = Column(DateTime, default=_utcnow)
 
     # 关联
     learner = relationship("Learner", back_populates="resources")

@@ -20,26 +20,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """添加诊断结果字段到 learners 表"""
-    # 使用 raw SQL 添加列，避免 SQLAlchemy 类型检测问题
-    bind = op.get_bind()
-    bind.execute(sa.text(
-        "ALTER TABLE learners ADD COLUMN knowledge_points JSON DEFAULT NULL COMMENT '知识点评分列表'"
-    ))
-    bind.execute(sa.text(
-        "ALTER TABLE learners ADD COLUMN blind_spots JSON DEFAULT NULL COMMENT '知识盲区列表'"
-    ))
-    bind.execute(sa.text(
-        "ALTER TABLE learners ADD COLUMN overall_level VARCHAR(20) DEFAULT NULL COMMENT '整体水平'"
-    ))
-    bind.execute(sa.text(
-        "ALTER TABLE learners ADD COLUMN recommended_difficulty VARCHAR(20) DEFAULT NULL COMMENT '推荐难度'"
-    ))
+    op.add_column("learners", sa.Column("knowledge_points", sa.JSON, nullable=True, comment="知识点评分列表"))
+    op.add_column("learners", sa.Column("blind_spots", sa.JSON, nullable=True, comment="知识盲区列表"))
+    op.add_column("learners", sa.Column("overall_level", sa.String(20), nullable=True, comment="整体水平"))
+    op.add_column("learners", sa.Column("recommended_difficulty", sa.String(20), nullable=True, comment="推荐难度"))
 
 
 def downgrade() -> None:
     """移除诊断结果字段"""
-    bind = op.get_bind()
-    bind.execute(sa.text("ALTER TABLE learners DROP COLUMN knowledge_points"))
-    bind.execute(sa.text("ALTER TABLE learners DROP COLUMN blind_spots"))
-    bind.execute(sa.text("ALTER TABLE learners DROP COLUMN overall_level"))
-    bind.execute(sa.text("ALTER TABLE learners DROP COLUMN recommended_difficulty"))
+    op.drop_column("learners", "recommended_difficulty")
+    op.drop_column("learners", "overall_level")
+    op.drop_column("learners", "blind_spots")
+    op.drop_column("learners", "knowledge_points")
