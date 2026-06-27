@@ -10,10 +10,11 @@ class DiagnosisAgent(BaseAgent):
     async def build_profile(self, input_data: dict) -> dict:
         """根据输入数据构建学习者画像"""
         context = self.retrieve_context(
-            f"学习者画像 {input_data.get('major', '')} {input_data.get('education_background', '')}"
+            f"数控加工 CNC 学习者画像 {input_data.get('major', '')} {input_data.get('education_background', '')}"
         )
 
-        prompt = f"""你是一位教育诊断专家。请根据以下学习者信息，构建详细的学习者画像。
+        prompt = f"""你是一位数控加工（CNC）领域的教育诊断专家。请根据以下学习者信息，构建详细的学习者画像。
+所有知识点和盲区必须围绕数控加工领域（如数控编程、G 代码、切削参数、刀具选择、加工工艺等），不得涉及编程语言或数据分析。
 
 [学习者输入信息]
 - 学历背景: {input_data.get('education_background', '未知')}

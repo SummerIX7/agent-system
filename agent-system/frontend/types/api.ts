@@ -69,6 +69,25 @@ export interface FeedbackResponse {
   reveal_answer?: boolean
 }
 
+// === 实操题批改 ===
+
+export interface PracticalFeedbackInput {
+  session_id: string
+  topic: string
+  question: string
+  user_answer: string
+  correct_answer: string
+  explanation?: string
+}
+
+export interface PracticalFeedbackResponse {
+  score: number
+  is_correct: boolean
+  feedback: string
+  key_points: string[]
+  reference_answer: string
+}
+
 // === 可视化 ===
 
 export interface VisualizationData {

@@ -5,6 +5,8 @@ import type {
   ResourceOutput,
   FeedbackInput,
   FeedbackResponse,
+  PracticalFeedbackInput,
+  PracticalFeedbackResponse,
   VisualizationData,
 } from '~/types/api'
 
@@ -93,6 +95,13 @@ export function useApi() {
     // 反馈
     submitFeedback: (data: FeedbackInput) =>
       request<FeedbackResponse>('/api/feedback', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    // 实操题批改
+    submitPracticalFeedback: (data: PracticalFeedbackInput) =>
+      request<PracticalFeedbackResponse>('/api/feedback/practical', {
         method: 'POST',
         body: JSON.stringify(data),
       }),

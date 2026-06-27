@@ -86,10 +86,51 @@
             </div>
           </template>
 
-          <!-- 实操题 -->
-          <div v-else class="p-4" style="background: var(--bg-muted); border-radius: var(--radius-sm);">
-            <p class="text-sm text-text-2 mb-2">请在编辑器中完成以下操作：</p>
-            <pre style="background: var(--bg); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-size: 13px; overflow-x: auto;"><code>{{ q.correct_answer }}</code></pre>
+          <!-- 实操题：文本输入 + 批改 -->
+          <div v-else class="practical-input-box">
+            <p class="text-sm text-text-2 mb-2">请在下方输入你的答案（G 代码、操作步骤、工艺分析等）：</p>
+            <textarea
+              v-model="q.practicalAnswer"
+              class="practical-textarea"
+              :disabled="q.practicalGraded"
+              placeholder="在此输入你的答案..."
+              rows="6"
+            />
+            <div style="display: flex; justify-content: flex-end; margin-top: 12px">
+              <button
+                class="btn btn--primary"
+                :disabled="!q.practicalAnswer?.trim() || q.practicalGrading || q.practicalGraded"
+                @click="submitPracticalAnswer(idx)"
+              >
+                {{ q.practicalGrading ? '批改中...' : '提交批改' }}
+              </button>
+            </div>
+
+            <!-- 批改结果 -->
+            <div v-if="q.practicalGraded" style="margin-top: 16px">
+              <div class="feedback-box" :class="q.practicalResult?.is_correct ? 'ok' : 'err'">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+                  <div style="font-weight: 600">{{ q.practicalResult?.is_correct ? '✅ 通过' : '❌ 未通过' }}</div>
+                  <div class="practical-score" :class="q.practicalResult?.is_correct ? 'pass' : 'fail'">
+                    {{ q.practicalResult?.score }}<span style="font-size: 14px; opacity: .6">/100</span>
+                  </div>
+                </div>
+                <div class="bar" style="margin-bottom: 14px">
+                  <div class="bar__fill" :class="q.practicalResult?.is_correct ? 'ok' : 'err'" :style="{ width: (q.practicalResult?.score || 0) + '%' }" />
+                </div>
+                <div style="font-size: 13.5px; line-height: 1.7; margin-bottom: 12px">{{ q.practicalResult?.feedback }}</div>
+                <div v-if="q.practicalResult?.key_points?.length" style="font-size: 13px; line-height: 1.8; margin-bottom: 12px">
+                  <div style="font-weight: 600; font-size: 12px; color: var(--accent); margin-bottom: 6px">📋 关键要点</div>
+                  <ul style="margin: 0; padding-left: 18px">
+                    <li v-for="(kp, kIdx) in q.practicalResult?.key_points" :key="kIdx">{{ kp }}</li>
+                  </ul>
+                </div>
+                <details>
+                  <summary style="font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; padding: 4px 0">📖 查看参考答案</summary>
+                  <pre class="reference-answer-block"><code>{{ q.practicalResult?.reference_answer }}</code></pre>
+                </details>
+              </div>
+            </div>
           </div>
 
           <!-- 解析 -->
@@ -312,6 +353,39 @@ const selectAnswer = (questionIndex: number, optionIndex: number) => {
   q.answered = true
 }
 
+// === 实操题批改 ===
+const submitPracticalAnswer = async (questionIndex: number) => {
+  const q = testQuestions.value[questionIndex]
+  if (!q.practicalAnswer?.trim() || q.practicalGrading || q.practicalGraded) return
+  q.practicalGrading = true
+  try {
+    const result = await api.submitPracticalFeedback({
+      session_id: sessionId.value || 'demo',
+      topic: 'CNC 数控编程',
+      question: q.question,
+      user_answer: q.practicalAnswer,
+      correct_answer: q.correct_answer || '',
+      explanation: q.explanation || '',
+    })
+    q.practicalResult = result
+    q.practicalGraded = true
+    q.answered = true
+  } catch (err) {
+    console.error('实操题批改失败:', err)
+    q.practicalResult = {
+      score: 0,
+      is_correct: false,
+      feedback: '批改服务暂时不可用，请稍后重试。',
+      key_points: [],
+      reference_answer: q.correct_answer || '',
+    }
+    q.practicalGraded = true
+    q.answered = true
+  } finally {
+    q.practicalGrading = false
+  }
+}
+
 onMounted(async () => {
   if (!sessionId.value) {
     loading.value = false
@@ -346,6 +420,10 @@ onMounted(async () => {
           correctIndex: q.options?.findIndex((o: string) => o === q.correct_answer || o.startsWith(q.correct_answer)) ?? 0,
           selectedIndex: -1,
           answered: false,
+          practicalAnswer: '',
+          practicalGrading: false,
+          practicalGraded: false,
+          practicalResult: null,
         }))
       }
     }
@@ -500,5 +578,73 @@ onMounted(async () => {
 }
 @media (max-width: 760px) {
   .sources-grid { grid-template-columns: 1fr; }
+}
+.practical-input-box {
+  background: var(--bg-muted, #f7f8fa);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+.practical-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono), 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  background: var(--bg, #fff);
+  color: var(--text);
+  transition: border-color .15s;
+}
+.practical-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.practical-textarea:disabled {
+  opacity: .7;
+  cursor: not-allowed;
+}
+.practical-score {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: -.02em;
+}
+.practical-score.pass { color: var(--ok); }
+.practical-score.fail { color: var(--err); }
+.feedback-box {
+  padding: 16px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.feedback-box.ok { background: var(--ok-soft); border: 1px solid #A7F3D0; }
+.feedback-box.err { background: var(--err-soft); border: 1px solid #FECACA; }
+.bar {
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar__fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.bar__fill.ok { background: var(--ok); }
+.bar__fill.err { background: var(--err); }
+.reference-answer-block {
+  background: var(--bg, #fff);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  font-family: var(--mono), 'Consolas', 'Courier New', monospace;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  margin-top: 8px;
 }
 </style>

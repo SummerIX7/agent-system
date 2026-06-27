@@ -17,12 +17,28 @@ from app.models.agent_state import AgentLog, FeedbackRecord
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时：创建数据库表（如果不存在）
+    # ── 启动时 ──
+    # 1. 清除配置缓存，确保加载最新 .env 和 config.py
+    get_settings.cache_clear()
+
+    # 2. 重置知识库检索器单例，避免使用旧索引
+    import app.knowledge.retriever as retriever_mod
+    retriever_mod._retriever = None
+
+    # 3. 清空内存会话 store，避免残留旧的 topic/Goals
+    from app.core.store import _sessions
+    _sessions.clear()
+
+    print("[启动] 缓存已清除，配置已刷新")
+
+    # 4. 创建数据库表（如果不存在）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("[启动] 数据库表已就绪")
+
     yield
-    # 关闭时：清理资源
+
+    # ── 关闭时 ──
     await engine.dispose()
 
 

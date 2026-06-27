@@ -97,6 +97,25 @@ class FeedbackResponse(BaseModel):
     reveal_answer: bool = False       # 是否应展示正确答案（达到最大轮次时为 True）
 
 
+# === 实操题批改 ===
+
+class PracticalFeedbackInput(BaseModel):
+    session_id: str
+    topic: str
+    question: str
+    user_answer: str                  # 用户提交的自由文本答案（G 代码、操作步骤等）
+    correct_answer: str               # 参考答案
+    explanation: str = ""             # 评分标准和要点
+
+
+class PracticalFeedbackResponse(BaseModel):
+    score: int                        # 0-100 分
+    is_correct: bool                  # score >= 60 为 True
+    feedback: str                     # 详细批改反馈
+    key_points: List[str] = []        # 关键要点/扣分项
+    reference_answer: str = ""        # 参考答案
+
+
 # === 可视化 ===
 
 class VisualizationData(BaseModel):

@@ -37,19 +37,45 @@
           {{ currentQuestion.question }}
         </div>
 
-        <div
-          v-for="(opt, idx) in currentQuestion.options"
-          :key="idx"
-          class="opt-big"
-          :class="optionClass(idx)"
-          @click="selectOption(idx)"
-        >
-          <div class="opt-big__key" :class="optionClass(idx)">{{ String.fromCharCode(65 + idx) }}</div>
-          <div style="font-size: 14px">{{ stripOptionPrefix(opt) }}</div>
-        </div>
+        <!-- 选择题/判断题选项 -->
+        <template v-if="currentQuestion.question_type !== 'practical'">
+          <div
+            v-for="(opt, idx) in currentQuestion.options"
+            :key="idx"
+            class="opt-big"
+            :class="optionClass(idx)"
+            @click="selectOption(idx)"
+          >
+            <div class="opt-big__key" :class="optionClass(idx)">{{ String.fromCharCode(65 + idx) }}</div>
+            <div style="font-size: 14px">{{ stripOptionPrefix(opt) }}</div>
+          </div>
+        </template>
 
-        <!-- 反馈区 -->
-        <div v-if="showFeedback" class="feedback-box" :class="isCorrect ? 'ok' : 'err'">
+        <!-- 实操题：文本输入 -->
+        <template v-else>
+          <div class="practical-input-box">
+            <p class="practical-hint">请在下方输入你的答案（G 代码、操作步骤、工艺分析等）：</p>
+            <textarea
+              v-model="practicalAnswer"
+              class="practical-textarea"
+              :disabled="practicalGraded"
+              placeholder="在此输入你的答案..."
+              rows="8"
+            />
+            <div style="display: flex; justify-content: flex-end; margin-top: 12px">
+              <button
+                class="btn btn--primary"
+                :disabled="!practicalAnswer.trim() || practicalGrading || practicalGraded"
+                @click="submitPractical"
+              >
+                {{ practicalGrading ? '批改中...' : '提交批改' }}
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 反馈区（选择题/判断题） -->
+        <div v-if="showFeedback && currentQuestion.question_type !== 'practical'" class="feedback-box" :class="isCorrect ? 'ok' : 'err'">
           <div style="font-weight: 600; margin-bottom: 6px">{{ isCorrect ? '回答正确！' : '回答错误' }}</div>
 
           <!-- 答对 或 追问耗尽时显示解析 -->
@@ -75,6 +101,44 @@
             <p class="text-sm font-medium" style="color: var(--warn)">📌 正确答案：{{ currentQuestion.correctAnswer }}</p>
             <p class="text-sm mt-1 text-text-2">{{ currentQuestion.explanation }}</p>
           </div>
+        </div>
+
+        <!-- 实操题批改结果 -->
+        <div v-if="practicalGraded" class="feedback-box" :class="practicalResult?.is_correct ? 'ok' : 'err'">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+            <div style="font-weight: 600">{{ practicalResult?.is_correct ? '✅ 通过' : '❌ 未通过' }}</div>
+            <div class="practical-score" :class="practicalResult?.is_correct ? 'pass' : 'fail'">
+              {{ practicalResult?.score }}<span style="font-size: 14px; opacity: .6">/100</span>
+            </div>
+          </div>
+
+          <!-- 评分条 -->
+          <div class="bar" style="margin-bottom: 16px">
+            <div
+              class="bar__fill"
+              :class="practicalResult?.is_correct ? 'ok' : 'err'"
+              :style="{ width: (practicalResult?.score || 0) + '%' }"
+            />
+          </div>
+
+          <!-- 详细反馈 -->
+          <div style="font-size: 13.5px; line-height: 1.7; margin-bottom: 14px">
+            {{ practicalResult?.feedback }}
+          </div>
+
+          <!-- 关键要点 -->
+          <div v-if="practicalResult?.key_points?.length" class="socratic-box" style="margin-bottom: 14px">
+            <div style="font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 8px">📋 关键要点</div>
+            <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8">
+              <li v-for="(kp, idx) in practicalResult?.key_points" :key="idx">{{ kp }}</li>
+            </ul>
+          </div>
+
+          <!-- 参考答案 -->
+          <details style="margin-top: 8px">
+            <summary style="font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; padding: 8px 0">📖 查看参考答案</summary>
+            <pre class="reference-answer-block"><code>{{ practicalResult?.reference_answer }}</code></pre>
+          </details>
         </div>
 
         <div style="display: flex; justify-content: space-between; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line)">
@@ -151,6 +215,12 @@ const socraticHistory = ref<{round: number, hint: string}[]>([])
 const revealAnswer = ref(false)
 const socraticLoading = ref(false)
 
+// === 实操题状态 ===
+const practicalAnswer = ref('')
+const practicalGrading = ref(false)
+const practicalGraded = ref(false)
+const practicalResult = ref<{score: number; is_correct: boolean; feedback: string; key_points: string[]; reference_answer: string} | null>(null)
+
 // === 计算属性 ===
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const correctCount = computed(() => questions.value.filter(q => q.finalCorrect === true).length)
@@ -215,6 +285,9 @@ const fetchQuestions = async () => {
       answered: false,
       finalCorrect: null,
       correctAnswer: q.correct_answer || '',
+      practicalAnswer: '',
+      practicalGraded: false,
+      practicalResult: null,
     }))
     currentIndex.value = 0
     resetState()
@@ -269,6 +342,45 @@ const lockQuestion = (correct: boolean) => {
   currentQuestion.value.finalCorrect = correct
   isCorrect.value = correct
   showFeedback.value = true
+}
+
+// === 提交实操题答案 ===
+const submitPractical = async () => {
+  if (!practicalAnswer.value.trim()) return
+  practicalGrading.value = true
+  try {
+    const result = await api.submitPracticalFeedback({
+      session_id: sessionId.value || 'demo',
+      topic: currentQuestion.value.topic || 'CNC 数控编程',
+      question: currentQuestion.value.question,
+      user_answer: practicalAnswer.value,
+      correct_answer: currentQuestion.value.correctAnswer,
+      explanation: currentQuestion.value.explanation || '',
+    })
+    practicalResult.value = result
+    practicalGraded.value = true
+    // 保存状态到 question 对象（翻页后恢复）
+    currentQuestion.value.practicalAnswer = practicalAnswer.value
+    currentQuestion.value.practicalGraded = true
+    currentQuestion.value.practicalResult = result
+    // 锁定本题
+    lockQuestion(result.is_correct)
+  } catch (err) {
+    console.error('实操题批改失败:', err)
+    practicalResult.value = {
+      score: 0,
+      is_correct: false,
+      feedback: '批改服务暂时不可用，请稍后重试。',
+      key_points: [],
+      reference_answer: currentQuestion.value.correctAnswer || '',
+    }
+    practicalGraded.value = true
+    currentQuestion.value.practicalGraded = true
+    currentQuestion.value.practicalResult = practicalResult.value
+    lockQuestion(false)
+  } finally {
+    practicalGrading.value = false
+  }
 }
 
 // === 选项点击 ===
@@ -330,6 +442,11 @@ const resetState = () => {
   socraticHistory.value = []
   revealAnswer.value = false
   socraticLoading.value = false
+  // 实操题状态
+  practicalAnswer.value = q?.practicalAnswer || ''
+  practicalGrading.value = false
+  practicalGraded.value = q?.practicalGraded ?? false
+  practicalResult.value = q?.practicalResult || null
 }
 
 // === 初始化 ===
@@ -417,5 +534,58 @@ onMounted(() => {
 }
 @media (max-width: 900px) {
   .quiz-grid { grid-template-columns: 1fr; }
+}
+.practical-input-box {
+  background: var(--bg-muted, #f7f8fa);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 18px 20px;
+}
+.practical-hint {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 12px;
+}
+.practical-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono), 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  background: var(--bg, #fff);
+  color: var(--text);
+  transition: border-color .15s;
+}
+.practical-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.practical-textarea:disabled {
+  opacity: .7;
+  cursor: not-allowed;
+}
+.practical-score {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: -.02em;
+}
+.practical-score.pass { color: var(--ok); }
+.practical-score.fail { color: var(--err); }
+.reference-answer-block {
+  background: var(--bg, #fff);
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  font-family: var(--mono), 'Consolas', 'Courier New', monospace;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  margin-top: 8px;
 }
 </style>

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 
 from app.models.database import Base, JsonText
 
@@ -35,8 +35,8 @@ class FeedbackRecord(Base):
     learner_id = Column(Integer, ForeignKey("learners.id", ondelete="CASCADE"), nullable=False, index=True, comment="学习者 ID")
     topic = Column(String(200), nullable=False, comment="题目主题")
     question = Column(String(500), nullable=False, comment="题目内容")
-    user_answer = Column(String(500), nullable=True, comment="用户答案")
-    correct_answer = Column(String(500), nullable=True, comment="正确答案")
+    user_answer = Column(Text, nullable=True, comment="用户答案")
+    correct_answer = Column(Text, nullable=True, comment="正确答案")
     is_correct = Column(Float, nullable=True, comment="是否正确 0/1")
     heuristic_question = Column(String(500), nullable=True, comment="启发式追问")
     created_at = Column(DateTime, default=datetime.utcnow)

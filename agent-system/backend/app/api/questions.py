@@ -31,11 +31,13 @@ async def get_questions(
     session_data = get_session(session_id)
     profile = session_data.get("profile", {})
 
-    # 3. 推断 topic 和 difficulty
+    # 3. 推断 topic 和 difficulty（强制 CNC 领域）
     goals = profile.get("goals", [])
     if not goals and learner and learner.goals:
         goals = learner.goals
-    topic = goals[0] if goals else "CNC 数控编程基础"
+    # 无论 goals 内容如何，始终以数控领域为出题方向
+    raw_goal = goals[0] if goals else ""
+    topic = f"数控加工（CNC）领域 - {raw_goal}" if raw_goal else "数控加工（CNC）编程与操作基础"
 
     difficulty = profile.get("recommended_difficulty", "beginner")
     if difficulty == "beginner" and learner:
