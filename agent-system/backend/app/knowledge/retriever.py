@@ -8,7 +8,7 @@ from app.knowledge.loader import load_documents, split_documents
 
 
 class KnowledgeRetriever:
-    """知识库检索器"""
+    """知识库检索器（支持多目录）"""
 
     def __init__(self, persist_dir: str | None = None):
         settings = get_settings()
@@ -17,17 +17,33 @@ class KnowledgeRetriever:
         self.vectorstore: Chroma | None = None
 
     def build_index(self, doc_dir: str) -> int:
-        """从文档目录构建向量索引"""
+        """从单个文档目录构建向量索引"""
         documents = load_documents(doc_dir)
         chunks = split_documents(documents)
 
-        self.vectorstore = Chroma.from_documents(
-            documents=chunks,
-            embedding=self.embeddings,
-            persist_directory=self.persist_dir,
-        )
-        print(f"索引构建完成，共 {len(chunks)} 个知识块")
+        if self.vectorstore is None:
+            self.vectorstore = Chroma.from_documents(
+                documents=chunks,
+                embedding=self.embeddings,
+                persist_directory=self.persist_dir,
+            )
+        else:
+            self.vectorstore.add_documents(chunks)
+
+        print(f"[{doc_dir}] 索引构建完成，共 {len(chunks)} 个知识块")
         return len(chunks)
+
+    def build_index_from_dirs(self, doc_dirs: list[str]) -> int:
+        """从多个文档目录构建向量索引"""
+        total = 0
+        for doc_dir in doc_dirs:
+            doc_path = Path(doc_dir)
+            if doc_path.exists():
+                total += self.build_index(doc_dir)
+            else:
+                print(f"[警告] 知识库目录不存在: {doc_dir}")
+        print(f"全部索引构建完成，共 {total} 个知识块")
+        return total
 
     def load_index(self) -> None:
         """从磁盘加载已有索引"""

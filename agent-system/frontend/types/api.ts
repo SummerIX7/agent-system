@@ -55,6 +55,8 @@ export interface FeedbackInput {
   question: string
   user_answer: string
   correct_answer: string
+  round?: number
+  heuristic_context?: string
 }
 
 export interface FeedbackResponse {
@@ -63,6 +65,8 @@ export interface FeedbackResponse {
   heuristic_question: string | null
   topic: string
   correctness: number
+  round?: number
+  reveal_answer?: boolean
 }
 
 // === 可视化 ===

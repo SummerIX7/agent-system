@@ -50,7 +50,7 @@ async def test_knowledge_accuracy():
     results = []
 
     for profile in profiles:
-        topic = "Python 数据分析基础"
+        topic = "CNC 数控编程基础"
         difficulty = profile.get("expected_difficulty", "beginner")
         learner_input = {
             "topic": topic,
@@ -183,14 +183,14 @@ async def test_knowledge_coverage():
 
     gen_agent = GenerationAgent()
 
-    # Python 数据分析核心知识点
+    # CNC 数控编程核心知识点
     core_topics = [
-        "NumPy 数组创建",
-        "NumPy 索引切片",
-        "Pandas DataFrame",
-        "Pandas 数据清洗",
-        "Matplotlib 基础图表",
-        "数据分组聚合",
+        "G 代码基础指令",
+        "数控车床编程",
+        "数控铣床编程",
+        "切削参数选择",
+        "刀具选择与管理",
+        "公差与配合",
     ]
 
     covered = 0

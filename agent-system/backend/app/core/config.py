@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # 知识库开关
     ENABLE_KNOWLEDGE_BASE: bool = True
 
+    # 知识库目录（多个目录用逗号分隔，相对于 backend 目录）
+    KNOWLEDGE_BASE_DIRS: str = "../knowledge-base/demo_domain/python_data_analysis,../knowledge-base/cnc_domain"
+
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 

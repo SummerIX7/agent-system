@@ -35,7 +35,7 @@ async def get_questions(
     goals = profile.get("goals", [])
     if not goals and learner and learner.goals:
         goals = learner.goals
-    topic = goals[0] if goals else "Python 数据分析基础"
+    topic = goals[0] if goals else "CNC 数控编程基础"
 
     difficulty = profile.get("recommended_difficulty", "beginner")
     if difficulty == "beginner" and learner:

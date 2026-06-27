@@ -113,7 +113,7 @@ const startGenerate = async () => {
   try {
     const result = await api.generateResources(
       sessionId.value,
-      'Python 数据分析基础',
+      'CNC 数控编程基础',
       ['lecture', 'guide', 'project'],
       profile.value || {}
     )

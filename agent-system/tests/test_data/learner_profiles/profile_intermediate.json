@@ -1,30 +1,30 @@
 {
-  "profile_name": "有编程基础",
-  "description": "计算机专业，有 Python 基础，想系统学习数据分析",
+  "profile_name": "有机械基础",
+  "description": "机械工程专业，有普通机床操作经验，想系统学习数控编程",
   "education_background": "本科",
-  "major": "计算机科学",
+  "major": "机械工程",
   "work_experience_years": 1,
   "self_assessment": {
-    "Python 基础": "熟练",
-    "NumPy": "了解基础",
-    "Pandas": "了解基础",
-    "Matplotlib": "不了解",
-    "统计学基础": "了解基础",
-    "SQL 数据库": "熟练",
-    "数据清洗": "了解基础",
-    "机器学习基础": "不了解"
+    "机械制图基础": "熟练",
+    "G 代码编程": "了解基础",
+    "数控车床操作": "了解基础",
+    "数控铣床操作": "不了解",
+    "CAM 软件应用": "不了解",
+    "刀具选择与管理": "了解基础",
+    "切削参数优化": "了解基础",
+    "测量与检测": "了解基础"
   },
   "learning_style": "practice",
   "goals": [
-    "掌握数据分析全流程",
-    "提升 Pandas 数据处理能力",
-    "学会数据可视化",
-    "了解机器学习基础"
+    "掌握数控车床和铣床编程",
+    "学会使用 CAM 软件",
+    "能独立完成中等复杂零件的加工工艺制定",
+    "了解多轴加工基础"
   ],
   "expected_difficulty": "intermediate",
   "expected_blind_spots": [
-    "Matplotlib 高级图表",
-    "Pandas 高级操作（透视表、时间序列）",
-    "统计学假设检验"
+    "CAM 软件操作",
+    "复杂轮廓编程",
+    "切削参数优化"
   ]
 }

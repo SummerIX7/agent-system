@@ -19,7 +19,7 @@
           </UFormGroup>
 
           <UFormGroup label="专业方向" name="major">
-            <UInput v-model="formState.major" placeholder="如：计算机科学、数据科学" />
+            <UInput v-model="formState.major" placeholder="如：机械工程、数控技术、模具设计" />
           </UFormGroup>
 
           <UFormGroup label="工作经验（年）" name="work_experience_years">
@@ -130,14 +130,14 @@ onMounted(async () => {
 })
 
 const skillOptions = [
-  'Python 基础',
-  'NumPy',
-  'Pandas',
-  'Matplotlib',
-  '统计学基础',
-  'SQL 数据库',
-  '数据清洗',
-  '机器学习基础',
+  '机械制图基础',
+  'G 代码编程',
+  '数控车床操作',
+  '数控铣床操作',
+  'CAM 软件应用',
+  '刀具选择与管理',
+  '切削参数优化',
+  '测量与检测',
 ]
 
 const formState = reactive({
