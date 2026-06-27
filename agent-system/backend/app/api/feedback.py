@@ -1,15 +1,21 @@
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
 from app.models.schemas import FeedbackInput, FeedbackResponse, PracticalFeedbackInput, PracticalFeedbackResponse
 from app.models.agent_state import FeedbackRecord
+from app.models.learner import Learner
 from app.core.llm import get_llm
-from app.core.store import add_feedback, get_session
+from app.core.store import add_feedback, get_session, get_all_sessions
+from app.agents.orchestrator import DecisionOrchestrator
 
 router = APIRouter(prefix="/api/feedback", tags=["交互反馈"])
+
+# 决策调度 Agent（用于学习路径调整）
+orchestrator = DecisionOrchestrator()
 
 
 async def generate_heuristic_question(
@@ -107,6 +113,38 @@ async def submit_feedback(
         "heuristic_question": heuristic,
         "round": current_round,
     })
+
+    # P2-2: 学习路径二次更新闭环
+    # 根据答题反馈动态调整学习路径，并持久化到数据库
+    if learner_id:
+        try:
+            # 获取当前学习路径
+            current_path = session.get("learning_path", {})
+            feedback_history = session.get("feedback", [])
+
+            if current_path and feedback_history:
+                # 调用决策调度 Agent 调整学习路径
+                adjusted_path = await orchestrator.adjust_learning_path(
+                    current_path,
+                    feedback_history
+                )
+
+                # 如果路径有变化，持久化到数据库
+                if adjusted_path != current_path:
+                    # 更新内存 store
+                    session["learning_path"] = adjusted_path
+
+                    # 持久化到数据库
+                    stmt = select(Learner).where(Learner.id == learner_id)
+                    result = await db.execute(stmt)
+                    learner = result.scalar_one_or_none()
+                    if learner:
+                        learner.learning_path = adjusted_path
+                        await db.flush()
+                        print(f"[学习路径] 已根据答题反馈调整并持久化: learner_id={learner_id}")
+        except Exception as e:
+            print(f"[警告] 学习路径调整失败: {e}")
+            # 路径调整失败不影响反馈返回
 
     return FeedbackResponse(
         is_correct=is_correct,

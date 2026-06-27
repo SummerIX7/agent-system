@@ -37,7 +37,7 @@
           <span>·</span><span>约 12 分钟阅读</span>
           <span>·</span><span>已通过审核纠偏</span>
         </div>
-        <div class="prose" v-html="renderMarkdown(lectureContent)" />
+        <MarkdownRenderer :content="lectureContent" />
       </div>
 
       <!-- 实验指导 -->
@@ -47,7 +47,7 @@
           <span>·</span><span>预计 30 分钟</span>
           <span>·</span><span>含完整代码与数据集</span>
         </div>
-        <div class="prose" v-html="renderMarkdown(guideContent)" />
+        <MarkdownRenderer :content="guideContent" />
       </div>
 
       <!-- 项目案例 -->
@@ -57,7 +57,7 @@
           <span>·</span><span>综合项目</span>
           <span>·</span><span>含完整数据集与解答</span>
         </div>
-        <div class="prose" v-html="renderMarkdown(projectContent)" />
+        <MarkdownRenderer :content="projectContent" />
       </div>
 
       <!-- 试题 -->
@@ -312,38 +312,6 @@ const parseSources = (content: string): SourceInfo[] => {
   }
 
   return sources
-}
-
-const renderMarkdown = (md: string) => {
-  if (!md) return '<p class="text-text-3">暂无内容</p>'
-  return md
-    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
-    .replace(
-      /(📚\s*来源[：:].+?)(?=\n|<br>|$)/g,
-      '<span class="source-tag">$1</span>'
-    )
-    .replace(
-      /(📄\s*来源[：:].+?)(?=\n|<br>|$)/g,
-      '<span class="source-tag">$1</span>'
-    )
-    .replace(
-      /(📋\s*来源[：:].+?)(?=\n|<br>|$)/g,
-      '<span class="source-tag">$1</span>'
-    )
-    .replace(
-      /(🔗\s*(?:链接|URL)[：:].+?)(?=\n|<br>|$)/g,
-      '<span class="source-tag">$1</span>'
-    )
-    .replace(
-      /(权威度[：:]\s*★+)/g,
-      '<span style="color: var(--warn); font-weight: 500;">$1</span>'
-    )
-    .replace(/\n/g, '<br>')
 }
 
 const selectAnswer = (questionIndex: number, optionIndex: number) => {
