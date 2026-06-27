@@ -1,0 +1,43 @@
+{
+  "profile_name": "CNC数控编程初学者",
+  "domain": "cnc",
+  "education_background": "高中",
+  "major": "非工科",
+  "work_experience_years": 0,
+  "self_assessment": {
+    "数控编程": "不了解",
+    "G代码": "不了解",
+    "机械制图": "不了解",
+    "切削参数": "不了解"
+  },
+  "learning_style": "practice",
+  "goals": [
+    "学习数控编程基础",
+    "掌握G代码基本指令",
+    "了解数控机床操作"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_blind_spots": [
+    "数控编程基础",
+    "G代码",
+    "切削参数",
+    "刀具选择"
+  ],
+  "expected_knowledge_points": [
+    {
+      "name": "数控编程基础",
+      "level": "beginner",
+      "score_range": [0, 15]
+    },
+    {
+      "name": "G代码",
+      "level": "beginner",
+      "score_range": [0, 10]
+    },
+    {
+      "name": "切削参数",
+      "level": "beginner",
+      "score_range": [0, 10]
+    }
+  ]
+}

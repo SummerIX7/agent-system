@@ -1,0 +1,54 @@
+{
+  "profile_name": "Python数据分析初学者",
+  "domain": "python_data_analysis",
+  "education_background": "本科",
+  "major": "市场营销",
+  "work_experience_years": 2,
+  "self_assessment": {
+    "Python基础": "不了解",
+    "NumPy": "不了解",
+    "Pandas": "不了解",
+    "数据可视化": "不了解",
+    "统计学基础": "了解一点"
+  },
+  "learning_style": "practice",
+  "goals": [
+    "学习Python数据分析基础",
+    "掌握Pandas数据清洗",
+    "能够用Matplotlib制作基本图表"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_blind_spots": [
+    "NumPy数组操作",
+    "Pandas DataFrame",
+    "数据可视化",
+    "Python基础语法"
+  ],
+  "expected_knowledge_points": [
+    {
+      "name": "Python基础",
+      "level": "beginner",
+      "score_range": [0, 20]
+    },
+    {
+      "name": "NumPy",
+      "level": "beginner",
+      "score_range": [0, 10]
+    },
+    {
+      "name": "Pandas",
+      "level": "beginner",
+      "score_range": [0, 10]
+    },
+    {
+      "name": "数据可视化",
+      "level": "beginner",
+      "score_range": [0, 10]
+    },
+    {
+      "name": "统计学基础",
+      "level": "beginner",
+      "score_range": [20, 40]
+    }
+  ]
+}

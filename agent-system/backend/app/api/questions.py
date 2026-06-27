@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
 from app.core.store import get_session
+from app.core.domains import get_domain_from_input, get_default_domain
 from app.models.database import get_db
 from app.models.learner import Learner
 from app.models.schemas import QuestionSet
@@ -31,13 +32,21 @@ async def get_questions(
     session_data = get_session(session_id)
     profile = session_data.get("profile", {})
 
-    # 3. 推断 topic 和 difficulty（强制 CNC 领域）
+    # 3. 推断领域配置（支持多领域，不再硬编码 CNC）
     goals = profile.get("goals", [])
     if not goals and learner and learner.goals:
         goals = learner.goals
-    # 无论 goals 内容如何，始终以数控领域为出题方向
+
+    # 构建输入数据用于推断领域
+    input_data = {
+        "domain": profile.get("domain", ""),
+        "goals": goals,
+    }
+    domain = get_domain_from_input(input_data)
+
+    # 构建 topic（基于领域和目标）
     raw_goal = goals[0] if goals else ""
-    topic = f"数控加工（CNC）领域 - {raw_goal}" if raw_goal else "数控加工（CNC）编程与操作基础"
+    topic = f"{domain.name} - {raw_goal}" if raw_goal else f"{domain.name}基础"
 
     difficulty = profile.get("recommended_difficulty", "beginner")
     if difficulty == "beginner" and learner:
@@ -51,6 +60,7 @@ async def get_questions(
 
     # 4. 构建 profile dict 供 Agent 使用
     profile_dict = {
+        "domain": domain.code,
         "education_background": learner.education_background if learner else "",
         "major": learner.major if learner else "",
         "goals": goals,
@@ -68,7 +78,7 @@ async def get_questions(
         )
     except Exception as e:
         print(f"[警告] 试题生成失败: {e}")
-        result_dict = {"topic": topic, "difficulty": difficulty, "questions": []}
+        result_dict = {"topic": topic, "difficulty": difficulty, "domain": domain.code, "questions": []}
 
     return QuestionSet(
         topic=result_dict.get("topic", topic),

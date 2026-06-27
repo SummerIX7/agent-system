@@ -1,0 +1,48 @@
+{
+  "profile_name": "CNC数控编程有机械基础学习者",
+  "domain": "cnc",
+  "education_background": "本科",
+  "major": "机械工程",
+  "work_experience_years": 2,
+  "self_assessment": {
+    "机械制图": "熟练",
+    "普通机床": "了解",
+    "数控编程": "不了解",
+    "G代码": "不了解",
+    "切削参数": "了解一点"
+  },
+  "learning_style": "practice",
+  "goals": [
+    "学习数控车床编程",
+    "掌握常用G代码指令",
+    "能够独立完成简单零件编程"
+  ],
+  "expected_difficulty": "intermediate",
+  "expected_blind_spots": [
+    "数控车床编程",
+    "高级G代码功能",
+    "刀具补偿"
+  ],
+  "expected_knowledge_points": [
+    {
+      "name": "数控编程基础",
+      "level": "intermediate",
+      "score_range": [40, 65]
+    },
+    {
+      "name": "G代码",
+      "level": "intermediate",
+      "score_range": [30, 55]
+    },
+    {
+      "name": "切削参数",
+      "level": "intermediate",
+      "score_range": [40, 60]
+    },
+    {
+      "name": "机械制图",
+      "level": "advanced",
+      "score_range": [70, 85]
+    }
+  ]
+}

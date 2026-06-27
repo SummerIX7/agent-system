@@ -2,6 +2,7 @@ import json
 from typing import Dict, List
 
 from app.agents.base import BaseAgent
+from app.core.domains import get_domain_from_input, build_domain_prompt
 
 
 class DiagnosisAgent(BaseAgent):
@@ -9,12 +10,19 @@ class DiagnosisAgent(BaseAgent):
 
     async def build_profile(self, input_data: dict) -> dict:
         """根据输入数据构建学习者画像"""
+        # 从输入数据推断领域配置
+        domain = get_domain_from_input(input_data)
+
         context = self.retrieve_context(
-            f"数控加工 CNC 学习者画像 {input_data.get('major', '')} {input_data.get('education_background', '')}"
+            f"{domain.name} 学习者画像 {input_data.get('major', '')} {input_data.get('education_background', '')}"
         )
 
-        prompt = f"""你是一位数控加工（CNC）领域的教育诊断专家。请根据以下学习者信息，构建详细的学习者画像。
-所有知识点和盲区必须围绕数控加工领域（如数控编程、G 代码、切削参数、刀具选择、加工工艺等），不得涉及编程语言或数据分析。
+        # 构建领域上下文 prompt
+        domain_prompt = build_domain_prompt(domain)
+
+        prompt = f"""你是一位{domain.name}领域的教育诊断专家。请根据以下学习者信息，构建详细的学习者画像。
+
+{domain_prompt}
 
 [学习者输入信息]
 - 学历背景: {input_data.get('education_background', '未知')}
@@ -28,12 +36,12 @@ class DiagnosisAgent(BaseAgent):
 {context}
 
 [难度判定标准]
-- beginner：零机械加工基础，非工科背景，从未接触过数控机床
-- intermediate：有机械基础（如机械制图、普通机床操作经验），或工科专业背景，但数控经验较少
-- advanced：有丰富的数控加工经验（3年以上），能独立完成复杂零件编程与加工
-- expert：数控编程专家，5年以上经验，精通多轴加工、工艺优化、CAM 编程
+- beginner：零基础，非相关专业背景，从未接触过该领域
+- intermediate：有相关基础（如相关专业背景或工作经验），但该领域经验较少
+- advanced：有丰富的领域经验（3年以上），能独立完成复杂任务
+- expert：领域专家，5年以上经验，精通高级技术和优化
 
-注意：如果学习者有机械加工基础（如普通车床/铣床操作经验），即使数控技能较弱，也应判定为 intermediate，因为机械加工基础意味着更容易理解数控原理。
+注意：如果学习者有相关领域基础，即使当前领域技能较弱，也应判定为 intermediate，因为相关基础意味着更容易理解核心概念。
 
 请输出 JSON 格式的画像，包含以下字段：
 {{
@@ -43,7 +51,8 @@ class DiagnosisAgent(BaseAgent):
     "blind_spots": ["知识盲区1", "知识盲区2"],
     "overall_level": "beginner/intermediate/advanced/expert",
     "learning_style_analysis": "学习风格分析",
-    "recommended_difficulty": "beginner/intermediate/advanced/expert"
+    "recommended_difficulty": "beginner/intermediate/advanced/expert",
+    "domain": "{domain.code}"
 }}
 
 只输出 JSON，不要其他文字。"""
@@ -51,6 +60,8 @@ class DiagnosisAgent(BaseAgent):
         response = await self.call_llm(prompt)
         try:
             profile = json.loads(response.strip().strip("```json").strip("```"))
+            # 确保 domain 字段被设置
+            profile["domain"] = profile.get("domain", domain.code)
         except json.JSONDecodeError:
             profile = {
                 "knowledge_points": [],
@@ -58,6 +69,7 @@ class DiagnosisAgent(BaseAgent):
                 "overall_level": "beginner",
                 "learning_style_analysis": "暂无分析",
                 "recommended_difficulty": "beginner",
+                "domain": domain.code,
             }
         return profile
 

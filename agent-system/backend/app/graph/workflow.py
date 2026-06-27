@@ -419,8 +419,141 @@ def get_workflow():
 
 
 async def run_workflow(learner_input: dict, topic: str, session_id: str = "", profile: dict = None) -> dict:
-    """运行完整 6 Agent 工作流"""
+    """运行完整 6 Agent 工作流（包含辩论机制）"""
     workflow = get_workflow()
+
+    # 如果传入了 profile，合并到 learner_input
+    if profile:
+        learner_input = {**learner_input, **profile}
+
+    initial_state: AgentState = {
+        "learner_input": learner_input,
+        "topic": topic,
+        "retry_count": 0,
+        "generated_content": {},
+        "debate_results": {},
+        "debate_rounds": [],
+        "question_set": {},
+        "learning_path": {},
+        "final_resources": [],
+        "feedback_history": [],
+        "decision_log": [],
+        "session_id": session_id,
+    }
+
+    result = await workflow.ainvoke(initial_state)
+    return result
+
+
+# ──────────────────────────────────────────────
+# 无辩论版本（用于消融实验）
+# ──────────────────────────────────────────────
+
+async def gen_questions_node_no_debate(state: AgentState) -> dict:
+    """试题生成节点（无辩论版本）"""
+    session_id = state.get("session_id", "")
+    _broadcast(session_id, "试题生成 Agent", "running", "正在生成试题...", 88)
+
+    topic = state.get("topic", "")
+    difficulty = state.get("difficulty", "beginner")
+    profile = state.get("profile", {})
+
+    result = await question_generator.generate_questions(topic, difficulty, profile)
+
+    _broadcast(session_id, "试题生成 Agent", "completed", "试题生成完成", 92)
+
+    return {
+        "question_set": result,
+        "decision_log": ["⑤ 试题生成完成（无辩论）"],
+    }
+
+
+async def finalize_node_no_debate(state: AgentState) -> dict:
+    """最终输出节点（无辩论版本）"""
+    final_resources = []
+    topic = state.get("topic", "")
+    difficulty = state.get("difficulty", "beginner")
+    generated = state.get("generated_content", {})
+
+    # 直接使用生成的内容，不经过辩论验证
+    for content_type, content in generated.items():
+        final_resources.append({
+            "type": content_type,
+            "content": content,
+            "topic": topic,
+            "difficulty": difficulty,
+        })
+
+    # 添加试题
+    question_set = state.get("question_set", {})
+    if question_set.get("questions"):
+        final_resources.append({
+            "type": "test",
+            "content": question_set,
+            "topic": topic,
+            "difficulty": difficulty,
+        })
+
+    # 添加学习路径
+    learning_path = state.get("learning_path", {})
+    if learning_path:
+        final_resources.append({
+            "type": "learning_path",
+            "content": learning_path,
+            "topic": topic,
+            "difficulty": difficulty,
+        })
+
+    return {
+        "final_resources": final_resources,
+        "learning_path": state.get("learning_path", {}),
+        "decision_log": ["⑥ 工作流完成（无辩论）"],
+    }
+
+
+def build_workflow_no_debate() -> StateGraph:
+    """构建无辩论版本的工作流（用于消融实验对比）"""
+    workflow = StateGraph(AgentState)
+
+    # 只包含分析、生成、试题、最终输出（无辩论/预审/决策）
+    workflow.add_node("analyze", analyze_node)            # ① 学情分析
+    workflow.add_node("plan_path", plan_path_node)        # ② 路径规划
+    workflow.add_node("generate", generate_node)          # ③ 知识生成
+    workflow.add_node("gen_questions", gen_questions_node_no_debate)  # ⑤ 试题生成（无辩论）
+    workflow.add_node("finalize", finalize_node_no_debate)  # 最终输出（无辩论）
+
+    # 简单流程：分析 → 生成 → 试题 → 输出
+    workflow.set_entry_point("analyze")
+    workflow.add_edge("analyze", "plan_path")
+    workflow.add_edge("plan_path", "generate")
+    workflow.add_edge("generate", "gen_questions")
+    workflow.add_edge("gen_questions", "finalize")
+    workflow.add_edge("finalize", END)
+
+    return workflow.compile()
+
+
+_workflow_no_debate = None
+
+
+def get_workflow_no_debate():
+    """获取无辩论工作流单例"""
+    global _workflow_no_debate
+    if _workflow_no_debate is None:
+        _workflow_no_debate = build_workflow_no_debate()
+    return _workflow_no_debate
+
+
+async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: str = "", profile: dict = None) -> dict:
+    """
+    运行无辩论版本的工作流（用于消融实验）
+
+    与 run_workflow 的区别：
+    - 跳过预审、辩论、裁判、决策节点
+    - 直接使用生成的内容，不进行质量验证
+    - 用于对比有/无辩论机制对谬误率的影响
+    """
+    workflow = get_workflow_no_debate()
 
     # 如果传入了 profile，合并到 learner_input
     if profile:
