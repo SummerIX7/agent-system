@@ -143,7 +143,7 @@ async def get_visualization(
         match_curve = {
             "learner_level": profile.get("recommended_difficulty", "beginner"),
             "resources": [
-                {"name": kp.name, "difficulty": kp.score / 20, "match": min(1.0, kp.score / 80)}
+                {"name": kp["name"], "difficulty": kp["score"] / 20, "match": min(1.0, kp["score"] / 80)}
                 for kp in knowledge_points
             ],
         }

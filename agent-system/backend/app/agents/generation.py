@@ -89,7 +89,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成讲义："""
 
-        return await self.call_llm(prompt)
+        return await self.call_llm(prompt, label="生成讲义")
 
     async def generate_practical_guide(self, topic: str, profile: dict,
                                        domain: Optional[DomainConfig] = None,
@@ -142,7 +142,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成实验指导："""
 
-        return await self.call_llm(prompt)
+        return await self.call_llm(prompt, label="生成实验指导")
 
     async def generate_project_case(self, topic: str, profile: dict,
                                     domain: Optional[DomainConfig] = None,
@@ -198,7 +198,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成项目案例："""
 
-        return await self.call_llm(prompt)
+        return await self.call_llm(prompt, label="生成项目案例")
 
     async def run(self, topic: str = "", profile: dict = None,
                   resource_types: List[str] = None,

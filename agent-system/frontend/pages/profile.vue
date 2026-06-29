@@ -16,7 +16,6 @@
         <div class="field">
           <label class="field__label">学历背景 <span style="color: var(--err)">*</span></label>
           <select v-model="formState.education_background" class="select">
-            <option value="">请选择</option>
             <option value="高中">高中</option>
             <option value="大专">大专</option>
             <option value="本科">本科</option>
@@ -38,7 +37,6 @@
         <div class="field">
           <label class="field__label">学习领域 <span style="color: var(--err)">*</span></label>
           <select v-model="formState.domain" class="select" @change="onDomainChange">
-            <option value="">请选择领域</option>
             <option v-for="d in domains" :key="d.code" :value="d.code">{{ d.name }}</option>
           </select>
         </div>
@@ -46,7 +44,6 @@
         <div class="field" style="margin-bottom: 0">
           <label class="field__label">学习风格</label>
           <select v-model="formState.learning_style" class="select">
-            <option value="">请选择</option>
             <option value="visual">视觉型</option>
             <option value="theory">理论型</option>
             <option value="practice">实践型</option>
@@ -65,7 +62,6 @@
             <div style="font-size: 13.5px; font-weight: 500">{{ skill }}</div>
           </div>
           <select v-model="formState.self_assessment[skill]" class="select" style="width: 130px; padding: 7px 10px; font-size: 13px">
-            <option value="">请选择</option>
             <option value="不了解">不了解</option>
             <option value="了解基础">了解基础</option>
             <option value="熟练">熟练</option>
@@ -134,10 +130,11 @@ onMounted(async () => {
       setSession(existing.session_id || `user-${existing.id}`, String(existing.id))
       setProfile(existing)
       // 预填表单
-      formState.education_background = existing.education_background || ''
+      formState.education_background = existing.education_background || '本科'
       formState.major = existing.major || ''
       formState.work_experience_years = existing.work_experience_years || 0
-      formState.learning_style = existing.learning_style || ''
+      formState.learning_style = existing.learning_style || 'practice'
+      formState.domain = (existing as any).domain || 'cnc'
       formState.self_assessment = existing.self_assessment || {}
       formState.goals = existing.goals?.length ? existing.goals : ['']
       profileLoaded.value = true
@@ -159,11 +156,11 @@ function onDomainChange() {
 }
 
 const formState = reactive({
-  education_background: '',
+  education_background: '本科',
   major: '',
   work_experience_years: 0,
-  learning_style: '',
-  domain: '',
+  learning_style: 'practice',
+  domain: 'cnc',
   self_assessment: {} as Record<string, string>,
   goals: [''],
 })

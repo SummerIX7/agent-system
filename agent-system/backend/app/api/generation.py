@@ -56,7 +56,7 @@ async def generate_resources(
     DB_RESOURCE_TYPES = {"lecture", "guide", "project", "test"}
 
     resources = []
-    debate_results = result.get("debate_results", {})
+    review_results = result.get("review_results", {})
 
     for res in result.get("final_resources", []):
         res_type = res.get("type", "")
@@ -71,7 +71,7 @@ async def generate_resources(
 
         # 只有标准资源类型才写入数据库
         if res_type in DB_RESOURCE_TYPES:
-            debate = debate_results.get(res_type, {})
+            review = review_results.get(res_type, {})
             db_resource = Resource(
                 learner_id=learner_id or "unknown",
                 session_id=request.session_id,
@@ -80,8 +80,8 @@ async def generate_resources(
                 topic=res.get("topic", request.topic),
                 difficulty=res.get("difficulty", "beginner"),
                 sources=res.get("sources", None),
-                review_score=debate.get("quality_score", None),
-                review_passed="passed" if debate.get("passed", True) else "failed",
+                review_score=review.get("score", None),
+                review_passed="passed" if review.get("passed", True) else "failed",
             )
             db.add(db_resource)
 
@@ -135,3 +135,40 @@ async def get_resources(
         )
         for r in session.get("resources", [])
     ]
+
+
+@router.get("/trace/{session_id}")
+async def get_trace(session_id: str):
+    """返回完整工作流追踪数据——每个节点的输入输出和 LLM 调用明细"""
+    from app.core.store import get_trace_entries
+    session = get_session(session_id)
+    entries = get_trace_entries(session_id)
+    # 也收集 agent_logs 作为补充
+    agent_logs = session.get("agent_logs", [])
+
+    # 确定最终结果
+    resources = session.get("resources", [])
+    outcome = "unknown"
+    if any(r.get("type") == "learning_path" for r in resources):
+        # 检查是否有降级内容
+        for r in resources:
+            if r.get("type") == "lecture" and "未通过质量审核" in str(r.get("content", "")):
+                outcome = "degraded"
+                break
+        else:
+            outcome = "completed"
+
+    return {
+        "session_id": session_id,
+        "topic": session.get("topic", ""),
+        "profile": {
+            "difficulty": session.get("profile", {}).get("recommended_difficulty", ""),
+            "goals": session.get("profile", {}).get("goals", []),
+        },
+        "nodes": entries,
+        "agent_logs": agent_logs,
+        "outcome": {
+            "result": outcome,
+            "resources_count": len(resources),
+        },
+    }

@@ -1,10 +1,10 @@
+import time as _time
+
 from langgraph.graph import END, StateGraph
 
 from app.agents.diagnosis import DiagnosisAgent
 from app.agents.path_planner import PathPlannerAgent
 from app.agents.generation import GenerationAgent
-from app.agents.debate import DebateManager
-from app.agents.judge import JudgeAgent
 from app.agents.question_generator import QuestionGeneratorAgent
 from app.agents.orchestrator import DecisionOrchestrator
 from app.agents.review import ReviewAgent
@@ -16,8 +16,6 @@ diagnosis_agent = DiagnosisAgent()
 path_planner = PathPlannerAgent()
 generation_agent = GenerationAgent()
 review_agent = ReviewAgent()
-debate_manager = DebateManager()
-judge_agent = JudgeAgent()
 question_generator = QuestionGeneratorAgent()
 orchestrator = DecisionOrchestrator()
 
@@ -35,22 +33,51 @@ def _broadcast(session_id: str, agent: str, status: str, message: str, progress:
             pass
 
 
+def _save_node_trace(session_id: str, node: str, agent_name: str,
+                     input_data: dict, output_data: dict,
+                     llm_calls: list, start_time: float):
+    """保存节点追踪记录"""
+    if not session_id:
+        return
+    try:
+        from app.core.store import add_trace_entry
+        add_trace_entry(session_id, {
+            "node": node,
+            "agent_name": agent_name,
+            "input": input_data,
+            "output": output_data,
+            "llm_calls": llm_calls,
+            "duration_ms": round((_time.time() - start_time) * 1000),
+        })
+    except Exception:
+        pass
+
+
 # ──────────────────────────────────────────────
 # ① 学情分析 Agent
 # ──────────────────────────────────────────────
 async def analyze_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
+    start = _time.time()
+    diagnosis_agent._trace_agent_name = "学情分析 Agent"
+    diagnosis_agent._trace_calls = []
+
     _broadcast(session_id, "学情分析 Agent", "running", "正在分析学习者画像...", 5)
 
     result = await diagnosis_agent.run(state.get("learner_input", {}))
 
     _broadcast(session_id, "学情分析 Agent", "completed", "学情分析完成", 15)
 
-    return {
+    output = {
         "profile": result.get("profile", {}),
         "difficulty": result.get("difficulty", "beginner"),
         "decision_log": ["① 学情分析完成"],
     }
+    _save_node_trace(session_id, "analyze", "学情分析 Agent",
+                     {"learner_input": state.get("learner_input", {})},
+                     {"difficulty": output["difficulty"]},
+                     diagnosis_agent.collect_trace(), start)
+    return output
 
 
 # ──────────────────────────────────────────────
@@ -58,9 +85,12 @@ async def analyze_node(state: AgentState) -> dict:
 # ──────────────────────────────────────────────
 async def plan_path_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
+    start = _time.time()
+    path_planner._trace_agent_name = "路径规划 Agent"
+    path_planner._trace_calls = []
+
     _broadcast(session_id, "路径规划 Agent", "running", "正在规划学习路径...", 20)
 
-    # 如果有反馈历史，调整路径；否则生成新路径
     existing_path = state.get("learning_path")
     feedback_history = state.get("feedback_history", [])
 
@@ -74,10 +104,15 @@ async def plan_path_node(state: AgentState) -> dict:
 
     _broadcast(session_id, "路径规划 Agent", "completed", "学习路径规划完成", 30)
 
-    return {
+    output = {
         "learning_path": result,
         "decision_log": ["② 路径规划完成"],
     }
+    _save_node_trace(session_id, "plan_path", "路径规划 Agent",
+                     {"profile": state.get("profile", {}), "topic": state.get("topic", "")},
+                     {"learning_path_stages": len(result.get("path", [])) if result else 0},
+                     path_planner.collect_trace(), start)
+    return output
 
 
 # ──────────────────────────────────────────────
@@ -85,6 +120,10 @@ async def plan_path_node(state: AgentState) -> dict:
 # ──────────────────────────────────────────────
 async def generate_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
+    start = _time.time()
+    generation_agent._trace_agent_name = "知识生成 Agent"
+    generation_agent._trace_calls = []
+
     topic = state.get("topic", "")
     profile = state.get("profile", {})
     domain_code = state.get("domain", "")
@@ -97,17 +136,11 @@ async def generate_node(state: AgentState) -> dict:
     retry_context = ""
     if retry_count > 0:
         issues_parts = []
-        # 从预审结果收集
         review_results = state.get("review_results", {})
         for ct, review in review_results.items():
             if review.get("issues"):
                 for issue in review["issues"]:
-                    issues_parts.append(f"[预审-{ct}] {issue}")
-        # 从辩论结果收集
-        debate_results = state.get("debate_results", {})
-        for ct, debate in debate_results.items():
-            if debate.get("reason"):
-                issues_parts.append(f"[裁判-{ct}] {debate['reason']}")
+                    issues_parts.append(f"[审核-{ct}] {issue}")
         if issues_parts:
             retry_context = "\n".join(issues_parts)
             logs.append(f"注入上一轮反馈: {len(issues_parts)} 条问题")
@@ -127,159 +160,132 @@ async def generate_node(state: AgentState) -> dict:
     generated["project"] = await generation_agent.generate_project_case(topic, profile, domain, retry_context)
     logs.append("项目案例生成完成")
 
-    # 注意：不在这里标记完成，因为还需要辩论验证
-    _broadcast(session_id, "知识生成 Agent", "running", "内容已生成，等待辩论验证...", 58)
+    _broadcast(session_id, "知识生成 Agent", "running", "内容已生成，等待审核验证...", 58)
 
-    return {
+    output = {
         "generated_content": generated,
         "decision_log": [f"③ 知识生成完成: {', '.join(logs)}"],
     }
+    _save_node_trace(session_id, "generate", "知识生成 Agent",
+                     {"topic": topic, "retry_count": retry_count, "has_retry_context": bool(retry_context)},
+                     {"content_types": list(generated.keys()),
+                      "lecture_len": len(generated.get("lecture", "")),
+                      "guide_len": len(generated.get("guide", "")),
+                      "project_len": len(generated.get("project", ""))},
+                     generation_agent.collect_trace(), start)
+    return output
 
 
 # ──────────────────────────────────────────────
-# ③½ 预审 Agent（辩论前的快速筛查）
+# ③½ 审核纠偏 Agent（双视角审查 + 修正，合并原预审+辩论）
 # ──────────────────────────────────────────────
-async def review_node(state: AgentState) -> dict:
+async def review_correct_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
-    topic = state.get("topic", "")
-    generated = state.get("generated_content", {})
-    review_results = {}
+    start = _time.time()
+    review_agent._trace_agent_name = "审核纠偏 Agent"
+    review_agent._trace_calls = []
 
-    _broadcast(session_id, "预审 Agent", "running", "启动双视角预审...", 59)
-
-    for content_type, content in generated.items():
-        if content_type == "test":
-            review_results[content_type] = {"passed": True, "score": 1.0, "issues": [], "skipped": True}
-            continue
-
-        _broadcast(session_id, "预审 Agent", "running",
-                   f"预审: {content_type}...", 59 + len(review_results))
-
-        try:
-            result = await review_agent.debate_verify(content, topic)
-            review_results[content_type] = {
-                "passed": result.passed,
-                "score": result.score,
-                "issues": result.issues,
-                "suggestions": result.suggestions,
-            }
-        except Exception as e:
-            review_results[content_type] = {
-                "passed": True,
-                "score": 0.5,
-                "issues": [f"预审异常: {str(e)}"],
-                "suggestions": [],
-            }
-
-    all_passed = all(r.get("passed", False) for r in review_results.values())
-    _broadcast(session_id, "预审 Agent", "completed",
-               f"预审完成：{'全部通过' if all_passed else '有内容需重点审查'}", 61)
-
-    return {
-        "review_results": review_results,
-        "decision_log": [f"③½ 预审完成（{'通过' if all_passed else '需重点审查'}）"],
-    }
-
-
-# ──────────────────────────────────────────────
-# ④ 审核纠偏 Agent（辩论 + 独立裁判）
-# ──────────────────────────────────────────────
-async def debate_node(state: AgentState) -> dict:
-    session_id = state.get("session_id", "")
     topic = state.get("topic", "")
     generated = state.get("generated_content", {})
     retry_count = state.get("retry_count", 0)
-    debate_results = {}
-    all_rounds = []
+    review_results = {}
 
-    _broadcast(session_id, "审核纠偏 Agent", "running", "启动辩论机制...", 62)
+    _broadcast(session_id, "审核纠偏 Agent", "running", "启动双视角审核纠偏...", 59)
 
     for content_type, content in generated.items():
-        progress = 62 + len(debate_results) * 3
-        _broadcast(session_id, "审核纠偏 Agent", "running",
-                   f"正在审核: {content_type}...", progress)
+        progress = 59 + len(review_results) * 5
 
         # 跳过非文本内容
         if content_type == "test":
-            debate_results[content_type] = {"passed": True, "reason": "试题不参与辩论", "final_content": content}
+            review_results[content_type] = {
+                "passed": True, "score": 1.0, "issues": [],
+                "final_content": content, "correction_applied": False,
+            }
             continue
 
-        # 达到最大重试次数，不再强制通过，标记为降级处理
+        # 达到最大重试次数，标记为降级
         if retry_count >= MAX_RETRIES:
-            debate_results[content_type] = {
-                "passed": False,
-                "adopted_side": "challenger",
-                "reason": f"超过最大重试次数({MAX_RETRIES})，内容未通过质量审核",
-                "quality_score": 0,
-                "final_content": content,
+            review_results[content_type] = {
+                "passed": False, "score": 0, "issues": [],
+                "final_content": content, "correction_applied": False,
                 "degraded": True,
             }
             continue
 
-        # 获取预审结果
-        review = state.get("review_results", {}).get(content_type, {})
-        review_score = review.get("score", 1.0)
+        _broadcast(session_id, "审核纠偏 Agent", "running",
+                   f"审核+纠偏: {content_type}...", progress)
 
-        # 如果预审分数极低（< 0.4），直接打回，跳过辩论
-        if review_score < 0.4:
-            debate_results[content_type] = {
-                "passed": False,
-                "adopted_side": "reviewer",
-                "reason": f"预审严重不合格（score={review_score:.2f}），跳过辩论直接打回",
-                "quality_score": review_score,
-                "final_content": content,
+        try:
+            result = await review_agent.corrective_review(content, topic)
+            review_results[content_type] = result
+        except Exception as e:
+            review_results[content_type] = {
+                "passed": False, "score": 0,
+                "issues": [f"审核纠偏异常: {str(e)}"],
+                "final_content": content, "correction_applied": False,
             }
-            continue
 
-        # 第1-2轮：辩论（审核质疑 → 生成反驳）
-        debate_result = await debate_manager.run_debate(content, topic, content_type)
-
-        all_rounds.append({
-            "content_type": content_type,
-            "challenge_issues": debate_result.challenge_issues,
-            "defend_responses": debate_result.defend_responses,
-        })
-
-        # 第3轮：独立裁判判决
-        _broadcast(session_id, "裁判 Agent", "running", f"正在判决: {content_type}...", 75)
-        judge_result = await judge_agent.run(
-            original_content=debate_result.original_content,
-            topic=topic,
-            content_type=content_type,
-            challenge_issues=debate_result.challenge_issues,
-            defend_responses=debate_result.defend_responses,
-            revised_content=debate_result.revised_content,
-        )
-
-        final_content = debate_result.revised_content if judge_result.get("adopted_side") == "defender" else content
-
-        debate_results[content_type] = {
-            "passed": judge_result.get("passed", True),
-            "adopted_side": judge_result.get("adopted_side", "defender"),
-            "reason": judge_result.get("reason", ""),
-            "quality_score": judge_result.get("quality_score", 0),
-            "final_content": final_content,
-        }
-
-    # 检查是否全部通过，未通过则递增重试计数
-    all_passed = all(r.get("passed", False) for r in debate_results.values())
+    all_passed = all(r.get("passed", False) for r in review_results.values())
+    has_degraded = any(r.get("degraded", False) for r in review_results.values())
     new_retry = retry_count if all_passed else retry_count + 1
 
-    if not all_passed:
-        _broadcast(session_id, "裁判 Agent", "completed", f"判决：有内容未通过（第{new_retry}次），将重新生成", 85)
-        _broadcast(session_id, "审核纠偏 Agent", "completed", f"辩论结束：未通过，需重新生成", 82)
-        _broadcast(session_id, "知识生成 Agent", "error", "内容未通过验证，需重新生成", 60)
-    else:
-        _broadcast(session_id, "裁判 Agent", "completed", "判决：所有内容通过", 85)
-        _broadcast(session_id, "审核纠偏 Agent", "completed", "辩论结束：所有内容通过验证", 82)
-        _broadcast(session_id, "知识生成 Agent", "completed", "内容生成并通过验证", 65)
+    # 本轮重试耗尽 → 标记为降级（修复：retry_count=2进入、失败后new_retry=3时漏标degraded）
+    if not all_passed and new_retry >= MAX_RETRIES and not has_degraded:
+        has_degraded = True
+        for ct in review_results:
+            if not review_results[ct].get("passed", False):
+                review_results[ct]["degraded"] = True
 
-    return {
-        "debate_results": debate_results,
-        "debate_rounds": all_rounds,
+    # 构建调试日志
+    debug_lines = []
+    for ct, r in review_results.items():
+        status = "通过" if r.get("passed") else ("降级" if r.get("degraded") else "未通过")
+        score = r.get("score", 0)
+        issue_count = len(r.get("issues", []))
+        corrected = "已修正" if r.get("correction_applied") else "未修正"
+        debug_lines.append(f"  {ct}: {status} | 评分={score:.2f} | 问题数={issue_count} | {corrected}")
+    debug_log = f"③½ 审核纠偏 第{new_retry}次 | {'全部通过' if all_passed else '需重试'}\n" + "\n".join(debug_lines)
+
+    # 广播
+    if has_degraded:
+        _broadcast(session_id, "审核纠偏 Agent", "completed",
+                   f"审核完成：已降级（超过最大重试{MAX_RETRIES}次）", 82)
+        _broadcast(session_id, "知识生成 Agent", "completed", "内容已生成（降级通过）", 65)
+    elif all_passed:
+        _broadcast(session_id, "审核纠偏 Agent", "completed", "审核完成：全部内容通过", 82)
+        _broadcast(session_id, "知识生成 Agent", "completed", "内容已生成并通过审核", 65)
+    else:
+        _broadcast(session_id, "审核纠偏 Agent", "completed",
+                   f"审核完成：有内容未通过（第{new_retry}次），触发重新生成", 82)
+        _broadcast(session_id, "知识生成 Agent", "error", "内容未通过审核，需重新生成", 60)
+
+    # 存储调试信息到 session
+    if session_id:
+        try:
+            from app.core.store import add_agent_log
+            add_agent_log(session_id, {
+                "agent_name": "审核纠偏 Agent",
+                "status": "completed",
+                "message": debug_log,
+                "progress": 82,
+            })
+        except Exception:
+            pass
+
+    output = {
+        "review_results": review_results,
         "retry_count": new_retry,
-        "decision_log": [f"④ 辩论+裁判完成（{'通过' if all_passed else f'未通过，第{new_retry}次'}）"],
+        "decision_log": [debug_log],
     }
+    _save_node_trace(session_id, "review_correct", "审核纠偏 Agent",
+                     {"content_types": list(generated.keys()), "retry_count": retry_count, "topic": topic},
+                     {"all_passed": all_passed, "has_degraded": has_degraded, "new_retry": new_retry,
+                      "results_summary": {ct: {"passed": r.get("passed"), "score": r.get("score"),
+                                               "issues": len(r.get("issues", [])),
+                                               "corrected": r.get("correction_applied")}
+                                          for ct, r in review_results.items()}},
+                     review_agent.collect_trace(), start)
+    return output
 
 
 # ──────────────────────────────────────────────
@@ -287,6 +293,10 @@ async def debate_node(state: AgentState) -> dict:
 # ──────────────────────────────────────────────
 async def gen_questions_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
+    start = _time.time()
+    question_generator._trace_agent_name = "试题生成 Agent"
+    question_generator._trace_calls = []
+
     _broadcast(session_id, "试题生成 Agent", "running", "正在生成试题...", 88)
 
     topic = state.get("topic", "")
@@ -297,10 +307,15 @@ async def gen_questions_node(state: AgentState) -> dict:
 
     _broadcast(session_id, "试题生成 Agent", "completed", "试题生成完成", 92)
 
-    return {
+    output = {
         "question_set": result,
         "decision_log": ["⑤ 试题生成完成"],
     }
+    _save_node_trace(session_id, "gen_questions", "试题生成 Agent",
+                     {"topic": topic, "difficulty": difficulty},
+                     {"question_count": len(result.get("questions", [])) if result else 0},
+                     question_generator.collect_trace(), start)
+    return output
 
 
 # ──────────────────────────────────────────────
@@ -310,23 +325,20 @@ async def decide_node(state: AgentState) -> str:
     session_id = state.get("session_id", "")
     _broadcast(session_id, "决策调度 Agent", "running", "正在决策...", 95)
 
-    debate_results = state.get("debate_results", {})
+    review_results = state.get("review_results", {})
     retry_count = state.get("retry_count", 0)
 
-    all_passed = all(r.get("passed", False) for r in debate_results.values())
-    has_degraded = any(d.get("degraded", False) for d in debate_results.values())
+    all_passed = all(r.get("passed", False) for r in review_results.values())
+    has_degraded = any(r.get("degraded", False) for r in review_results.values())
 
     if all_passed:
-        # 辩论通过，完成工作流
         _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成：所有内容通过质量审核", 100)
         return "complete"
     elif has_degraded or retry_count >= MAX_RETRIES:
-        # 超过最大重试次数或有降级标记，走降级完成路径
         _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成（降级）：内容未通过质量审核", 100)
         return "complete"
     else:
-        _broadcast(session_id, "决策调度 Agent", "running", f"辩论未通过（第{retry_count}次），触发重新生成...", 25)
-        # 重置相关 Agent 状态，准备重试
+        _broadcast(session_id, "决策调度 Agent", "running", f"审核未通过（第{retry_count}次），触发重新生成...", 25)
         _broadcast(session_id, "知识生成 Agent", "running", "重新生成内容...", 30)
         return "retry"
 
@@ -338,10 +350,10 @@ async def finalize_node(state: AgentState) -> dict:
     final_resources = []
     topic = state.get("topic", "")
     difficulty = state.get("difficulty", "beginner")
-    debate_results = state.get("debate_results", {})
+    review_results = state.get("review_results", {})
 
     # 检查是否有降级内容（超过最大重试次数仍未通过）
-    has_degraded = any(d.get("degraded", False) for d in debate_results.values())
+    has_degraded = any(r.get("degraded", False) for r in review_results.values())
 
     if has_degraded:
         # 降级处理：提供友好的降级提示内容
@@ -359,11 +371,11 @@ async def finalize_node(state: AgentState) -> dict:
             "difficulty": difficulty,
         })
     else:
-        # 正常处理：使用辩论通过的最终内容
-        for content_type, debate in debate_results.items():
+        # 正常处理：使用审核通过的最终内容
+        for content_type, review in review_results.items():
             final_resources.append({
                 "type": content_type,
-                "content": debate.get("final_content", ""),
+                "content": review.get("final_content", ""),
                 "topic": topic,
                 "difficulty": difficulty,
             })
@@ -402,25 +414,23 @@ async def finalize_node(state: AgentState) -> dict:
 def build_workflow() -> StateGraph:
     workflow = StateGraph(AgentState)
 
-    # 7 个主节点 + finalize
+    # 6 个节点（审核纠偏合并了原预审+辩论）
     workflow.add_node("analyze", analyze_node)            # ① 学情分析
     workflow.add_node("plan_path", plan_path_node)        # ② 路径规划
     workflow.add_node("generate", generate_node)          # ③ 知识生成
-    workflow.add_node("review", review_node)              # ③½ 预审
-    workflow.add_node("debate", debate_node)              # ④ 审核纠偏（辩论）
-    workflow.add_node("gen_questions", gen_questions_node) # ⑤ 试题生成
+    workflow.add_node("review_correct", review_correct_node)  # ③½ 审核纠偏（双视角审查+修正）
+    workflow.add_node("gen_questions", gen_questions_node) # ④ 试题生成
     workflow.add_node("finalize", finalize_node)          # 最终输出
 
     # 流程
     workflow.set_entry_point("analyze")
     workflow.add_edge("analyze", "plan_path")
     workflow.add_edge("plan_path", "generate")
-    workflow.add_edge("generate", "review")
-    workflow.add_edge("review", "debate")
+    workflow.add_edge("generate", "review_correct")
 
-    # 辩论后条件路由
+    # 审核纠偏后条件路由
     workflow.add_conditional_edges(
-        "debate",
+        "review_correct",
         decide_node,
         {
             "complete": "gen_questions",
@@ -445,7 +455,7 @@ def get_workflow():
 
 
 async def run_workflow(learner_input: dict, topic: str, session_id: str = "", profile: dict = None) -> dict:
-    """运行完整 6 Agent 工作流（包含辩论机制）"""
+    """运行完整 6 Agent 工作流（包含审核纠偏机制）"""
     workflow = get_workflow()
 
     # 如果传入了 profile，合并到 learner_input
@@ -460,8 +470,7 @@ async def run_workflow(learner_input: dict, topic: str, session_id: str = "", pr
         "topic": topic,
         "retry_count": 0,
         "generated_content": {},
-        "debate_results": {},
-        "debate_rounds": [],
+        "review_results": {},
         "question_set": {},
         "learning_path": {},
         "final_resources": [],
@@ -542,15 +551,15 @@ async def finalize_node_no_debate(state: AgentState) -> dict:
 
 
 def build_workflow_no_debate() -> StateGraph:
-    """构建无辩论版本的工作流（用于消融实验对比）"""
+    """构建无审核版本的工作流（用于消融实验对比）"""
     workflow = StateGraph(AgentState)
 
-    # 只包含分析、生成、试题、最终输出（无辩论/预审/决策）
+    # 只包含分析、生成、试题、最终输出（跳过审核纠偏）
     workflow.add_node("analyze", analyze_node)            # ① 学情分析
     workflow.add_node("plan_path", plan_path_node)        # ② 路径规划
     workflow.add_node("generate", generate_node)          # ③ 知识生成
-    workflow.add_node("gen_questions", gen_questions_node_no_debate)  # ⑤ 试题生成（无辩论）
-    workflow.add_node("finalize", finalize_node_no_debate)  # 最终输出（无辩论）
+    workflow.add_node("gen_questions", gen_questions_node_no_debate)  # ④ 试题生成（无审核）
+    workflow.add_node("finalize", finalize_node_no_debate)  # 最终输出（无审核）
 
     # 简单流程：分析 → 生成 → 试题 → 输出
     workflow.set_entry_point("analyze")
@@ -576,12 +585,12 @@ def get_workflow_no_debate():
 
 async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: str = "", profile: dict = None) -> dict:
     """
-    运行无辩论版本的工作流（用于消融实验）
+    运行无审核版本的工作流（用于消融实验）
 
     与 run_workflow 的区别：
-    - 跳过预审、辩论、裁判、决策节点
-    - 直接使用生成的内容，不进行质量验证
-    - 用于对比有/无辩论机制对谬误率的影响
+    - 跳过审核纠偏节点，直接使用生成的内容
+    - 不进行质量验证
+    - 用于对比有/无审核纠偏机制对谬误率的影响
     """
     workflow = get_workflow_no_debate()
 
@@ -597,8 +606,7 @@ async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: st
         "topic": topic,
         "retry_count": 0,
         "generated_content": {},
-        "debate_results": {},
-        "debate_rounds": [],
+        "review_results": {},
         "question_set": {},
         "learning_path": {},
         "final_resources": [],

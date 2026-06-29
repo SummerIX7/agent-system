@@ -86,6 +86,7 @@ def _new_session(session_id: str) -> dict:
         "resources": [],
         "feedback": [],
         "agent_logs": [],
+        "trace_entries": [],
         "created_at": datetime.now().isoformat(),
     }
 
@@ -94,7 +95,7 @@ def _serialize(data: dict) -> dict:
     """将 Python dict 序列化为 Redis Hash 兼容格式（全字符串）"""
     result = {}
     for k, v in data.items():
-        if k in ("profile", "resources", "feedback", "agent_logs"):
+        if k in ("profile", "resources", "feedback", "agent_logs", "trace_entries"):
             result[k] = json.dumps(v, ensure_ascii=False)
         elif v is not None:
             result[k] = str(v)
@@ -106,7 +107,7 @@ def _serialize(data: dict) -> dict:
 def _deserialize(raw: dict) -> dict:
     """将 Redis Hash（全字符串）还原为 Python dict"""
     result = dict(raw)
-    for field in ("profile", "resources", "feedback", "agent_logs"):
+    for field in ("profile", "resources", "feedback", "agent_logs", "trace_entries"):
         if field in result and isinstance(result[field], str):
             try:
                 result[field] = json.loads(result[field])
@@ -352,3 +353,21 @@ def redis_is_available() -> bool:
     """供外部查询 Redis 是否可用"""
     r = _get_redis()
     return _is_redis_ok(r)
+
+
+# ═══════════════════════════════════════════
+# 工作流追踪（Trace）
+# ═══════════════════════════════════════════
+
+def add_trace_entry(session_id: str, entry: dict) -> None:
+    """追加一条工作流追踪记录"""
+    session = get_session(session_id)
+    entries = session.get("trace_entries", [])
+    entries.append({**entry, "timestamp": datetime.now().isoformat()})
+    _update_field(session_id, "trace_entries", entries)
+
+
+def get_trace_entries(session_id: str) -> list[dict]:
+    """获取该 session 的完整追踪记录"""
+    session = get_session(session_id)
+    return session.get("trace_entries", [])

@@ -1,4 +1,6 @@
 from typing import Any
+from datetime import datetime
+import time
 
 from langchain_core.language_models import BaseChatModel
 
@@ -15,6 +17,9 @@ class BaseAgent:
     ):
         self.llm = llm or get_llm()
         self._kb = None  # 延迟初始化，避免启动时阻塞
+        # 追踪埋点
+        self._trace_calls: list = []
+        self._trace_agent_name: str = ""
 
     @property
     def kb(self):
@@ -87,13 +92,24 @@ class BaseAgent:
 
         return " | ".join(parts)
 
-    async def call_llm(self, prompt: str, max_retries: int = 3) -> str:
-        """调用 LLM 获取响应，带重试机制"""
+    async def call_llm(self, prompt: str, max_retries: int = 3, label: str = "") -> str:
+        """调用 LLM 获取响应，带重试机制和追踪埋点"""
         import asyncio
         last_error = None
+        start = time.time()
         for attempt in range(max_retries):
             try:
                 response = await self.llm.ainvoke(prompt)
+                elapsed_ms = round((time.time() - start) * 1000)
+
+                # 追踪埋点：记录 prompt/response/耗时
+                self._trace_calls.append({
+                    "label": label or f"LLM调用#{attempt+1}",
+                    "prompt": prompt,
+                    "response": response.content[:8000],
+                    "elapsed_ms": elapsed_ms,
+                    "timestamp": datetime.now().isoformat(),
+                })
                 return response.content
             except Exception as e:
                 last_error = e
@@ -102,6 +118,12 @@ class BaseAgent:
                     print(f"[重试] LLM 调用失败 (第{attempt+1}次)，{wait_time}秒后重试: {e}")
                     await asyncio.sleep(wait_time)
         raise RuntimeError(f"LLM 调用失败（已重试{max_retries}次）: {last_error}")
+
+    def collect_trace(self) -> list:
+        """收集并清空当前 Agent 的 LLM 调用追踪记录"""
+        calls = list(self._trace_calls)
+        self._trace_calls = []
+        return calls
 
     async def run(self, **kwargs) -> Any:
         """子类实现的主逻辑"""

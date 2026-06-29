@@ -8,7 +8,7 @@
           让每个学习者，<br>得到为自己而生的学习资源。
         </h1>
         <p class="page-head__desc" style="margin: 20px auto 0; max-width: 560px; line-height: 1.7;">
-          基于学习者画像精准诊断知识盲区，通过多智能体辩论与独立裁判机制生成可溯源的个性化讲义、实验与案例，并根据答题反馈动态调整学习路径。
+          基于学习者画像精准诊断知识盲区，通过多智能体双视角审核纠偏机制生成可溯源的个性化讲义、实验与案例，并根据答题反馈动态调整学习路径。
         </p>
         <div style="margin-top: 32px; display: flex; gap: 12px; justify-content: center;">
           <NuxtLink to="/profile" class="btn btn--primary btn--lg">开始学习诊断 →</NuxtLink>
@@ -22,7 +22,7 @@
       <div style="max-width: 560px; margin-bottom: 40px;">
         <h2 class="page-head__title" style="font-size: 22px;">六个 Agent，各司其职</h2>
         <p class="page-head__desc" style="margin-top: 10px;">
-          每个 Agent 负责教学链路中的一个关键环节，通过辩论质疑与独立裁判降低知识谬误率，确保生成内容准确、可溯源、难度适配。
+          每个 Agent 负责教学链路中的一个关键环节，通过双视角审核与自动修正降低知识谬误率，确保生成内容准确、可溯源、难度适配。
         </p>
       </div>
       <div class="agent-grid">
@@ -53,7 +53,7 @@
     <section class="page page--wide" style="padding-top: 0; padding-bottom: 80px;">
       <div style="margin-bottom: 36px;">
         <h2 class="page-head__title" style="font-size: 22px;">Agent 协同流程</h2>
-        <p class="page-head__desc" style="margin-top: 8px;">7个AI Agent协同工作，从决策调度到试题生成的完整流程。</p>
+        <p class="page-head__desc" style="margin-top: 8px;">6个AI Agent协同工作，从学情分析到试题生成的完整流程。</p>
       </div>
       <AgentViewAgentFlowDiagram />
     </section>
@@ -65,9 +65,9 @@ const agents = [
   { num: '01', name: '学情分析 Agent', desc: '解析学习者画像，定位知识盲区，匹配四个难度等级。' },
   { num: '02', name: '路径规划 Agent', desc: '基于盲区生成个性化学习路径与资源推荐序列。' },
   { num: '03', name: '知识生成 Agent', desc: '结合 RAG 知识库生成讲义、实验指导与项目案例，标注来源。' },
-  { num: '04', name: '审核纠偏 Agent', desc: '对生成内容提出质疑与修正建议，触发辩论流程。' },
-  { num: '05', name: '裁判 Agent', desc: '独立裁决生成与审核的分歧，给出最终结论与依据。' },
-  { num: '06', name: '试题生成 Agent', desc: '按难度生成分阶试题，并根据答题反馈动态调整路径。' },
+  { num: '04', name: '审核纠偏 Agent', desc: '双视角审查内容准确性，发现问题后自动修正，确保内容质量。' },
+  { num: '05', name: '试题生成 Agent', desc: '按难度生成分阶试题，并根据答题反馈动态调整路径。' },
+  { num: '06', name: '决策调度 Agent', desc: '工作流中枢，根据审核结果决策通过、重试或降级完成。' },
 ]
 
 const steps = [

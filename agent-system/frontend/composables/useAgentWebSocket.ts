@@ -22,6 +22,8 @@ export function useAgentWebSocket(sessionId: string) {
       ws.onmessage = (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data)
+          // 忽略系统消息（连接确认等），只处理 Agent 状态
+          if (data.agent === '系统') return
           const idx = agents.value.findIndex((a) => a.name === data.agent)
           if (idx >= 0) {
             agents.value[idx] = {

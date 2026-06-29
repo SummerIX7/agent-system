@@ -5,21 +5,21 @@ class DecisionOrchestrator(BaseAgent):
     """决策调度 Agent：根据学习者答题反馈实时调整学习路径"""
 
     async def decide_next(self, state: dict) -> str:
-        """决策：辩论通过则完成，超过最大重试次数则降级完成，否则打回重新生成"""
+        """决策：审核通过则完成，超过最大重试次数则降级完成，否则打回重新生成"""
         MAX_RETRIES = 3
-        debate_results = state.get("debate_results", {})
+        review_results = state.get("review_results", {})
         retry_count = state.get("retry_count", 0)
 
-        # 检查是否所有资源都辩论通过
+        # 检查是否所有资源都审核通过
         all_passed = all(
-            r.get("passed", False) for r in debate_results.values()
+            r.get("passed", False) for r in review_results.values()
         )
         has_degraded = any(
-            r.get("degraded", False) for r in debate_results.values()
+            r.get("degraded", False) for r in review_results.values()
         )
 
         if all_passed:
-            state["decision_log"] = state.get("decision_log", []) + ["所有资源辩论通过"]
+            state["decision_log"] = state.get("decision_log", []) + ["所有资源审核通过"]
             return "complete"
 
         if has_degraded or retry_count >= MAX_RETRIES:

@@ -290,11 +290,11 @@ class TestDecisionOrchestrator:
 
     @pytest.mark.asyncio
     async def test_decide_next_all_passed(self, orchestrator):
-        """测试所有资源辩论通过"""
+        """测试所有资源审核通过"""
         state = {
-            "debate_results": {
-                "lecture": {"passed": True, "quality_score": 0.9},
-                "guide": {"passed": True, "quality_score": 0.85}
+            "review_results": {
+                "lecture": {"passed": True, "score": 0.9},
+                "guide": {"passed": True, "score": 0.85}
             },
             "retry_count": 0,
             "decision_log": []
@@ -307,11 +307,11 @@ class TestDecisionOrchestrator:
 
     @pytest.mark.asyncio
     async def test_decide_next_not_passed_retry(self, orchestrator):
-        """测试辩论未通过，重试次数未达上限"""
+        """测试审核未通过，重试次数未达上限"""
         state = {
-            "debate_results": {
-                "lecture": {"passed": False, "quality_score": 0.5},
-                "guide": {"passed": True, "quality_score": 0.85}
+            "review_results": {
+                "lecture": {"passed": False, "score": 0.5},
+                "guide": {"passed": True, "score": 0.85}
             },
             "retry_count": 1,
             "decision_log": []
@@ -327,9 +327,9 @@ class TestDecisionOrchestrator:
     async def test_decide_next_max_retries_degraded(self, orchestrator):
         """测试超过最大重试次数，走降级流程"""
         state = {
-            "debate_results": {
-                "lecture": {"passed": False, "quality_score": 0.4, "degraded": True},
-                "guide": {"passed": False, "quality_score": 0.3, "degraded": True}
+            "review_results": {
+                "lecture": {"passed": False, "score": 0.4, "degraded": True},
+                "guide": {"passed": False, "score": 0.3, "degraded": True}
             },
             "retry_count": 3,
             "decision_log": []
@@ -337,7 +337,7 @@ class TestDecisionOrchestrator:
 
         result = await orchestrator.decide_next(state)
 
-        # 根据 P0-4 修复，应走降级完成路径
+        # 应走降级完成路径
         assert result == "complete"
         assert "降级" in state["decision_log"][-1] or "最大重试次数" in state["decision_log"][-1]
 

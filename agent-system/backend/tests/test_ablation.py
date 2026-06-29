@@ -84,18 +84,18 @@ class TestAblationStudy:
                     "difficulty": "beginner"
                 }
             ],
-            "debate_results": {
+            "review_results": {
                 "lecture": {
                     "passed": True,
-                    "quality_score": 0.92,
-                    "adopted_side": "defender",
-                    "reason": "辩论通过，内容准确"
+                    "score": 0.92,
+                    "final_content": "G00是快速定位指令，G01是直线插补指令",
+                    "correction_applied": False
                 }
             },
-            "decision_log": ["① 学情分析完成", "④ 辩论+裁判完成（通过）"]
+            "decision_log": ["① 学情分析完成", "③½ 审核纠偏完成（通过）"]
         }
 
-        # 模拟无辩论工作流的结果
+        # 模拟无审核工作流的结果
         mock_no_debate_result = {
             "final_resources": [
                 {
@@ -105,20 +105,20 @@ class TestAblationStudy:
                     "difficulty": "beginner"
                 }
             ],
-            "debate_results": {},
-            "decision_log": ["① 学情分析完成", "⑥ 工作流完成（无辩论）"]
+            "review_results": {},
+            "decision_log": ["① 学情分析完成", "⑥ 工作流完成（无审核）"]
         }
 
         # 验证两种工作流的结果结构
-        assert "debate_results" in mock_debate_result
-        assert "debate_results" in mock_no_debate_result
+        assert "review_results" in mock_debate_result
+        assert "review_results" in mock_no_debate_result
 
-        # 有辩论的工作流应该有辩论结果
-        assert len(mock_debate_result["debate_results"]) > 0
-        assert mock_debate_result["debate_results"]["lecture"]["passed"] is True
+        # 有审核的工作流应该有审核结果
+        assert len(mock_debate_result["review_results"]) > 0
+        assert mock_debate_result["review_results"]["lecture"]["passed"] is True
 
-        # 无辩论的工作流应该没有辩论结果
-        assert len(mock_no_debate_result["debate_results"]) == 0
+        # 无审核的工作流应该没有审核结果
+        assert len(mock_no_debate_result["review_results"]) == 0
 
     @pytest.mark.asyncio
     async def test_hallucination_checker_integration(self):
