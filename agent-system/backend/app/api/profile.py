@@ -8,7 +8,7 @@ from app.models.schemas import LearnerProfileInput, LearnerProfile
 from app.models.learner import Learner
 from app.models.user import User
 from app.agents.diagnosis import DiagnosisAgent
-from app.core.store import update_session
+from app.core.store import update_session, get_all_sessions
 
 router = APIRouter(prefix="/api/profile", tags=["学习者画像"])
 
@@ -126,10 +126,9 @@ async def get_my_profile(
     overall_level = learner.overall_level or "beginner"
     recommended_difficulty = learner.recommended_difficulty or "beginner"
 
-    # 如果数据库没有诊断结果，从内存 store 降级读取
+    # 如果数据库没有诊断结果，从 store 降级读取
     if not knowledge_points:
-        from app.core.store import _sessions
-        for sid, session in _sessions.items():
+        for session in get_all_sessions():
             if session.get("profile", {}).get("id") == learner.id:
                 p = session["profile"]
                 knowledge_points = p.get("knowledge_points", [])

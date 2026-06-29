@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -6,12 +7,15 @@ from fastapi.responses import JSONResponse
 
 from app.api import auth, feedback, generation, profile, questions, visualization, ws
 from app.core.config import get_settings
+from app.core.store import check_redis_health
 from app.models.database import engine, Base
 # 导入所有模型，确保被 Base 注册
 from app.models.user import User
 from app.models.learner import Learner
 from app.models.resource import Resource
 from app.models.agent_state import AgentLog, FeedbackRecord
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -25,11 +29,19 @@ async def lifespan(app: FastAPI):
     import app.knowledge.retriever as retriever_mod
     retriever_mod._retriever = None
 
-    # 3. 清空内存会话 store，避免残留旧的 topic/Goals
-    from app.core.store import _sessions
-    _sessions.clear()
+    # 3. 检查 Redis 连接状态
+    health = check_redis_health()
+    if health["status"] == "degraded":
+        logger.warning(
+            "⚠️ Redis 不可用，已降级为内存存储。"
+            "多用户部署时请确保 Redis 已启动且配置正确。"
+        )
+        print("[启动] ⚠️ Redis 不可用，已降级为内存存储")
+    else:
+        logger.info(f"✅ Redis 连接正常: {health}")
+        print(f"[启动] ✅ Redis 连接正常: {health}")
 
-    print("[启动] 缓存已清除，配置已刷新")
+    print("[启动] 配置已刷新")
 
     # 4. 创建数据库表（如果不存在）
     async with engine.begin() as conn:
@@ -86,4 +98,8 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """健康检查端点，包含 Redis 状态"""
+    return {
+        "status": "ok",
+        "redis": check_redis_health(),
+    }
