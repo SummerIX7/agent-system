@@ -18,7 +18,7 @@
       <div class="stat-cell">
         <div style="font-size: 12px; color: var(--text-3)">已覆盖知识点</div>
         <div style="font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin-top: 8px">{{ knowledgePoints.length }}</div>
-        <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">CNC数控加工领域</div>
+        <div style="font-size: 12px; color: var(--text-3); margin-top: 4px">已评估学习领域</div>
       </div>
       <div class="stat-cell">
         <div style="font-size: 12px; color: var(--text-3)">知识盲区</div>

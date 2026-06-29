@@ -2,29 +2,7 @@ from app.agents.base import BaseAgent
 
 
 class DecisionOrchestrator(BaseAgent):
-    """决策调度 Agent：根据用户答题反馈实时调整学习路径"""
-
-    async def handle_feedback(self, state: dict, user_answer: dict) -> dict:
-        """处理学习者答题反馈，动态调整策略"""
-        correctness = user_answer.get("correctness", 0)
-        topic = user_answer.get("topic", "")
-
-        if correctness < 0.6:
-            state["decision_log"] = state.get("decision_log", []) + [
-                f"正确率{correctness:.0%}<60%，触发降维解释"
-            ]
-            state["topic"] = f"{topic} 基础概念"
-            state["difficulty"] = self._downgrade_difficulty(state.get("difficulty", "beginner"))
-
-        elif correctness > 0.9:
-            state["decision_log"] = state.get("decision_log", []) + [
-                f"正确率{correctness:.0%}>90%，触发进阶挑战"
-            ]
-            state["topic"] = f"{topic} 高级应用"
-            state["difficulty"] = self._upgrade_difficulty(state.get("difficulty", "beginner"))
-
-        state["feedback_history"] = state.get("feedback_history", []) + [user_answer]
-        return state
+    """决策调度 Agent：根据学习者答题反馈实时调整学习路径"""
 
     async def decide_next(self, state: dict) -> str:
         """决策：辩论通过则完成，超过最大重试次数则降级完成，否则打回重新生成"""
@@ -95,7 +73,6 @@ class DecisionOrchestrator(BaseAgent):
         idx = levels.index(current) if current in levels else 0
         return levels[min(len(levels) - 1, idx + 1)]
 
-    async def run(self, state: dict = None, user_answer: dict = None, **kwargs) -> dict:
-        if state and user_answer:
-            return await self.handle_feedback(state, user_answer)
+    async def run(self, state: dict = None, **kwargs) -> dict:
+        """基类接口：返回当前状态（实际调度通过 decide_next 和 adjust_learning_path）"""
         return state or {}

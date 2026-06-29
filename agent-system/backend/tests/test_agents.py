@@ -179,9 +179,9 @@ class TestJudgeAgent:
 
     @pytest.mark.asyncio
     async def test_judge_json_parse_failure_defaults_to_not_passed(self, agent):
-        """测试 JSON 解析失败时默认不通过"""
+        """测试 JSON 解析失败时默认不通过（增强容错后仍保留安全默认值）"""
         # Mock LLM 返回无效 JSON
-        agent.llm.ainvoke = AsyncMock(return_value=MagicMock(content="这不是有效的JSON响应"))
+        agent.llm.ainvoke = AsyncMock(return_value=MagicMock(content="这不是有效的JSON响应，没有passed字段"))
 
         result = await agent.judge(
             original_content="测试内容",
@@ -192,12 +192,11 @@ class TestJudgeAgent:
             revised_content="修正后内容"
         )
 
-        # 根据 C-5 修复，解析失败应默认不通过
+        # JSON 解析失败且无法从文本推断时，应默认不通过
         assert result["passed"] is False
         assert result["adopted_side"] == "challenger"
-        assert "解析失败" in result["reason"]
+        assert "无法" in result["reason"]  # 包含降级说明
         assert result["quality_score"] == 0
-        assert "raw_response" in result
 
     @pytest.mark.asyncio
     async def test_judge_regression_check_passes(self, agent):
@@ -343,40 +342,57 @@ class TestDecisionOrchestrator:
         assert "降级" in state["decision_log"][-1] or "最大重试次数" in state["decision_log"][-1]
 
     @pytest.mark.asyncio
-    async def test_handle_feedback_low_correctness(self, orchestrator):
-        """测试低正确率触发降维解释"""
-        state = {
-            "difficulty": "intermediate",
-            "topic": "G代码基础",
-            "decision_log": []
+    async def test_adjust_learning_path_low_correctness(self, orchestrator):
+        """测试近期正确率 < 60% 时触发难度降级"""
+        path = {
+            "current_stage": 1,
+            "total_estimated_hours": 10,
+            "path": [
+                {"stage": 1, "title": "G代码基础", "difficulty": "intermediate",
+                 "topics": ["G代码"], "estimated_hours": 5,
+                 "prerequisites": [], "resources_type": ["lecture"], "completed": False},
+            ]
         }
-        user_answer = {
-            "correctness": 0.4,
-            "topic": "G代码基础"
-        }
+        # 最近 5 题正确率 = (0+0+1+1+0)/5 = 0.4 < 0.6，应触发降级
+        feedback_history = [
+            {"correctness": 0.0, "topic": "a"},
+            {"correctness": 0.0, "topic": "b"},
+            {"correctness": 1.0, "topic": "c"},
+            {"correctness": 1.0, "topic": "d"},
+            {"correctness": 0.0, "topic": "e"},
+        ]
 
-        result = await orchestrator.handle_feedback(state, user_answer)
+        result = await orchestrator.adjust_learning_path(path, feedback_history)
 
-        assert "降维解释" in result["decision_log"][-1]
-        assert result["difficulty"] == "beginner"  # 降级到更低难度
+        stage = result["path"][0]
+        assert stage["difficulty"] == "beginner"
+        assert "基础巩固" in stage["title"]
 
     @pytest.mark.asyncio
-    async def test_handle_feedback_high_correctness(self, orchestrator):
-        """测试高正确率触发进阶挑战"""
-        state = {
-            "difficulty": "intermediate",
-            "topic": "G代码基础",
-            "decision_log": []
+    async def test_adjust_learning_path_high_correctness(self, orchestrator):
+        """测试近期正确率 > 90% 时触发阶段进阶"""
+        path = {
+            "current_stage": 1,
+            "total_estimated_hours": 10,
+            "path": [
+                {"stage": 1, "title": "G代码基础", "difficulty": "intermediate",
+                 "topics": ["G代码"], "estimated_hours": 5,
+                 "prerequisites": [], "resources_type": ["lecture"], "completed": False},
+            ]
         }
-        user_answer = {
-            "correctness": 0.95,
-            "topic": "G代码基础"
-        }
+        # 最近 5 题正确率 = (1+1+1+1+0.95)/5 > 0.9，应标记完成并推进
+        feedback_history = [
+            {"correctness": 1.0, "topic": "a"},
+            {"correctness": 1.0, "topic": "b"},
+            {"correctness": 1.0, "topic": "c"},
+            {"correctness": 1.0, "topic": "d"},
+            {"correctness": 0.95, "topic": "e"},
+        ]
 
-        result = await orchestrator.handle_feedback(state, user_answer)
+        result = await orchestrator.adjust_learning_path(path, feedback_history)
 
-        assert "进阶挑战" in result["decision_log"][-1]
-        assert result["difficulty"] == "advanced"  # 升级到更高难度
+        assert result["path"][0]["completed"] is True
+        assert result["current_stage"] == 2
 
 
 if __name__ == "__main__":

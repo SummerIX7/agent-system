@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, feedback, generation, profile, questions, visualization, ws
+from app.api import auth, domains, feedback, generation, profile, questions, visualization, ws
 from app.core.config import get_settings
 from app.core.store import check_redis_health
 from app.models.database import engine, Base
@@ -74,6 +74,7 @@ app.add_middleware(
 
 # 挂载路由
 app.include_router(auth.router)
+app.include_router(domains.router)
 app.include_router(profile.router)
 app.include_router(generation.router)
 app.include_router(feedback.router)

@@ -192,6 +192,7 @@ const lectureContent = ref('')
 const guideContent = ref('')
 const projectContent = ref('')
 const testQuestions = ref<any[]>([])
+const currentTopic = ref('')
 
 interface SourceInfo {
   icon: string
@@ -329,7 +330,7 @@ const submitPracticalAnswer = async (questionIndex: number) => {
   try {
     const result = await api.submitPracticalFeedback({
       session_id: sessionId.value || 'demo',
-      topic: 'CNC 数控编程',
+      topic: currentTopic.value || q.topic || '基础知识',
       question: q.question,
       user_answer: q.practicalAnswer,
       correct_answer: q.correct_answer || '',
@@ -363,6 +364,11 @@ onMounted(async () => {
   try {
     const data = await api.getResources(sessionId.value)
     resources.value = data
+
+    // 从第一个资源的 topic 获取当前主题
+    if (data.length > 0 && data[0].topic) {
+      currentTopic.value = data[0].topic
+    }
 
     for (const res of data) {
       const content = typeof res.content === 'string' ? res.content : JSON.stringify(res.content)

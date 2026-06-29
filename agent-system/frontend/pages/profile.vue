@@ -35,6 +35,14 @@
           <input v-model.number="formState.work_experience_years" class="input" type="number" placeholder="0">
         </div>
 
+        <div class="field">
+          <label class="field__label">学习领域 <span style="color: var(--err)">*</span></label>
+          <select v-model="formState.domain" class="select" @change="onDomainChange">
+            <option value="">请选择领域</option>
+            <option v-for="d in domains" :key="d.code" :value="d.code">{{ d.name }}</option>
+          </select>
+        </div>
+
         <div class="field" style="margin-bottom: 0">
           <label class="field__label">学习风格</label>
           <select v-model="formState.learning_style" class="select">
@@ -88,6 +96,8 @@
 </template>
 
 <script setup lang="ts">
+import type { DomainConfig } from '~/types/api'
+
 const router = useRouter()
 const api = useApi()
 const toast = useToast()
@@ -96,6 +106,9 @@ const { setSession, setProfile } = useSession()
 const loading = ref(false)
 const profileLoaded = ref(false)
 
+// 领域列表
+const domains = ref<DomainConfig[]>([])
+
 // 等认证状态恢复后再判断
 watch(authLoading, async (val) => {
   if (!val && !isLoggedIn.value) {
@@ -103,9 +116,18 @@ watch(authLoading, async (val) => {
   }
 }, { immediate: true })
 
-// 登录后自动加载已有画像
+// 登录后自动加载已有画像 + 领域列表
 onMounted(async () => {
   if (!isLoggedIn.value) return
+
+  // 加载可用领域
+  try {
+    domains.value = await api.getDomains()
+  } catch {
+    console.warn('加载领域列表失败')
+  }
+
+  // 加载已有画像
   try {
     const existing = await api.getMyProfile()
     if (existing) {
@@ -125,22 +147,23 @@ onMounted(async () => {
   }
 })
 
-const skillOptions = [
-  '机械制图基础',
-  'G 代码编程',
-  '数控车床操作',
-  '数控铣床操作',
-  'CAM 软件应用',
-  '刀具选择与管理',
-  '切削参数优化',
-  '测量与检测',
-]
+// 当前领域的技能自评项
+const skillOptions = computed(() => {
+  const selected = domains.value.find(d => d.code === formState.domain)
+  return selected?.self_assessment_skills || []
+})
+
+// 领域切换时重置技能评估
+function onDomainChange() {
+  formState.self_assessment = {}
+}
 
 const formState = reactive({
   education_background: '',
   major: '',
   work_experience_years: 0,
   learning_style: '',
+  domain: '',
   self_assessment: {} as Record<string, string>,
   goals: [''],
 })
@@ -172,6 +195,7 @@ const submitProfile = async () => {
       self_assessment: formState.self_assessment,
       learning_style: formState.learning_style || 'practice',
       goals: formState.goals.filter(g => g.trim()),
+      domain: formState.domain || undefined,
     })
 
     // 存入全局状态

@@ -1,11 +1,11 @@
 import logging
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import get_db
+from app.models.schemas import VisualizationData, KnowledgePoint as SchemaKnowledgePoint, BlindSpot as SchemaBlindSpot
 from app.core.store import get_session
 from app.models.resource import Resource
 from app.models.agent_state import FeedbackRecord
@@ -14,26 +14,6 @@ from app.metrics.hallucination_checker import compute_hallucination_rate
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["可视化数据"])
-
-
-class KnowledgePoint(BaseModel):
-    name: str
-    score: float
-    level: str
-
-
-class BlindSpot(BaseModel):
-    name: str
-    severity: float
-
-
-class VisualizationData(BaseModel):
-    knowledge_points: List[KnowledgePoint]
-    blind_spots: List[BlindSpot]
-    learning_path: List[dict]
-    match_curve: Optional[dict] = None
-    agent_logs: List[dict] = []
-    metrics: Optional[dict] = None
 
 
 @router.get("/visualization/{session_id}", response_model=VisualizationData)
@@ -85,17 +65,17 @@ async def get_visualization(
 
     # 从画像中提取知识点
     knowledge_points = [
-        KnowledgePoint(
+        SchemaKnowledgePoint(
             name=kp.get("name", ""),
             score=kp.get("score", 0),
             level=kp.get("level", "beginner"),
-        )
+        ).model_dump()
         for kp in profile.get("knowledge_points", [])
     ]
 
     # 从画像中提取盲区
     blind_spots = [
-        BlindSpot(name=bs, severity=0.7)
+        SchemaBlindSpot(name=bs, severity=0.7).model_dump()
         for bs in profile.get("blind_spots", [])
     ]
 

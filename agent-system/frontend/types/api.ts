@@ -7,6 +7,7 @@ export interface LearnerProfileInput {
   self_assessment: Record<string, string>
   learning_style: string
   goals: string[]
+  domain?: string
 }
 
 export interface KnowledgePoint {
@@ -115,4 +116,15 @@ export interface AgentStatus {
   status: 'idle' | 'running' | 'completed' | 'error'
   message: string
   progress: number
+}
+
+// === 领域配置 ===
+
+export interface DomainConfig {
+  code: string
+  name: string
+  description: string
+  core_topics: string[]
+  difficulty_levels: string[]
+  self_assessment_skills: string[]
 }

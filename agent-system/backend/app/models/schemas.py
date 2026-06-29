@@ -24,6 +24,11 @@ class KnowledgePoint(BaseModel):
     confidence: float = 0
 
 
+class BlindSpot(BaseModel):
+    name: str
+    severity: float = 0.5
+
+
 class LearnerProfileInput(BaseModel):
     education_background: str
     major: str

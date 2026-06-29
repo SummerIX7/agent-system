@@ -1,7 +1,8 @@
 import json
-from typing import List
+from typing import List, Optional
 
 from app.agents.base import BaseAgent
+from app.core.domains import DomainConfig, build_domain_prompt, get_default_domain
 
 
 class GenerationAgent(BaseAgent):
@@ -23,12 +24,29 @@ class GenerationAgent(BaseAgent):
 4. 禁止编造不存在的书名、论文或 URL
 5. 多个知识点可引用同一来源，但每个知识点必须单独标注"""
 
-    async def generate_lecture_notes(self, topic: str, profile: dict) -> str:
+    async def generate_lecture_notes(self, topic: str, profile: dict,
+                                     domain: Optional[DomainConfig] = None,
+                                     retry_context: str = "") -> str:
         """生成定制化讲义（含知识溯源）"""
-        context = self.retrieve_context(topic)
+        domain = domain or get_default_domain()
+        context = self.retrieve_context(f"{domain.name} {topic}")
         difficulty = profile.get("recommended_difficulty", "beginner")
+        domain_prompt = build_domain_prompt(domain)
 
-        prompt = f"""你是一位资深的教育专家。请根据以下学习者画像和知识库内容，为该学习者生成一份个性化的学习讲义。
+        # 重试上下文：注入上一轮审核未通过的问题
+        retry_section = ""
+        if retry_context:
+            retry_section = f"""
+[上一轮审核未通过，请针对以下问题改进]
+{retry_context}
+
+请特别注意修正上述问题，确保本轮内容不再出现同样错误。
+"""
+
+        prompt = f"""你是一位资深的教育专家，专精于{domain.name}领域。请根据以下学习者画像和知识库内容，为该学习者生成一份个性化的学习讲义。
+{retry_section}
+
+{domain_prompt}
 
 [学习者画像]
 - 当前水平: {json.dumps(profile.get('knowledge_points', []), ensure_ascii=False)}
@@ -47,7 +65,7 @@ class GenerationAgent(BaseAgent):
 [生成要求]
 1. 难度适配学习者当前水平（{difficulty}）
 2. 重点覆盖学习者的知识盲区
-3. 包含完整的 G 代码示例（用 ```gcode 包裹）和操作步骤说明
+3. 包含完整的代码/操作示例（用对应的代码块包裹）和操作步骤说明
 4. 使用 Markdown 格式，结构清晰
 5. 内容不少于 800 字，确保知识点讲解充分
 
@@ -60,8 +78,8 @@ class GenerationAgent(BaseAgent):
 ## 核心知识点
 （逐一讲解，每个知识点附来源引用）
 
-## G 代码示例
-（完整的 G 代码加工程序和操作步骤）
+## 代码/操作示例
+（完整的示例和操作步骤说明）
 
 ## 常见问题
 （初学者容易犯的错误和解决方法）
@@ -73,11 +91,26 @@ class GenerationAgent(BaseAgent):
 
         return await self.call_llm(prompt)
 
-    async def generate_practical_guide(self, topic: str, profile: dict) -> str:
+    async def generate_practical_guide(self, topic: str, profile: dict,
+                                       domain: Optional[DomainConfig] = None,
+                                       retry_context: str = "") -> str:
         """生成实验指导（含知识溯源）"""
-        context = self.retrieve_context(f"{topic} 实践操作")
+        domain = domain or get_default_domain()
+        context = self.retrieve_context(f"{domain.name} {topic} 实践操作")
+        domain_prompt = build_domain_prompt(domain)
 
-        prompt = f"""你是一位资深的实验指导专家。请根据以下主题和知识库内容，生成一份实验指导手册。
+        retry_section = ""
+        if retry_context:
+            retry_section = f"""
+[上一轮审核未通过，请针对以下问题改进]
+{retry_context}
+
+请特别注意修正上述问题，确保本轮内容不再出现同样错误。
+"""
+
+        prompt = f"""你是一位资深的实验指导专家，专精于{domain.name}领域。请根据以下主题和知识库内容，生成一份实验指导手册。
+{retry_section}
+{domain_prompt}
 
 [主题]
 {topic}
@@ -92,7 +125,7 @@ class GenerationAgent(BaseAgent):
 
 [要求]
 1. 包含实验目标和前置知识
-2. 步骤清晰，每步都有操作说明和 G 代码示例（用 ```gcode 包裹）
+2. 步骤清晰，每步都有操作说明和代码/命令示例（用对应的代码块包裹）
 3. 标注常见错误和排查方法
 4. 使用 Markdown 格式
 5. 内容不少于 600 字
@@ -103,7 +136,7 @@ class GenerationAgent(BaseAgent):
 ## 实验目标
 ## 前置知识
 ## 操作步骤
-（每步带 G 代码和工艺说明）
+（每步带代码/命令示例和说明）
 ## 常见错误与排查
 ## 思考题
 
@@ -111,11 +144,27 @@ class GenerationAgent(BaseAgent):
 
         return await self.call_llm(prompt)
 
-    async def generate_project_case(self, topic: str, profile: dict) -> str:
+    async def generate_project_case(self, topic: str, profile: dict,
+                                    domain: Optional[DomainConfig] = None,
+                                    retry_context: str = "") -> str:
         """生成项目案例（含知识溯源）"""
-        context = self.retrieve_context(f"{topic} 项目案例 实战")
+        domain = domain or get_default_domain()
+        context = self.retrieve_context(f"{domain.name} {topic} 项目案例 实战")
+        domain_prompt = build_domain_prompt(domain)
 
-        prompt = f"""你是一位资深的项目实战导师。请根据以下主题，生成一个端到端的项目案例。
+        retry_section = ""
+        if retry_context:
+            retry_section = f"""
+[上一轮审核未通过，请针对以下问题改进]
+{retry_context}
+
+请特别注意修正上述问题，确保本轮内容不再出现同样错误。
+"""
+
+        prompt = f"""你是一位资深的项目实战导师，专精于{domain.name}领域。请根据以下主题，生成一个端到端的项目案例。
+{retry_section}
+
+{domain_prompt}
 
 [主题]
 {topic}
@@ -130,10 +179,10 @@ class GenerationAgent(BaseAgent):
 
 [要求]
 1. 项目背景和需求说明
-2. 毛坯选择和加工工艺分析
-3. 完整的加工工艺流程和 G 代码（带注释，用 ```gcode 包裹）
-4. 关键步骤的工艺原理和注意事项
-5. 加工结果分析和质量检测要求
+2. 需求分析与方案设计
+3. 完整的实现流程和代码/操作示例（带注释，用对应的代码块包裹）
+4. 关键步骤的原理和注意事项
+5. 结果分析和质量验证要求
 6. 使用 Markdown 格式
 7. 内容不少于 1000 字
 
@@ -141,29 +190,33 @@ class GenerationAgent(BaseAgent):
 # {topic} 项目案例
 
 ## 项目背景
-## 工艺分析
-## 加工步骤
-（完整 G 代码，每步带工艺说明）
-## 质量检测
+## 需求分析与方案设计
+## 实现步骤
+（完整代码/操作示例，每步带说明）
+## 质量验证
 ## 总结与扩展
 
 请开始生成项目案例："""
 
         return await self.call_llm(prompt)
 
-    async def run(self, topic: str = "", profile: dict = None, resource_types: List[str] = None, **kwargs) -> dict:
+    async def run(self, topic: str = "", profile: dict = None,
+                  resource_types: List[str] = None,
+                  domain: Optional[DomainConfig] = None,
+                  retry_context: str = "", **kwargs) -> dict:
         """执行资源生成（讲义 + 实验指导 + 项目案例）"""
         profile = profile or {}
         resource_types = resource_types or ["lecture", "guide", "project"]
+        domain = domain or get_default_domain()
         results = {}
 
         if "lecture" in resource_types:
-            results["lecture"] = await self.generate_lecture_notes(topic, profile)
+            results["lecture"] = await self.generate_lecture_notes(topic, profile, domain, retry_context)
 
         if "guide" in resource_types:
-            results["guide"] = await self.generate_practical_guide(topic, profile)
+            results["guide"] = await self.generate_practical_guide(topic, profile, domain, retry_context)
 
         if "project" in resource_types:
-            results["project"] = await self.generate_project_case(topic, profile)
+            results["project"] = await self.generate_project_case(topic, profile, domain, retry_context)
 
         return results

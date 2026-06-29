@@ -8,6 +8,7 @@ import type {
   PracticalFeedbackInput,
   PracticalFeedbackResponse,
   VisualizationData,
+  DomainConfig,
 } from '~/types/api'
 
 /**
@@ -117,5 +118,9 @@ export function useApi() {
     // 试题
     getQuestions: (sessionId: string) =>
       request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
+
+    // 领域
+    getDomains: () =>
+      request<DomainConfig[]>('/api/domains'),
   }
 }

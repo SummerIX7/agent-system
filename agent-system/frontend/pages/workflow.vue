@@ -162,9 +162,12 @@ const startGenerate = async () => {
   agents.value = agents.value.map(a => ({ ...a, status: 'idle' as const, message: '等待启动', progress: 0 }))
 
   try {
+    // 从画像中获取学习目标作为主题，或以画像推荐难度对应的领域主题
+    const goals = profile.value?.goals || []
+    const topic = goals.length > 0 ? goals[0] : (profile.value?.knowledge_points?.[0]?.name || '基础知识')
     const result = await api.generateResources(
       sessionId.value,
-      'CNC 数控编程基础',
+      topic,
       ['lecture', 'guide', 'project'],
       profile.value || {}
     )

@@ -305,7 +305,7 @@ const fetchHeuristic = async (round: number, optionIndex: number) => {
   try {
     const result = await api.submitFeedback({
       session_id: sessionId.value || 'demo',
-      topic: currentQuestion.value.topic || 'CNC 数控编程',
+      topic: currentQuestion.value.topic || '专业知识',
       question: currentQuestion.value.question,
       user_answer: String.fromCharCode(65 + optionIndex),
       correct_answer: currentQuestion.value.correctAnswer,
@@ -351,7 +351,7 @@ const submitPractical = async () => {
   try {
     const result = await api.submitPracticalFeedback({
       session_id: sessionId.value || 'demo',
-      topic: currentQuestion.value.topic || 'CNC 数控编程',
+      topic: currentQuestion.value.topic || '专业知识',
       question: currentQuestion.value.question,
       user_answer: practicalAnswer.value,
       correct_answer: currentQuestion.value.correctAnswer,

@@ -60,10 +60,17 @@ class DebateManager(BaseAgent):
         return result
 
     async def defend(self, content: str, topic: str, issues: list) -> dict:
-        """第2轮：知识生成 Agent 针对问题反驳或修正"""
+        """第2轮：知识生成 Agent 针对问题反驳或修正（含知识库参照）"""
+        # 检索知识库作为辩护依据
+        context = self.retrieve_context(topic, k=8)
+
         prompt = f"""你是一位知识内容生成专家。审核专家对你的内容提出了以下质疑，请逐一反驳或修正。
 
 [主题] {topic}
+
+[参考资料（作为辩护和修正的依据）]
+{context if context else "（无可用参考资料，请基于专业知识回应）"}
+
 [原始内容]
 {content}
 
@@ -71,9 +78,10 @@ class DebateManager(BaseAgent):
 {json.dumps(issues, ensure_ascii=False)}
 
 [要求]
-1. 对于确实有问题的地方，给出修正后的内容
-2. 对于没有问题的地方，给出反驳理由（引用知识库依据）
-3. 保持专业性和准确性
+1. 对每条质疑，对照参考资料判断其是否成立
+2. 质疑不成立：引用参考资料中的证据进行反驳，说明为什么质疑方理解有误
+3. 质疑成立：给出修正后的内容，说明修正依据
+4. 保持专业性和准确性
 
 输出 JSON 格式：
 {{

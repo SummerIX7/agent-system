@@ -10,6 +10,7 @@ from app.models.agent_state import FeedbackRecord
 from app.models.learner import Learner
 from app.core.llm import get_llm
 from app.core.store import add_feedback, get_session, get_all_sessions
+from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
 from app.agents.orchestrator import DecisionOrchestrator
 
 router = APIRouter(prefix="/api/feedback", tags=["交互反馈"])
@@ -24,6 +25,7 @@ async def generate_heuristic_question(
     correct_answer: str,
     round: int = 1,
     previous_context: str = "",
+    domain: DomainConfig = None,
 ) -> str:
     """生成苏格拉底式追问（支持多轮，逐层降级）"""
     llm = get_llm()
@@ -39,7 +41,9 @@ async def generate_heuristic_question(
     if previous_context:
         context_part = f"\n[之前的追问] {previous_context}\n学习者仍然没有理解，请换一个角度。"
 
-    prompt = f"""你是一位数控加工（CNC）领域的教学专家。基于以下数控相关的题目，生成一个启发式追问（第 {round} 轮）。
+    domain_desc = domain.prompt_context if domain else "专业领域"
+
+    prompt = f"""你是一位{domain_desc}的教学专家。基于以下题目，生成一个启发式追问（第 {round} 轮）。
 
 [主题] {topic}
 [题目] {question}
@@ -50,7 +54,7 @@ async def generate_heuristic_question(
 要求：
 1. 简洁明了，一到两句话
 2. 第 {round} 轮追问，难度逐轮降低
-3. 结合数控加工的实际场景来引导思考（如机床操作、切削过程、G 代码执行等）
+3. 结合{domain.name if domain else '专业'}的实际场景来引导思考
 
 只输出追问内容，不要其他文字。"""
 
@@ -83,12 +87,17 @@ async def submit_feedback(
                     feedback.correct_answer,
                     round=current_round,
                     previous_context=feedback.heuristic_context,
+                    domain=domain,
                 )
             except Exception as e:
                 print(f"[警告] 启发式追问生成失败: {e}")
 
     session = get_session(feedback.session_id)
     learner_id = session.get("learner_id", "")
+
+    # 从 session profile 获取当前领域配置
+    profile = session.get("profile", {})
+    domain = get_domain_from_input(profile)
 
     record = FeedbackRecord(
         session_id=feedback.session_id,
@@ -167,11 +176,15 @@ async def grade_practical_answer(
     user_answer: str,
     correct_answer: str,
     explanation: str,
+    domain: DomainConfig = None,
 ) -> dict:
     """使用 LLM 对实操题答案进行语义批改"""
     llm = get_llm()
 
-    prompt = f"""你是一位数控加工（CNC）领域的考评专家。请对学习者的实操题答案进行批改评分。
+    domain_desc = domain.prompt_context if domain else "专业领域"
+    default_criteria = f"按{domain.name if domain else '专业'}的规范性、正确性、完整性评分"
+
+    prompt = f"""你是一位{domain_desc}的考评专家。请对学习者的实操题答案进行批改评分。
 
 [题目]
 {question}
@@ -180,16 +193,16 @@ async def grade_practical_answer(
 {correct_answer}
 
 [评分标准]
-{explanation if explanation else "按数控加工的规范性、正确性、完整性评分"}
+{explanation if explanation else default_criteria}
 
 [学习者答案]
 {user_answer}
 
 [批改要求]
 1. 对比学习者答案与参考答案，从以下维度评分：
-   - 关键步骤/代码是否正确（核心得分点）
-   - 工艺参数是否合理（切削参数、刀具选择等）
-   - 是否遗漏重要步骤或存在安全隐患
+   - 关键步骤/代码/操作是否正确（核心得分点）
+   - 参数选择是否合理
+   - 是否遗漏重要步骤或存在错误
    - 整体逻辑是否清晰完整
 2. 给出 0-100 的综合评分
 3. 列出关键要点（正确的和需要改进的）
@@ -221,6 +234,11 @@ async def submit_practical_feedback(
     db: AsyncSession = Depends(get_db),
 ):
     """提交实操题答案，由 LLM Agent 批改"""
+    # 0. 获取当前领域配置
+    session = get_session(feedback.session_id)
+    profile = session.get("profile", {})
+    domain = get_domain_from_input(profile)
+
     # 1. 调用 LLM 批改
     try:
         grading = await grade_practical_answer(
@@ -229,6 +247,7 @@ async def submit_practical_feedback(
             user_answer=feedback.user_answer,
             correct_answer=feedback.correct_answer,
             explanation=feedback.explanation,
+            domain=domain,
         )
     except Exception as e:
         print(f"[警告] 实操题批改失败: {e}")
@@ -242,7 +261,6 @@ async def submit_practical_feedback(
     is_correct = score >= 60
 
     # 2. 存入数据库（需要有效的 learner_id）
-    session = get_session(feedback.session_id)
     learner_id = session.get("learner_id", "")
 
     if learner_id:

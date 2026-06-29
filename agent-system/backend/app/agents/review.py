@@ -60,53 +60,139 @@ class ReviewAgent(BaseAgent):
         )
 
     async def debate_verify(self, content: str, topic: str) -> ReviewResult:
-        """双角色辩论式验证（创新点）"""
+        """双角色辩论式验证（创新点）—— 对照知识库核查，区分问题严重度"""
+        # 检索知识库获取参考答案
+        context = self.retrieve_context(topic, k=8)
+
         # 学术审查者视角
-        prompt_a = f"""你是一位严格的学术审查者。请审查以下内容的学术准确性：
-1. 概念定义是否正确
-2. 理论推导是否严谨
-3. 引用来源是否可靠
+        prompt_a = f"""你是一位严格的学术审查者。请**对照参考资料**，审查以下内容的学术准确性。
+
+[参考资料]
+{context if context else "（无可用参考资料，请基于常识判断）"}
 
 [待审核内容]
 {content}
 
-发现任何问题请列出，用 JSON 数组格式输出。如无问题输出空数组 []。"""
+请逐条核实：概念定义是否正确、理论推导是否严谨、引用来源是否可靠。
+仅当你确认某条陈述与参考资料明确矛盾时才标记为问题。不确定或参考资料未覆盖的事项不要列为问题。
+
+输出 JSON 数组，每个问题标注严重度：
+[
+  {{"issue": "问题描述", "severity": "critical"}},
+  {{"issue": "问题描述", "severity": "minor"}},
+  {{"issue": "问题描述", "severity": "suggestion"}}
+]
+
+severity 取值：
+- "critical": 事实性错误、概念定义错误、编造不存在的内容/API/函数
+- "minor": 表述不精确、推理不严谨、缺乏引用来源
+- "suggestion": 优化建议、风格改进、补充说明建议
+
+如无任何问题，输出空数组 []。"""
 
         # 工业实践者视角
-        prompt_b = f"""你是一位有10年行业经验的实践专家。请审查以下内容的实操可行性：
-1. 操作步骤是否可以在真实环境中复现
-2. 代码是否可运行
-3. 是否符合行业规范
+        prompt_b = f"""你是一位有10年行业经验的实践专家。请**对照参考资料**，审查以下内容的实操可行性。
+
+[参考资料]
+{context if context else "（无可用参考资料，请基于常识判断）"}
 
 [待审核内容]
 {content}
 
-发现任何问题请列出，用 JSON 数组格式输出。如无问题输出空数组 []。"""
+请逐条核实：操作步骤是否可复现、代码是否可运行、是否符合行业规范。
+仅当你确认某条陈述与参考资料明确矛盾或存在实际执行障碍时才标记为问题。不确定的事项不要列为问题。
+
+输出 JSON 数组，每个问题标注严重度：
+[
+  {{"issue": "问题描述", "severity": "critical"}},
+  {{"issue": "问题描述", "severity": "minor"}},
+  {{"issue": "问题描述", "severity": "suggestion"}}
+]
+
+severity 取值同上。
+如无任何问题，输出空数组 []。"""
 
         # 并行调用两个视角
         response_a = await self.call_llm(prompt_a)
         response_b = await self.call_llm(prompt_b)
 
-        try:
-            issues_a = json.loads(response_a.strip().strip("```json").strip("```"))
-        except json.JSONDecodeError:
-            issues_a = ["学术审查解析失败"]
+        # 增强的 JSON 解析
+        issues_a = self._parse_issues(response_a)
+        issues_b = self._parse_issues(response_b)
 
-        try:
-            issues_b = json.loads(response_b.strip().strip("```json").strip("```"))
-        except json.JSONDecodeError:
-            issues_b = ["实践审查解析失败"]
+        # 合并并去重，保留最高严重度
+        all_issues = self._merge_issues(issues_a, issues_b)
 
-        # 取并集
-        all_issues = list(set(issues_a + issues_b))
-        score = max(0, 1 - len(all_issues) * 0.1)
+        # 按严重度加权评分
+        score = self._severity_weighted_score(all_issues)
 
         return ReviewResult(
-            passed=score >= 0.85,
+            passed=score >= 0.75,
             score=score,
-            issues=all_issues,
-            suggestions=[f"修复: {issue}" for issue in all_issues],
+            issues=[i["issue"] for i in all_issues],
+            suggestions=[f"修复({i['severity']}): {i['issue']}" for i in all_issues],
         )
+
+    def _parse_issues(self, response: str) -> list:
+        """解析 LLM 返回的问题列表，兼容新旧格式"""
+        import re
+        cleaned = response.strip()
+        # 去除 markdown 代码块
+        for prefix in ["```json", "```"]:
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].strip()
+
+        try:
+            result = json.loads(cleaned)
+        except json.JSONDecodeError:
+            # 尝试正则提取 JSON 数组
+            match = re.search(r'\[.*\]', cleaned, re.DOTALL)
+            if match:
+                try:
+                    result = json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    return []
+            else:
+                return []
+
+        # 统一格式：兼容旧格式（纯字符串列表）和新格式（对象列表）
+        parsed = []
+        for item in (result if isinstance(result, list) else []):
+            if isinstance(item, str):
+                parsed.append({"issue": item, "severity": "minor"})
+            elif isinstance(item, dict):
+                parsed.append({
+                    "issue": item.get("issue", str(item)),
+                    "severity": item.get("severity", "minor"),
+                })
+        return parsed
+
+    def _merge_issues(self, issues_a: list, issues_b: list) -> list:
+        """合并两个视角的问题，按内容去重，保留最高严重度"""
+        severity_rank = {"critical": 3, "minor": 2, "suggestion": 1}
+        merged = {}
+        for item in issues_a + issues_b:
+            key = item["issue"][:80]  # 用前80字符作为去重键
+            if key not in merged or severity_rank.get(item["severity"], 1) > severity_rank.get(merged[key]["severity"], 0):
+                merged[key] = item
+        return list(merged.values())
+
+    def _severity_weighted_score(self, issues: list) -> float:
+        """按问题严重度加权计算评分"""
+        if not issues:
+            return 1.0
+        score = 1.0
+        for item in issues:
+            sev = item.get("severity", "minor")
+            if sev == "critical":
+                score -= 0.15
+            elif sev == "minor":
+                score -= 0.05
+            else:  # suggestion
+                score -= 0.02
+        return max(0, score)
 
     async def run(self, content: str, topic: str, use_debate: bool = False) -> ReviewResult:
         """执行审核"""

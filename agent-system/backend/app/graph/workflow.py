@@ -9,6 +9,7 @@ from app.agents.question_generator import QuestionGeneratorAgent
 from app.agents.orchestrator import DecisionOrchestrator
 from app.agents.review import ReviewAgent
 from app.graph.state import AgentState
+from app.core.domains import get_domain_from_input
 
 # Agent 实例
 diagnosis_agent = DiagnosisAgent()
@@ -86,19 +87,44 @@ async def generate_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
     topic = state.get("topic", "")
     profile = state.get("profile", {})
+    domain_code = state.get("domain", "")
+    domain = get_domain_from_input({"domain": domain_code, **profile})
+    retry_count = state.get("retry_count", 0)
     generated = {}
     logs = []
 
-    _broadcast(session_id, "知识生成 Agent", "running", "正在生成讲义...", 35)
-    generated["lecture"] = await generation_agent.generate_lecture_notes(topic, profile)
+    # 重试时收集上一轮审核反馈，注入到生成 prompt 中
+    retry_context = ""
+    if retry_count > 0:
+        issues_parts = []
+        # 从预审结果收集
+        review_results = state.get("review_results", {})
+        for ct, review in review_results.items():
+            if review.get("issues"):
+                for issue in review["issues"]:
+                    issues_parts.append(f"[预审-{ct}] {issue}")
+        # 从辩论结果收集
+        debate_results = state.get("debate_results", {})
+        for ct, debate in debate_results.items():
+            if debate.get("reason"):
+                issues_parts.append(f"[裁判-{ct}] {debate['reason']}")
+        if issues_parts:
+            retry_context = "\n".join(issues_parts)
+            logs.append(f"注入上一轮反馈: {len(issues_parts)} 条问题")
+
+    _broadcast(session_id, "知识生成 Agent", "running",
+               "正在重新生成讲义（已注入审核反馈）..." if retry_context else "正在生成讲义...", 35)
+    generated["lecture"] = await generation_agent.generate_lecture_notes(topic, profile, domain, retry_context)
     logs.append("讲义生成完成")
 
-    _broadcast(session_id, "知识生成 Agent", "running", "正在生成实验指导...", 45)
-    generated["guide"] = await generation_agent.generate_practical_guide(topic, profile)
+    _broadcast(session_id, "知识生成 Agent", "running",
+               "正在重新生成实验指导..." if retry_context else "正在生成实验指导...", 45)
+    generated["guide"] = await generation_agent.generate_practical_guide(topic, profile, domain, retry_context)
     logs.append("实验指导生成完成")
 
-    _broadcast(session_id, "知识生成 Agent", "running", "正在生成项目案例...", 55)
-    generated["project"] = await generation_agent.generate_project_case(topic, profile)
+    _broadcast(session_id, "知识生成 Agent", "running",
+               "正在重新生成项目案例..." if retry_context else "正在生成项目案例...", 55)
+    generated["project"] = await generation_agent.generate_project_case(topic, profile, domain, retry_context)
     logs.append("项目案例生成完成")
 
     # 注意：不在这里标记完成，因为还需要辩论验证
@@ -426,6 +452,9 @@ async def run_workflow(learner_input: dict, topic: str, session_id: str = "", pr
     if profile:
         learner_input = {**learner_input, **profile}
 
+    # 解析领域配置
+    domain = get_domain_from_input(learner_input)
+
     initial_state: AgentState = {
         "learner_input": learner_input,
         "topic": topic,
@@ -439,6 +468,7 @@ async def run_workflow(learner_input: dict, topic: str, session_id: str = "", pr
         "feedback_history": [],
         "decision_log": [],
         "session_id": session_id,
+        "domain": domain.code,
     }
 
     result = await workflow.ainvoke(initial_state)
@@ -559,6 +589,9 @@ async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: st
     if profile:
         learner_input = {**learner_input, **profile}
 
+    # 解析领域配置
+    domain = get_domain_from_input(learner_input)
+
     initial_state: AgentState = {
         "learner_input": learner_input,
         "topic": topic,
@@ -572,6 +605,7 @@ async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: st
         "feedback_history": [],
         "decision_log": [],
         "session_id": session_id,
+        "domain": domain.code,
     }
 
     result = await workflow.ainvoke(initial_state)
