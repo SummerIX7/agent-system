@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
-from app.core.store import get_session
+from app.core.store import get_session, save_practice_state, get_practice_state
 from app.core.domains import get_domain_from_input, get_default_domain
 from app.models.database import get_db
 from app.models.learner import Learner
@@ -85,3 +86,23 @@ async def get_questions(
         difficulty=result_dict.get("difficulty", difficulty),
         questions=result_dict.get("questions", []),
     )
+
+
+# ── 答题进度持久化 ──
+
+class PracticeStateRequest(BaseModel):
+    current_index: int = 0
+    questions: list = []
+
+
+@router.post("/practice/state/{session_id}")
+async def save_state(session_id: str, state: PracticeStateRequest):
+    """保存答题进度到 session"""
+    save_practice_state(session_id, state.model_dump())
+    return {"ok": True}
+
+
+@router.get("/practice/state/{session_id}")
+async def get_state(session_id: str):
+    """恢复答题进度"""
+    return get_practice_state(session_id)

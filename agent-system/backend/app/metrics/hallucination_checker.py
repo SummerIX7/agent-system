@@ -45,9 +45,11 @@ class HallucinationChecker(BaseAgent):
                 "method": "独立事实核查 — RAG 知识库逐条比对",
             }
 
-        # 2. 对每个断言进行 RAG 检索和验证（抽样上限 20 个）
+        # 2. 对每个断言进行 RAG 检索和验证（随机抽样上限 20 个，避免只采样前半部分）
+        import random
+        sample = random.sample(assertions, min(20, len(assertions)))
         results = []
-        for assertion in assertions[:20]:
+        for assertion in sample:
             try:
                 context = self.retrieve_context(assertion, k=3)
                 verdict = await self._verify_assertion(assertion, context, topic)

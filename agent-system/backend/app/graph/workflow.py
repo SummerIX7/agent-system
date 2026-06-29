@@ -291,6 +291,56 @@ async def review_correct_node(state: AgentState) -> dict:
 # ──────────────────────────────────────────────
 # ⑤ 试题生成 Agent
 # ──────────────────────────────────────────────
+
+def _validate_questions(questions: list) -> tuple[list, list]:
+    """
+    试题格式校验：检查题目结构、选项合法性、答案是否在选项中。
+    不依赖 LLM，纯规则检查，防止生成明显错误的试题。
+    返回 (valid_questions, issues)
+    """
+    issues = []
+    valid = []
+    valid_letters = {"A", "B", "C", "D", "E", "F"}
+
+    for i, q in enumerate(questions):
+        q_type = q.get("question_type", "")
+        q_issues = []
+
+        # 必填字段检查
+        if not q.get("question"):
+            q_issues.append("缺少题目内容")
+        if not q_type:
+            q_issues.append("缺少题目类型")
+
+        if q_type == "multiple_choice":
+            options = q.get("options", [])
+            if len(options) < 3:
+                q_issues.append(f"选项数量不足({len(options)}，至少3个)")
+            if not q.get("correct_answer") or q["correct_answer"] not in valid_letters:
+                q_issues.append(f"正确答案格式无效({q.get('correct_answer')})")
+            elif q["correct_answer"] in valid_letters:
+                idx = ord(q["correct_answer"]) - 65
+                if idx >= len(options):
+                    q_issues.append(f"正确答案索引({q['correct_answer']})超出选项范围")
+        elif q_type == "true_false":
+            options = q.get("options", [])
+            if "正确" not in str(options) and "错误" not in str(options):
+                q_issues.append("判断题缺少正确/错误选项")
+            if q.get("correct_answer") not in ("正确", "错误"):
+                q_issues.append(f"判断题答案应为正确/错误，实际为: {q.get('correct_answer')}")
+        elif q_type == "practical":
+            if not q.get("explanation"):
+                q_issues.append("实操缺少评分标准(explanation)")
+        else:
+            q_issues.append(f"未知题型: {q_type}")
+
+        if q_issues:
+            issues.append(f"题目{i+1}: {'; '.join(q_issues)}")
+        valid.append(q)
+
+    return valid, issues
+
+
 async def gen_questions_node(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
     start = _time.time()
@@ -305,11 +355,20 @@ async def gen_questions_node(state: AgentState) -> dict:
 
     result = await question_generator.generate_questions(topic, difficulty, profile)
 
-    _broadcast(session_id, "试题生成 Agent", "completed", "试题生成完成", 92)
+    # 试题格式校验
+    raw_questions = result.get("questions", [])
+    valid_questions, q_issues = _validate_questions(raw_questions)
+    result["questions"] = valid_questions
+
+    log_msg = "⑤ 试题生成完成"
+    if q_issues:
+        log_msg += f"（{len(q_issues)}题格式异常已过滤: {'; '.join(q_issues[:3])}）"
+
+    _broadcast(session_id, "试题生成 Agent", "completed", log_msg, 92)
 
     output = {
         "question_set": result,
-        "decision_log": ["⑤ 试题生成完成"],
+        "decision_log": [log_msg],
     }
     _save_node_trace(session_id, "gen_questions", "试题生成 Agent",
                      {"topic": topic, "difficulty": difficulty},
@@ -356,20 +415,20 @@ async def finalize_node(state: AgentState) -> dict:
     has_degraded = any(r.get("degraded", False) for r in review_results.values())
 
     if has_degraded:
-        # 降级处理：提供友好的降级提示内容
-        degraded_content = (
-            f"抱歉，关于「{topic}」的个性化内容生成未通过质量审核。\n\n"
-            "系统已多次尝试优化，但仍未能达到质量标准。建议：\n"
-            "1. 更换学习主题\n"
-            "2. 联系管理员添加更多领域知识库资料\n"
-            "3. 尝试更具体的子主题"
+        # 降级处理：保留最后一次生成的内容，标注"未通过质量审核，仅供参考"
+        degraded_warning = (
+            "\n\n---\n"
+            "> ⚠️ **质量提醒**：本内容经多轮审核后仍未完全通过质量验证，可能存在不准确之处，仅供参考学习。\n"
+            "> 建议结合权威资料交叉验证，或尝试更换学习主题以获得更高质量内容。\n"
         )
-        final_resources.append({
-            "type": "lecture",
-            "content": degraded_content,
-            "topic": topic,
-            "difficulty": difficulty,
-        })
+        for content_type, review in review_results.items():
+            content = review.get("final_content", "")
+            final_resources.append({
+                "type": content_type,
+                "content": content + degraded_warning if content else degraded_warning.strip(),
+                "topic": topic,
+                "difficulty": difficulty,
+            })
     else:
         # 正常处理：使用审核通过的最终内容
         for content_type, review in review_results.items():

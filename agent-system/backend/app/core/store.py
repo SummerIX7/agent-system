@@ -201,6 +201,16 @@ def add_agent_log(session_id: str, log: dict) -> None:
     _update_field(session_id, "agent_logs", logs)
 
 
+def save_practice_state(session_id: str, state: dict) -> None:
+    """保存答题进度到 session"""
+    _update_field(session_id, "practice_state", state)
+
+
+def get_practice_state(session_id: str) -> dict:
+    """从 session 读取答题进度"""
+    return get_session(session_id).get("practice_state", {})
+
+
 def get_all_sessions() -> list[dict]:
     """获取所有活跃会话（替代直接遍历 _sessions dict）"""
     r = _get_redis()

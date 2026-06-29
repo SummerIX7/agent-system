@@ -119,6 +119,16 @@ export function useApi() {
     getQuestions: (sessionId: string) =>
       request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
 
+    // 答题进度持久化
+    savePracticeState: (sessionId: string, data: { current_index: number; questions: any[] }) =>
+      request<{ ok: boolean }>(`/api/questions/practice/state/${sessionId}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getPracticeState: (sessionId: string) =>
+      request<{ current_index: number; questions: any[] }>(`/api/questions/practice/state/${sessionId}`),
+
     // 领域
     getDomains: () =>
       request<DomainConfig[]>('/api/domains'),

@@ -291,6 +291,33 @@ const fetchQuestions = async () => {
     }))
     currentIndex.value = 0
     resetState()
+
+    // 尝试恢复之前的答题进度
+    if (sessionId.value) {
+      try {
+        const saved = await api.getPracticeState(sessionId.value)
+        if (saved?.questions?.length > 0) {
+          questions.value = questions.value.map((q: any) => {
+            const match = saved.questions.find((s: any) => s.question === q.question)
+            if (match) {
+              return { ...q,
+                selectedIndex: match.selectedIndex ?? -1,
+                answered: match.answered ?? false,
+                finalCorrect: match.finalCorrect ?? null,
+                practicalAnswer: match.practicalAnswer || '',
+                practicalGraded: match.practicalGraded ?? false,
+                practicalResult: match.practicalResult || null,
+              }
+            }
+            return q
+          })
+          if (typeof saved.current_index === 'number') {
+            currentIndex.value = saved.current_index
+          }
+          resetState()
+        }
+      } catch { /* 没有已保存的进度 */ }
+    }
   } catch (err: any) {
     loadError.value = '试题加载失败，请稍后重试'
     console.error('获取试题失败:', err)
@@ -342,6 +369,7 @@ const lockQuestion = (correct: boolean) => {
   currentQuestion.value.finalCorrect = correct
   isCorrect.value = correct
   showFeedback.value = true
+  saveProgress()
 }
 
 // === 提交实操题答案 ===
@@ -421,6 +449,7 @@ const prevQuestion = () => {
   if (currentIndex.value > 0) {
     currentIndex.value--
     resetState()
+    saveProgress()
   }
 }
 
@@ -428,7 +457,9 @@ const nextQuestion = () => {
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
     resetState()
+    saveProgress()
   } else {
+    saveProgress()
     router.push('/report')
   }
 }
@@ -447,6 +478,25 @@ const resetState = () => {
   practicalGrading.value = false
   practicalGraded.value = q?.practicalGraded ?? false
   practicalResult.value = q?.practicalResult || null
+}
+
+// === 答题进度持久化 ===
+const saveProgress = async () => {
+  if (!sessionId.value) return
+  try {
+    await api.savePracticeState(sessionId.value, {
+      current_index: currentIndex.value,
+      questions: questions.value.map((q: any) => ({
+        question: q.question,
+        selectedIndex: q.selectedIndex,
+        answered: q.answered,
+        finalCorrect: q.finalCorrect,
+        practicalAnswer: q.practicalAnswer,
+        practicalGraded: q.practicalGraded,
+        practicalResult: q.practicalResult,
+      })),
+    })
+  } catch { /* 静默失败，不影响答题流程 */ }
 }
 
 // === 初始化 ===

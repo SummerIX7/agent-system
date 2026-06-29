@@ -59,24 +59,26 @@ class PathPlannerAgent(BaseAgent):
         return path
 
     async def adjust_path(self, path: dict, feedback: dict) -> dict:
-        """根据用户反馈调整学习路径"""
+        """根据用户反馈调整学习路径
+
+        注意：此方法基于单条反馈做 LLM 驱动的路径结构调整，
+        与 orchestrator.adjust_learning_path() 的滑动窗口规则策略互补。
+        """
         correctness = feedback.get("correctness", 0)
         current_stage = path.get("current_stage", 1)
 
         if correctness < 0.6:
-            # 降低难度，补充基础
-            prompt = f"""学习者在阶段 {correctness:.0%} 正确率较低，请调整学习路径：
-1. 在当前阶段前插入基础知识补充阶段
-2. 降低当前阶段难度
+            prompt = f"""学习者近期正确率为 {correctness:.0%}（偏低），当前在第 {current_stage} 阶段。请调整学习路径：
+1. 在第 {current_stage} 阶段前插入基础知识补充阶段
+2. 降低第 {current_stage} 阶段的难度
 
 当前路径：{json.dumps(path, ensure_ascii=False)}
 
 输出调整后的 JSON 路径。只输出 JSON。"""
         elif correctness > 0.9:
-            # 跳过已掌握内容
-            prompt = f"""学习者正确率 {correctness:.0%}，掌握良好，请调整学习路径：
-1. 当前阶段标记为已完成
-2. 跳过基础内容，直接进入进阶
+            prompt = f"""学习者近期正确率为 {correctness:.0%}（优秀），当前在第 {current_stage} 阶段。请调整学习路径：
+1. 将第 {current_stage} 阶段标记为已完成
+2. 跳过已覆盖的基础内容，推进到下一阶段
 
 当前路径：{json.dumps(path, ensure_ascii=False)}
 
