@@ -203,8 +203,9 @@ async def review_correct_node(state: AgentState) -> dict:
             }
             continue
 
-        # 达到最大重试次数，标记为降级
-        if retry_count >= MAX_RETRIES:
+        # Bug#9 修复：用 retry_count+1 预判本轮是否会耗尽重试次数，提前短路避免浪费 LLM 调用
+        # 原 `retry_count >= MAX_RETRIES` 只在重试已达到上限的下一轮才触发（已冗余）
+        if retry_count + 1 >= MAX_RETRIES:
             review_results[content_type] = {
                 "passed": False, "score": 0, "issues": [],
                 "final_content": content, "correction_applied": False,
@@ -316,12 +317,22 @@ def _validate_questions(questions: list) -> tuple[list, list]:
             options = q.get("options", [])
             if len(options) < 3:
                 q_issues.append(f"选项数量不足({len(options)}，至少3个)")
-            if not q.get("correct_answer") or q["correct_answer"] not in valid_letters:
-                q_issues.append(f"正确答案格式无效({q.get('correct_answer')})")
-            elif q["correct_answer"] in valid_letters:
-                idx = ord(q["correct_answer"]) - 65
+
+            # Bug#8 修复：标准化 correct_answer（LLM 可能返回 "A" 或 "A. 选项文本"）
+            raw_answer = q.get("correct_answer", "")
+            normalized_answer = raw_answer
+            if raw_answer and len(raw_answer) > 1 and raw_answer[0] in valid_letters:
+                # "A. xxx" 或 "A、xxx" → "A"
+                if raw_answer[1] in (".", "、", ")", " ", "："):
+                    normalized_answer = raw_answer[0]
+                    q["correct_answer"] = normalized_answer
+
+            if not normalized_answer or normalized_answer not in valid_letters:
+                q_issues.append(f"正确答案格式无效({raw_answer})")
+            else:
+                idx = ord(normalized_answer) - 65
                 if idx >= len(options):
-                    q_issues.append(f"正确答案索引({q['correct_answer']})超出选项范围")
+                    q_issues.append(f"正确答案索引({normalized_answer})超出选项范围")
         elif q_type == "true_false":
             options = q.get("options", [])
             if "正确" not in str(options) and "错误" not in str(options):
@@ -336,7 +347,8 @@ def _validate_questions(questions: list) -> tuple[list, list]:
 
         if q_issues:
             issues.append(f"题目{i+1}: {'; '.join(q_issues)}")
-        valid.append(q)
+        else:
+            valid.append(q)
 
     return valid, issues
 
@@ -381,25 +393,21 @@ async def gen_questions_node(state: AgentState) -> dict:
 # ⑥ 决策调度 Agent
 # ──────────────────────────────────────────────
 async def decide_node(state: AgentState) -> str:
+    """决策路由节点：委托 Orchestrator 判断下一步是完成还是重新生成"""
     session_id = state.get("session_id", "")
     _broadcast(session_id, "决策调度 Agent", "running", "正在决策...", 95)
 
-    review_results = state.get("review_results", {})
-    retry_count = state.get("retry_count", 0)
+    # Bug#6 修复：委托 orchestrator.decide_next() 而非重复实现相同逻辑
+    decision = await orchestrator.decide_next(state)
 
-    all_passed = all(r.get("passed", False) for r in review_results.values())
-    has_degraded = any(r.get("degraded", False) for r in review_results.values())
-
-    if all_passed:
-        _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成：所有内容通过质量审核", 100)
-        return "complete"
-    elif has_degraded or retry_count >= MAX_RETRIES:
-        _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成（降级）：内容未通过质量审核", 100)
-        return "complete"
+    if decision == "complete":
+        _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成", 100)
     else:
-        _broadcast(session_id, "决策调度 Agent", "running", f"审核未通过（第{retry_count}次），触发重新生成...", 25)
+        _broadcast(session_id, "决策调度 Agent", "running",
+                   f"审核未通过（第{state.get('retry_count', 0)}次），触发重新生成...", 25)
         _broadcast(session_id, "知识生成 Agent", "running", "重新生成内容...", 30)
-        return "retry"
+
+    return decision
 
 
 # ──────────────────────────────────────────────

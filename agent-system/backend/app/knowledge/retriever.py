@@ -84,8 +84,17 @@ _retriever: KnowledgeRetriever | None = None
 
 
 def get_retriever() -> KnowledgeRetriever:
-    """获取知识库检索器单例"""
+    """获取知识库检索器单例。MOCK_MODE=true 时返回 MockRetriever。"""
     global _retriever
+    settings = get_settings()
+
+    # Mock 模式：返回本地模拟检索器，不调用嵌入 API 和 ChromaDB
+    if settings.MOCK_MODE:
+        if _retriever is None:
+            from app.mock.knowledge import MockRetriever
+            _retriever = MockRetriever()
+        return _retriever
+
     if _retriever is None:
         _retriever = KnowledgeRetriever()
     return _retriever

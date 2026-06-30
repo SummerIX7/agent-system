@@ -75,6 +75,12 @@ async def submit_feedback(
     reveal = False
     heuristic = None
 
+    # 提前获取 session 和领域配置（Bug#1 修复：domain 须在 generate_heuristic_question 调用前赋值）
+    session = get_session(feedback.session_id)
+    learner_id = session.get("learner_id", "")
+    profile = session.get("profile", {})
+    domain = get_domain_from_input(profile)
+
     if not is_correct:
         if current_round >= MAX_ROUNDS:
             reveal = True
@@ -91,13 +97,6 @@ async def submit_feedback(
                 )
             except Exception as e:
                 print(f"[警告] 启发式追问生成失败: {e}")
-
-    session = get_session(feedback.session_id)
-    learner_id = session.get("learner_id", "")
-
-    # 从 session profile 获取当前领域配置
-    profile = session.get("profile", {})
-    domain = get_domain_from_input(profile)
 
     record = FeedbackRecord(
         session_id=feedback.session_id,

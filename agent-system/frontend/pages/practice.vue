@@ -6,6 +6,18 @@
       <p class="page-head__desc">答题正确直接进入下一题；答错时系统会通过苏格拉底式追问引导你思考，并将反馈用于动态调整学习路径。</p>
     </div>
 
+    <!-- 顶部操作栏 -->
+    <div v-if="!loading && !loadError && questions.length > 0" class="toolbar">
+      <div class="toolbar__info">
+        <span class="badge badge--accent">Step 5</span>
+        <span class="toolbar__hint">数据来自缓存，切换页面不会丢失进度</span>
+      </div>
+      <button class="btn btn--ghost btn--sm" :disabled="loading" @click="fetchQuestions">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+        重新生成试题
+      </button>
+    </div>
+
     <!-- 加载中 -->
     <div v-if="loading" class="flex flex-col items-center justify-center py-20">
       <div class="animate-spin" style="width: 48px; height: 48px; border: 4px solid var(--line); border-top-color: var(--accent); border-radius: 50%;"></div>
@@ -20,8 +32,8 @@
 
     <!-- 无试题 -->
     <div v-else-if="questions.length === 0" class="flex flex-col items-center justify-center py-20">
-      <p class="text-text-3 mb-4">暂无试题</p>
-      <button class="btn btn--primary" @click="fetchQuestions">生成试题</button>
+      <p class="text-text-3 mb-4">暂无试题，请先在工作流页面生成资源</p>
+      <NuxtLink to="/workflow" class="btn btn--primary">前往生成资源</NuxtLink>
     </div>
 
     <!-- 答题区域 -->
@@ -200,8 +212,13 @@ const api = useApi()
 const { sessionId } = useSession()
 const { isLoggedIn } = useAuth()
 
+// ── 跨页面数据缓存（useState 在 SPA 导航中持久化）──
+const cachedQuestions = useState<any[]>('practice-questions', () => [])
+const cachedSessionId = useState<string>('practice-session-id', () => '')
+const dataLoaded = ref(false)
+
 // === 状态 ===
-const loading = ref(true)
+const loading = ref(false)
 const loadError = ref('')
 const questions = ref<any[]>([])
 const currentIndex = ref(0)
@@ -278,7 +295,7 @@ const fetchQuestions = async () => {
   loadError.value = ''
   try {
     const result = await api.getQuestions(sessionId.value)
-    questions.value = (result.questions || []).map((q: any) => ({
+    const parsed = (result.questions || []).map((q: any) => ({
       ...q,
       correctIndex: resolveCorrectIndex(q),
       selectedIndex: -1,
@@ -289,8 +306,14 @@ const fetchQuestions = async () => {
       practicalGraded: false,
       practicalResult: null,
     }))
+    questions.value = parsed
     currentIndex.value = 0
     resetState()
+
+    // 持久化到跨页面缓存
+    cachedQuestions.value = parsed
+    cachedSessionId.value = sessionId.value
+    dataLoaded.value = true
 
     // 尝试恢复之前的答题进度
     if (sessionId.value) {
@@ -501,19 +524,59 @@ const saveProgress = async () => {
 
 // === 初始化 ===
 onMounted(() => {
-  if (isLoggedIn.value && sessionId.value) {
-    fetchQuestions()
-  } else if (!isLoggedIn.value) {
+  if (!isLoggedIn.value) {
     loading.value = false
     loadError.value = '请先登录'
-  } else {
+    return
+  }
+  if (!sessionId.value) {
     loading.value = false
     loadError.value = '请先完成学情诊断'
+    return
   }
+
+  // 跨页面缓存命中：同一 session 且有缓存数据时直接恢复，不重新请求
+  if (cachedSessionId.value === sessionId.value && cachedQuestions.value.length > 0) {
+    questions.value = cachedQuestions.value
+    dataLoaded.value = true
+    // 恢复答题进度
+    api.getPracticeState(sessionId.value).then(saved => {
+      if (saved?.questions?.length) {
+        questions.value = questions.value.map((q: any) => {
+          const match = saved.questions.find((s: any) => s.question === q.question)
+          return match ? { ...q, ...match } : q
+        })
+      }
+    }).catch(() => {})
+    resetState()
+    return
+  }
+
+  // 缓存未命中或 session 变更：重新获取
+  fetchQuestions()
 })
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+}
+.toolbar__info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toolbar__hint {
+  font-size: 12px;
+  color: var(--text-3);
+}
 .quiz-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;

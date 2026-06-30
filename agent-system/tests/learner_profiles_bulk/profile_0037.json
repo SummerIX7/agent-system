@@ -1,0 +1,31 @@
+{
+  "profile_name": "相关专业-高中-intermediate-#037",
+  "domain": "python_data_analysis",
+  "domain_name": "Python 数据分析",
+  "education_background": "高中",
+  "education_label": "high_school",
+  "major": "数据科学",
+  "major_related": true,
+  "work_experience_years": 3,
+  "learning_style": "theory",
+  "self_assessment": {
+    "Python基础语法": "了解基础",
+    "NumPy数组操作": "了解基础",
+    "Pandas数据处理": "了解基础",
+    "Matplotlib绘图": "熟练",
+    "Seaborn可视化": "不了解",
+    "数据清洗与预处理": "精通",
+    "统计分析基础": "了解基础",
+    "Jupyter Notebook使用": "熟练"
+  },
+  "goals": [
+    "系统学习Python 数据分析核心内容"
+  ],
+  "expected_difficulty": "intermediate",
+  "expected_level": "intermediate",
+  "expected_knowledge_score_range": [
+    30,
+    60
+  ],
+  "profile_id": 37
+}

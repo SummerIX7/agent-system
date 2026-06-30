@@ -80,6 +80,22 @@
       </nav>
     </div>
 
+    <!-- 步骤进度指示器 -->
+    <div class="step-bar">
+      <div class="step-bar__inner">
+        <NuxtLink
+          v-for="(step, idx) in steps"
+          :key="step.path"
+          :to="step.path"
+          class="step-bar__item"
+          :class="{ active: isCurrentStep(step.path), done: isStepDone(step.path) }"
+        >
+          <span class="step-bar__num">{{ isStepDone(step.path) ? '✓' : idx + 1 }}</span>
+          <span class="step-bar__label">{{ step.label }}</span>
+        </NuxtLink>
+      </div>
+    </div>
+
     <!-- 主内容区 -->
     <main class="flex-1">
       <slot />
@@ -94,7 +110,9 @@
 
 <script setup lang="ts">
 const router = useRouter()
+const route = useRoute()
 const { user, isLoggedIn, restoreToken, logout } = useAuth()
+const { sessionId } = useSession()
 
 const mobileMenuOpen = ref(false)
 
@@ -108,6 +126,33 @@ const navItems = [
   { path: '/report', label: '分析报告' },
   { path: '/history', label: '历史记录' },
 ]
+
+// 步骤进度条：只包含 6 个核心步骤
+const steps = [
+  { path: '/profile', label: '画像' },
+  { path: '/dashboard', label: '诊断' },
+  { path: '/workflow', label: '生成' },
+  { path: '/resources', label: '资源' },
+  { path: '/practice', label: '练习' },
+  { path: '/report', label: '报告' },
+]
+
+// 步骤顺序映射（用于判断哪些步骤已完成）
+const stepOrder = Object.fromEntries(steps.map((s, i) => [s.path, i]))
+
+// 判断当前所在步骤
+const currentStepIndex = computed(() => {
+  const idx = stepOrder[route.path]
+  return idx !== undefined ? idx : -1
+})
+
+const isCurrentStep = (path: string) => route.path === path
+const isStepDone = (path: string) => {
+  const stepIdx = stepOrder[path]
+  if (stepIdx === undefined) return false
+  // 已完成的步骤：有 session 且步骤在当前步骤之前
+  return sessionId.value !== '' && stepIdx < currentStepIndex.value
+}
 
 // 用户名首字母（用于头像显示）
 const userInitial = computed(() => {
@@ -125,3 +170,80 @@ const handleLogout = () => {
   router.push('/login')
 }
 </script>
+
+<style scoped>
+/* ── 步骤进度条 ── */
+.step-bar {
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  position: sticky;
+  top: 56px;
+  z-index: 40;
+}
+.step-bar__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+.step-bar__item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 8px;
+  font-size: 13px;
+  color: var(--text-3);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+  position: relative;
+}
+.step-bar__item:hover {
+  color: var(--text-2);
+  border-bottom-color: var(--line-2);
+}
+.step-bar__item.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.step-bar__item.done {
+  color: var(--ok);
+}
+.step-bar__num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+.step-bar__item.active .step-bar__num {
+  background: var(--accent);
+  color: #fff;
+}
+.step-bar__item.done .step-bar__num {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.step-bar__label {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .step-bar__label {
+    display: none;
+  }
+  .step-bar__item {
+    padding: 10px 4px;
+  }
+}
+</style>

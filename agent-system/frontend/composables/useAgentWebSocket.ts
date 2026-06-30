@@ -12,6 +12,11 @@ export function useAgentWebSocket(sessionId: string) {
   let ws: WebSocket | null = null
 
   const connect = () => {
+    // Bug#10 修复：空 sessionId 不建立连接，避免路由歧义和无效 WebSocket 连接
+    if (!sessionId) {
+      console.warn('[WebSocket] 未提供 sessionId，跳过连接')
+      return
+    }
     try {
       ws = new WebSocket(`${config.public.wsBase}/ws/agent-status/${sessionId}`)
 

@@ -1,0 +1,32 @@
+{
+  "profile_name": "相关专业-大专-expert-#032",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "大专",
+  "education_label": "associate",
+  "major": "车辆工程",
+  "major_related": true,
+  "work_experience_years": 0,
+  "learning_style": "practice",
+  "self_assessment": {
+    "机械制图基础": "精通",
+    "G 代码编程": "熟练",
+    "数控车床操作": "精通",
+    "数控铣床操作": "精通",
+    "CAM 软件应用": "精通",
+    "刀具选择与管理": "精通",
+    "切削参数优化": "精通",
+    "测量与检测": "熟练"
+  },
+  "goals": [
+    "研究CNC 数控加工前沿技术",
+    "成为CNC 数控加工领域专家"
+  ],
+  "expected_difficulty": "expert",
+  "expected_level": "expert",
+  "expected_knowledge_score_range": [
+    85,
+    100
+  ],
+  "profile_id": 32
+}

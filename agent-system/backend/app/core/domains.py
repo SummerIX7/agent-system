@@ -58,7 +58,7 @@ DOMAINS: Dict[str, DomainConfig] = {
         name="Python 数据分析",
         code="python_data_analysis",
         description="Python编程、NumPy、Pandas、Matplotlib、数据清洗、数据可视化等",
-        knowledge_base_dir=str(_KB_BASE / "demo_domain" / "python_data_analysis"),
+        knowledge_base_dir=str(_KB_BASE / "python_data_domain"),
         core_topics=[
             "Python基础", "NumPy", "Pandas", "Matplotlib", "Seaborn",
             "数据清洗", "数据可视化", "统计分析", "数据处理",

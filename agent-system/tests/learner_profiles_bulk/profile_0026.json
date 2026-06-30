@@ -1,0 +1,31 @@
+{
+  "profile_name": "相关专业-硕士-advanced-#026",
+  "domain": "python_data_analysis",
+  "domain_name": "Python 数据分析",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "数学与应用数学",
+  "major_related": true,
+  "work_experience_years": 2,
+  "learning_style": "theory",
+  "self_assessment": {
+    "Python基础语法": "了解基础",
+    "NumPy数组操作": "熟练",
+    "Pandas数据处理": "熟练",
+    "Matplotlib绘图": "不了解",
+    "Seaborn可视化": "熟练",
+    "数据清洗与预处理": "了解基础",
+    "统计分析基础": "精通",
+    "Jupyter Notebook使用": "熟练"
+  },
+  "goals": [
+    "精通Python 数据分析高级技术"
+  ],
+  "expected_difficulty": "advanced",
+  "expected_level": "advanced",
+  "expected_knowledge_score_range": [
+    60,
+    85
+  ],
+  "profile_id": 26
+}

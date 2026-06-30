@@ -1,0 +1,32 @@
+{
+  "profile_name": "非相关专业-硕士-expert-#050",
+  "domain": "python_data_analysis",
+  "domain_name": "Python 数据分析",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "英语",
+  "major_related": false,
+  "work_experience_years": 5,
+  "learning_style": "visual",
+  "self_assessment": {
+    "Python基础语法": "熟练",
+    "NumPy数组操作": "熟练",
+    "Pandas数据处理": "精通",
+    "Matplotlib绘图": "精通",
+    "Seaborn可视化": "精通",
+    "数据清洗与预处理": "精通",
+    "统计分析基础": "精通",
+    "Jupyter Notebook使用": "精通"
+  },
+  "goals": [
+    "掌握Python 数据分析系统级优化",
+    "研究Python 数据分析前沿技术"
+  ],
+  "expected_difficulty": "expert",
+  "expected_level": "expert",
+  "expected_knowledge_score_range": [
+    85,
+    100
+  ],
+  "profile_id": 50
+}

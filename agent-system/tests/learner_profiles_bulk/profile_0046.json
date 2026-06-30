@@ -1,0 +1,31 @@
+{
+  "profile_name": "相关专业-硕士-beginner-#046",
+  "domain": "python_data_analysis",
+  "domain_name": "Python 数据分析",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "金融工程",
+  "major_related": true,
+  "work_experience_years": 0.5,
+  "learning_style": "visual",
+  "self_assessment": {
+    "Python基础语法": "不了解",
+    "NumPy数组操作": "不了解",
+    "Pandas数据处理": "不了解",
+    "Matplotlib绘图": "不了解",
+    "Seaborn可视化": "不了解",
+    "数据清洗与预处理": "精通",
+    "统计分析基础": "不了解",
+    "Jupyter Notebook使用": "不了解"
+  },
+  "goals": [
+    "学习Python 数据分析基本操作"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_level": "beginner",
+  "expected_knowledge_score_range": [
+    5,
+    30
+  ],
+  "profile_id": 46
+}

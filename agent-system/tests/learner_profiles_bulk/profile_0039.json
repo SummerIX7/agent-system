@@ -1,0 +1,31 @@
+{
+  "profile_name": "相关专业-博士-intermediate-#039",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "博士",
+  "education_label": "doctor",
+  "major": "机械设计制造及其自动化",
+  "major_related": true,
+  "work_experience_years": 0,
+  "learning_style": "theory",
+  "self_assessment": {
+    "机械制图基础": "了解基础",
+    "G 代码编程": "熟练",
+    "数控车床操作": "了解基础",
+    "数控铣床操作": "熟练",
+    "CAM 软件应用": "不了解",
+    "刀具选择与管理": "了解基础",
+    "切削参数优化": "熟练",
+    "测量与检测": "不了解"
+  },
+  "goals": [
+    "掌握CNC 数控加工常用技术"
+  ],
+  "expected_difficulty": "intermediate",
+  "expected_level": "intermediate",
+  "expected_knowledge_score_range": [
+    30,
+    60
+  ],
+  "profile_id": 39
+}

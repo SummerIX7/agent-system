@@ -95,6 +95,14 @@ class BaseAgent:
     async def call_llm(self, prompt: str, max_retries: int = 3, label: str = "") -> str:
         """调用 LLM 获取响应，带重试机制和追踪埋点"""
         import asyncio
+
+        # Mock 模式：通过 contextvars 将 label 传递给 MockLLM.ainvoke()
+        try:
+            from app.mock.llm import _mock_label
+            _mock_label.set(label)
+        except ImportError:
+            pass  # 非 mock 模式，正常跳过
+
         last_error = None
         start = time.time()
         for attempt in range(max_retries):

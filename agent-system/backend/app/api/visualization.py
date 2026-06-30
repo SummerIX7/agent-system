@@ -208,11 +208,13 @@ async def get_visualization(
         except Exception as e:
             logger.warning(f"谬误率计算失败，使用降级方案: {e}")
             # 降级：使用基于 review_score 的估算
+            # 映射关系：score=1.0→0%, score=0.7→3%, score=0.5→5%, score=0.3→7%
+            # 公式：hallucination_rate = (1 - avg_score) * 10，反映 score 越低谬误越高
             if db_resources:
                 scores = [r.review_score for r in db_resources if r.review_score is not None]
                 if scores:
                     avg_score = sum(scores) / len(scores)
-                    hallucination_rate = round(max(0, (1 - avg_score) / 0.15 * 5), 1)
+                    hallucination_rate = round(max(0, (1 - avg_score) * 10), 1)
                     hallucination_rate = min(hallucination_rate, 10.0)
 
     # 如果所有方法都无法计算，给出合理的默认值

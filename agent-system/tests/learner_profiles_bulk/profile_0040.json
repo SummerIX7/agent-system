@@ -1,0 +1,31 @@
+{
+  "profile_name": "相关专业-本科-beginner-#040",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "本科",
+  "education_label": "bachelor",
+  "major": "数控技术",
+  "major_related": true,
+  "work_experience_years": 0.5,
+  "learning_style": "visual",
+  "self_assessment": {
+    "机械制图基础": "不了解",
+    "G 代码编程": "不了解",
+    "数控车床操作": "不了解",
+    "数控铣床操作": "不了解",
+    "CAM 软件应用": "不了解",
+    "刀具选择与管理": "不了解",
+    "切削参数优化": "了解基础",
+    "测量与检测": "不了解"
+  },
+  "goals": [
+    "了解CNC 数控加工基础概念"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_level": "beginner",
+  "expected_knowledge_score_range": [
+    5,
+    30
+  ],
+  "profile_id": 40
+}

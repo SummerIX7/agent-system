@@ -1,0 +1,31 @@
+{
+  "profile_name": "非相关专业-博士-beginner-#002",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "博士",
+  "education_label": "doctor",
+  "major": "人力资源管理",
+  "major_related": false,
+  "work_experience_years": 8,
+  "learning_style": "practice",
+  "self_assessment": {
+    "机械制图基础": "不了解",
+    "G 代码编程": "不了解",
+    "数控车床操作": "了解基础",
+    "数控铣床操作": "不了解",
+    "CAM 软件应用": "不了解",
+    "刀具选择与管理": "不了解",
+    "切削参数优化": "不了解",
+    "测量与检测": "不了解"
+  },
+  "goals": [
+    "掌握CNC 数控加工入门知识"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_level": "beginner",
+  "expected_knowledge_score_range": [
+    5,
+    30
+  ],
+  "profile_id": 2
+}

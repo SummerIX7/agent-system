@@ -1,0 +1,32 @@
+{
+  "profile_name": "相关专业-高中-expert-#013",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "高中",
+  "education_label": "high_school",
+  "major": "车辆工程",
+  "major_related": true,
+  "work_experience_years": 5,
+  "learning_style": "practice",
+  "self_assessment": {
+    "机械制图基础": "精通",
+    "G 代码编程": "熟练",
+    "数控车床操作": "熟练",
+    "数控铣床操作": "熟练",
+    "CAM 软件应用": "精通",
+    "刀具选择与管理": "熟练",
+    "切削参数优化": "精通",
+    "测量与检测": "精通"
+  },
+  "goals": [
+    "研究CNC 数控加工前沿技术",
+    "掌握CNC 数控加工系统级优化"
+  ],
+  "expected_difficulty": "expert",
+  "expected_level": "expert",
+  "expected_knowledge_score_range": [
+    85,
+    100
+  ],
+  "profile_id": 13
+}

@@ -19,15 +19,8 @@ class AgentState(TypedDict, total=False):
     # ③ 知识生成
     generated_content: dict      # 生成的资源 {lecture/guide/project: content}
 
-    # ③½ 预审
-    review_results: dict         # 预审结果 {type: ReviewResult}
-
-    # ③½ 预审
-    review_results: dict         # 预审结果 {type: ReviewResult}
-
-    # ④ 审核纠偏（辩论）
-    debate_results: dict         # 辩论结果 {type: DebateResult}
-    debate_rounds: list          # 辩论记录
+    # ③½ 审核纠偏（双视角审查+修正，合并了原预审+辩论）
+    review_results: dict         # 审核结果 {type: {passed, score, issues, final_content, correction_applied}}
 
     # ⑤ 试题生成
     question_set: dict           # 试题集 {questions: [...]}

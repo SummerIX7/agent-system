@@ -110,8 +110,9 @@ const currentProgress = ref(0)
 const currentMessage = ref('准备中...')
 const generating = ref(false)
 
-// WebSocket 连接
-const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
+// Bug#10 修复：未登录时 WebSocket 使用空字符串避免路由歧义，
+// 仅在有有效 sessionId 时才建立真实连接
+const { agents, isConnected } = useAgentWebSocket(sessionId.value || '')
 
 // 初始化 6 个 Agent 状态
 if (agents.value.length === 0) {

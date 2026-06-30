@@ -1,0 +1,31 @@
+{
+  "profile_name": "相关专业-博士-advanced-#010",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "博士",
+  "education_label": "doctor",
+  "major": "工业工程",
+  "major_related": true,
+  "work_experience_years": 2,
+  "learning_style": "practice",
+  "self_assessment": {
+    "机械制图基础": "熟练",
+    "G 代码编程": "了解基础",
+    "数控车床操作": "精通",
+    "数控铣床操作": "精通",
+    "CAM 软件应用": "精通",
+    "刀具选择与管理": "熟练",
+    "切削参数优化": "熟练",
+    "测量与检测": "了解基础"
+  },
+  "goals": [
+    "学习CNC 数控加工优化方法"
+  ],
+  "expected_difficulty": "advanced",
+  "expected_level": "advanced",
+  "expected_knowledge_score_range": [
+    60,
+    85
+  ],
+  "profile_id": 10
+}

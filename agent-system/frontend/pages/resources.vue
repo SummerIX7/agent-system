@@ -177,6 +177,12 @@
         </div>
       </div>
     </div>
+
+    <!-- 底部导航：进入答题练习 -->
+    <div v-if="!loading && resources.length > 0" style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
+      <NuxtLink to="/workflow" class="btn btn--ghost btn--lg">← 重新生成资源</NuxtLink>
+      <NuxtLink to="/practice" class="btn btn--primary btn--lg">进入答题练习 →</NuxtLink>
+    </div>
   </div>
 </template>
 

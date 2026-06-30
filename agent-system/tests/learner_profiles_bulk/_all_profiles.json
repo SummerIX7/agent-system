@@ -1,0 +1,1565 @@
+[
+  {
+    "profile_name": "相关专业-高中-beginner-#001",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "机械设计制造及其自动化",
+    "major_related": true,
+    "work_experience_years": 3,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "不了解",
+      "数控铣床操作": "了解基础",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "不了解",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "学习CNC 数控加工基本操作"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 1
+  },
+  {
+    "profile_name": "非相关专业-博士-beginner-#002",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "人力资源管理",
+    "major_related": false,
+    "work_experience_years": 8,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "不了解",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "掌握CNC 数控加工入门知识"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 2
+  },
+  {
+    "profile_name": "相关专业-高中-beginner-#003",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "数控技术",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "了解基础",
+      "数控车床操作": "不了解",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "不了解",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "学习CNC 数控加工基本操作",
+      "掌握CNC 数控加工入门知识"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 3
+  },
+  {
+    "profile_name": "非相关专业-大专-beginner-#004",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "艺术设计",
+    "major_related": false,
+    "work_experience_years": 0.5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "了解基础",
+      "CAM 软件应用": "了解基础",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "不了解",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "了解CNC 数控加工基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 4
+  },
+  {
+    "profile_name": "相关专业-本科-beginner-#005",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "车辆工程",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "不了解",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "了解基础",
+      "切削参数优化": "不了解",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "掌握CNC 数控加工入门知识",
+      "了解CNC 数控加工基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 5
+  },
+  {
+    "profile_name": "相关专业-高中-intermediate-#006",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "车辆工程",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "了解基础",
+      "刀具选择与管理": "了解基础",
+      "切削参数优化": "了解基础",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "系统学习CNC 数控加工核心内容"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 6
+  },
+  {
+    "profile_name": "非相关专业-大专-intermediate-#007",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "市场营销",
+    "major_related": false,
+    "work_experience_years": 15,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "了解基础",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "了解基础",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "精通",
+      "切削参数优化": "了解基础",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "提升CNC 数控加工实践技能"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 7
+  },
+  {
+    "profile_name": "相关专业-硕士-intermediate-#008",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "材料成型及控制工程",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "了解基础",
+      "G 代码编程": "精通",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "精通",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "了解基础",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "掌握CNC 数控加工常用技术"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 8
+  },
+  {
+    "profile_name": "非相关专业-高中-intermediate-#009",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "汉语言文学",
+    "major_related": false,
+    "work_experience_years": 3,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "了解基础",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "了解基础",
+      "切削参数优化": "了解基础",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "掌握CNC 数控加工常用技术"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 9
+  },
+  {
+    "profile_name": "相关专业-博士-advanced-#010",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "工业工程",
+    "major_related": true,
+    "work_experience_years": 2,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "熟练",
+      "G 代码编程": "了解基础",
+      "数控车床操作": "精通",
+      "数控铣床操作": "精通",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "熟练",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 10
+  },
+  {
+    "profile_name": "相关专业-高中-advanced-#011",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "车辆工程",
+    "major_related": true,
+    "work_experience_years": 2,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "了解基础",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "了解基础",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "了解基础",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "掌握CNC 数控加工复杂场景应用"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 11
+  },
+  {
+    "profile_name": "相关专业-博士-advanced-#012",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "工业工程",
+    "major_related": true,
+    "work_experience_years": 8,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "熟练",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "熟练",
+      "测量与检测": "精通"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 12
+  },
+  {
+    "profile_name": "相关专业-高中-expert-#013",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "车辆工程",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "熟练",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "精通",
+      "测量与检测": "精通"
+    },
+    "goals": [
+      "研究CNC 数控加工前沿技术",
+      "掌握CNC 数控加工系统级优化"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 13
+  },
+  {
+    "profile_name": "相关专业-大专-expert-#014",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "智能制造工程",
+    "major_related": true,
+    "work_experience_years": 15,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "精通",
+      "数控车床操作": "精通",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "精通",
+      "切削参数优化": "熟练",
+      "测量与检测": "精通"
+    },
+    "goals": [
+      "掌握CNC 数控加工系统级优化"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 14
+  },
+  {
+    "profile_name": "相关专业-高中-beginner-#015",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "人工智能",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "了解基础",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "了解Python 数据分析基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 15
+  },
+  {
+    "profile_name": "非相关专业-博士-beginner-#016",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "行政管理",
+    "major_related": false,
+    "work_experience_years": 0.5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "掌握Python 数据分析入门知识",
+      "了解Python 数据分析基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 16
+  },
+  {
+    "profile_name": "相关专业-高中-beginner-#017",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "金融工程",
+    "major_related": true,
+    "work_experience_years": 8,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "了解基础",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "了解Python 数据分析基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 17
+  },
+  {
+    "profile_name": "非相关专业-博士-beginner-#018",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "英语",
+    "major_related": false,
+    "work_experience_years": 15,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "了解基础",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "熟练",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "了解Python 数据分析基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 18
+  },
+  {
+    "profile_name": "相关专业-大专-beginner-#019",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "软件工程",
+    "major_related": true,
+    "work_experience_years": 8,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "了解基础",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "掌握Python 数据分析入门知识"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 19
+  },
+  {
+    "profile_name": "相关专业-大专-intermediate-#020",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "数学与应用数学",
+    "major_related": true,
+    "work_experience_years": 3,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "了解基础",
+      "Pandas数据处理": "了解基础",
+      "Matplotlib绘图": "熟练",
+      "Seaborn可视化": "熟练",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "了解基础",
+      "Jupyter Notebook使用": "了解基础"
+    },
+    "goals": [
+      "提升Python 数据分析实践技能"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 20
+  },
+  {
+    "profile_name": "非相关专业-博士-intermediate-#021",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "人力资源管理",
+    "major_related": false,
+    "work_experience_years": 3,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "熟练",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "熟练",
+      "Matplotlib绘图": "了解基础",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "熟练",
+      "统计分析基础": "了解基础",
+      "Jupyter Notebook使用": "了解基础"
+    },
+    "goals": [
+      "掌握Python 数据分析常用技术"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 21
+  },
+  {
+    "profile_name": "相关专业-本科-intermediate-#022",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "电子信息工程",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "了解基础",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "了解基础",
+      "Jupyter Notebook使用": "了解基础"
+    },
+    "goals": [
+      "系统学习Python 数据分析核心内容"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 22
+  },
+  {
+    "profile_name": "非相关专业-高中-intermediate-#023",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "国际经济与贸易",
+    "major_related": false,
+    "work_experience_years": 0.5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "Python基础语法": "了解基础",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "了解基础",
+      "Seaborn可视化": "了解基础",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "了解基础",
+      "Jupyter Notebook使用": "了解基础"
+    },
+    "goals": [
+      "系统学习Python 数据分析核心内容",
+      "提升Python 数据分析实践技能"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 23
+  },
+  {
+    "profile_name": "相关专业-大专-advanced-#024",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "软件工程",
+    "major_related": true,
+    "work_experience_years": 15,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "精通",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "了解基础",
+      "Matplotlib绘图": "了解基础",
+      "Seaborn可视化": "熟练",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "熟练",
+      "Jupyter Notebook使用": "精通"
+    },
+    "goals": [
+      "学习Python 数据分析优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 24
+  },
+  {
+    "profile_name": "相关专业-高中-advanced-#025",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "统计学",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "Python基础语法": "精通",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "熟练",
+      "Matplotlib绘图": "了解基础",
+      "Seaborn可视化": "精通",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "精通",
+      "Jupyter Notebook使用": "精通"
+    },
+    "goals": [
+      "学习Python 数据分析优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 25
+  },
+  {
+    "profile_name": "相关专业-硕士-advanced-#026",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "数学与应用数学",
+    "major_related": true,
+    "work_experience_years": 2,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "了解基础",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "熟练",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "熟练",
+      "数据清洗与预处理": "了解基础",
+      "统计分析基础": "精通",
+      "Jupyter Notebook使用": "熟练"
+    },
+    "goals": [
+      "精通Python 数据分析高级技术"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 26
+  },
+  {
+    "profile_name": "相关专业-硕士-expert-#027",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "统计学",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "精通",
+      "NumPy数组操作": "精通",
+      "Pandas数据处理": "熟练",
+      "Matplotlib绘图": "精通",
+      "Seaborn可视化": "熟练",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "精通",
+      "Jupyter Notebook使用": "精通"
+    },
+    "goals": [
+      "研究Python 数据分析前沿技术",
+      "掌握Python 数据分析系统级优化"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 27
+  },
+  {
+    "profile_name": "相关专业-博士-expert-#028",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "数据科学",
+    "major_related": true,
+    "work_experience_years": 8,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "精通",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "精通",
+      "Matplotlib绘图": "精通",
+      "Seaborn可视化": "精通",
+      "数据清洗与预处理": "熟练",
+      "统计分析基础": "精通",
+      "Jupyter Notebook使用": "熟练"
+    },
+    "goals": [
+      "研究Python 数据分析前沿技术"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 28
+  },
+  {
+    "profile_name": "相关专业-博士-advanced-#029",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "模具设计与制造",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "熟练",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "熟练",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 29
+  },
+  {
+    "profile_name": "相关专业-本科-advanced-#030",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "机械工程",
+    "major_related": true,
+    "work_experience_years": 3,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "熟练",
+      "G 代码编程": "熟练",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "熟练",
+      "测量与检测": "精通"
+    },
+    "goals": [
+      "掌握CNC 数控加工复杂场景应用"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 30
+  },
+  {
+    "profile_name": "相关专业-本科-advanced-#031",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "自动化",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "熟练",
+      "G 代码编程": "熟练",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "精通",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法",
+      "掌握CNC 数控加工复杂场景应用"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 31
+  },
+  {
+    "profile_name": "相关专业-大专-expert-#032",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "车辆工程",
+    "major_related": true,
+    "work_experience_years": 0,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "熟练",
+      "数控车床操作": "精通",
+      "数控铣床操作": "精通",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "精通",
+      "切削参数优化": "精通",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "研究CNC 数控加工前沿技术",
+      "成为CNC 数控加工领域专家"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 32
+  },
+  {
+    "profile_name": "相关专业-硕士-expert-#033",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "电子信息工程",
+    "major_related": true,
+    "work_experience_years": 15,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "精通",
+      "NumPy数组操作": "精通",
+      "Pandas数据处理": "精通",
+      "Matplotlib绘图": "熟练",
+      "Seaborn可视化": "熟练",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "精通",
+      "Jupyter Notebook使用": "精通"
+    },
+    "goals": [
+      "成为Python 数据分析领域专家"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 33
+  },
+  {
+    "profile_name": "相关专业-本科-beginner-#034",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "统计学",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "了解基础",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "掌握Python 数据分析入门知识"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 34
+  },
+  {
+    "profile_name": "相关专业-高中-expert-#035",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "自动化",
+    "major_related": true,
+    "work_experience_years": 8,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "熟练",
+      "数控车床操作": "精通",
+      "数控铣床操作": "精通",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "精通",
+      "切削参数优化": "精通",
+      "测量与检测": "精通"
+    },
+    "goals": [
+      "成为CNC 数控加工领域专家",
+      "掌握CNC 数控加工系统级优化"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 35
+  },
+  {
+    "profile_name": "相关专业-硕士-advanced-#036",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "机械工程",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "熟练",
+      "G 代码编程": "熟练",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "了解基础",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "不了解",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "掌握CNC 数控加工复杂场景应用",
+      "精通CNC 数控加工高级技术"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 36
+  },
+  {
+    "profile_name": "相关专业-高中-intermediate-#037",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "数据科学",
+    "major_related": true,
+    "work_experience_years": 3,
+    "learning_style": "theory",
+    "self_assessment": {
+      "Python基础语法": "了解基础",
+      "NumPy数组操作": "了解基础",
+      "Pandas数据处理": "了解基础",
+      "Matplotlib绘图": "熟练",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "了解基础",
+      "Jupyter Notebook使用": "熟练"
+    },
+    "goals": [
+      "系统学习Python 数据分析核心内容"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 37
+  },
+  {
+    "profile_name": "非相关专业-高中-advanced-#038",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "高中",
+    "education_label": "high_school",
+    "major": "会计学",
+    "major_related": false,
+    "work_experience_years": 0,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "了解基础",
+      "G 代码编程": "不了解",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "了解基础",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "熟练",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 38
+  },
+  {
+    "profile_name": "相关专业-博士-intermediate-#039",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "机械设计制造及其自动化",
+    "major_related": true,
+    "work_experience_years": 0,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "了解基础",
+      "G 代码编程": "熟练",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "了解基础",
+      "切削参数优化": "熟练",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "掌握CNC 数控加工常用技术"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 39
+  },
+  {
+    "profile_name": "相关专业-本科-beginner-#040",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "数控技术",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "不了解",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "了解基础",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "了解CNC 数控加工基础概念"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 40
+  },
+  {
+    "profile_name": "相关专业-本科-expert-#041",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "电子商务",
+    "major_related": true,
+    "work_experience_years": 5,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "精通",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "精通",
+      "Matplotlib绘图": "熟练",
+      "Seaborn可视化": "精通",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "熟练",
+      "Jupyter Notebook使用": "了解基础"
+    },
+    "goals": [
+      "掌握Python 数据分析系统级优化"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 41
+  },
+  {
+    "profile_name": "相关专业-本科-advanced-#042",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "模具设计与制造",
+    "major_related": true,
+    "work_experience_years": 3,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "精通",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "熟练",
+      "切削参数优化": "熟练",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 42
+  },
+  {
+    "profile_name": "非相关专业-大专-beginner-#043",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "历史学",
+    "major_related": false,
+    "work_experience_years": 3,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "不了解",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "不了解",
+      "测量与检测": "不了解"
+    },
+    "goals": [
+      "掌握CNC 数控加工入门知识"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 43
+  },
+  {
+    "profile_name": "非相关专业-大专-advanced-#044",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "大专",
+    "education_label": "associate",
+    "major": "旅游管理",
+    "major_related": false,
+    "work_experience_years": 2,
+    "learning_style": "practice",
+    "self_assessment": {
+      "机械制图基础": "熟练",
+      "G 代码编程": "熟练",
+      "数控车床操作": "熟练",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "熟练",
+      "刀具选择与管理": "精通",
+      "切削参数优化": "精通",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "学习CNC 数控加工优化方法"
+    ],
+    "expected_difficulty": "advanced",
+    "expected_level": "advanced",
+    "expected_knowledge_score_range": [
+      60,
+      85
+    ],
+    "profile_id": 44
+  },
+  {
+    "profile_name": "非相关专业-博士-intermediate-#045",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "英语",
+    "major_related": false,
+    "work_experience_years": 3,
+    "learning_style": "visual",
+    "self_assessment": {
+      "机械制图基础": "熟练",
+      "G 代码编程": "了解基础",
+      "数控车床操作": "了解基础",
+      "数控铣床操作": "不了解",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "了解基础",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "提升CNC 数控加工实践技能"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 45
+  },
+  {
+    "profile_name": "相关专业-硕士-beginner-#046",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "金融工程",
+    "major_related": true,
+    "work_experience_years": 0.5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "不了解",
+      "Seaborn可视化": "不了解",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "学习Python 数据分析基本操作"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 46
+  },
+  {
+    "profile_name": "相关专业-本科-expert-#047",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "智能制造工程",
+    "major_related": true,
+    "work_experience_years": 8,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "精通",
+      "G 代码编程": "熟练",
+      "数控车床操作": "精通",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "精通",
+      "刀具选择与管理": "精通",
+      "切削参数优化": "熟练",
+      "测量与检测": "熟练"
+    },
+    "goals": [
+      "研究CNC 数控加工前沿技术"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 47
+  },
+  {
+    "profile_name": "非相关专业-博士-intermediate-#048",
+    "domain": "cnc",
+    "domain_name": "CNC 数控加工",
+    "education_background": "博士",
+    "education_label": "doctor",
+    "major": "行政管理",
+    "major_related": false,
+    "work_experience_years": 10,
+    "learning_style": "theory",
+    "self_assessment": {
+      "机械制图基础": "不了解",
+      "G 代码编程": "不了解",
+      "数控车床操作": "不了解",
+      "数控铣床操作": "熟练",
+      "CAM 软件应用": "不了解",
+      "刀具选择与管理": "不了解",
+      "切削参数优化": "不了解",
+      "测量与检测": "了解基础"
+    },
+    "goals": [
+      "掌握CNC 数控加工常用技术",
+      "提升CNC 数控加工实践技能"
+    ],
+    "expected_difficulty": "intermediate",
+    "expected_level": "intermediate",
+    "expected_knowledge_score_range": [
+      30,
+      60
+    ],
+    "profile_id": 48
+  },
+  {
+    "profile_name": "相关专业-本科-beginner-#049",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "本科",
+    "education_label": "bachelor",
+    "major": "数据科学",
+    "major_related": true,
+    "work_experience_years": 1,
+    "learning_style": "practice",
+    "self_assessment": {
+      "Python基础语法": "不了解",
+      "NumPy数组操作": "不了解",
+      "Pandas数据处理": "不了解",
+      "Matplotlib绘图": "了解基础",
+      "Seaborn可视化": "了解基础",
+      "数据清洗与预处理": "不了解",
+      "统计分析基础": "不了解",
+      "Jupyter Notebook使用": "不了解"
+    },
+    "goals": [
+      "掌握Python 数据分析入门知识",
+      "学习Python 数据分析基本操作"
+    ],
+    "expected_difficulty": "beginner",
+    "expected_level": "beginner",
+    "expected_knowledge_score_range": [
+      5,
+      30
+    ],
+    "profile_id": 49
+  },
+  {
+    "profile_name": "非相关专业-硕士-expert-#050",
+    "domain": "python_data_analysis",
+    "domain_name": "Python 数据分析",
+    "education_background": "硕士",
+    "education_label": "master",
+    "major": "英语",
+    "major_related": false,
+    "work_experience_years": 5,
+    "learning_style": "visual",
+    "self_assessment": {
+      "Python基础语法": "熟练",
+      "NumPy数组操作": "熟练",
+      "Pandas数据处理": "精通",
+      "Matplotlib绘图": "精通",
+      "Seaborn可视化": "精通",
+      "数据清洗与预处理": "精通",
+      "统计分析基础": "精通",
+      "Jupyter Notebook使用": "精通"
+    },
+    "goals": [
+      "掌握Python 数据分析系统级优化",
+      "研究Python 数据分析前沿技术"
+    ],
+    "expected_difficulty": "expert",
+    "expected_level": "expert",
+    "expected_knowledge_score_range": [
+      85,
+      100
+    ],
+    "profile_id": 50
+  }
+]

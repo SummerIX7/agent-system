@@ -1,0 +1,31 @@
+{
+  "profile_name": "非相关专业-大专-intermediate-#007",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "大专",
+  "education_label": "associate",
+  "major": "市场营销",
+  "major_related": false,
+  "work_experience_years": 15,
+  "learning_style": "visual",
+  "self_assessment": {
+    "机械制图基础": "不了解",
+    "G 代码编程": "了解基础",
+    "数控车床操作": "熟练",
+    "数控铣床操作": "了解基础",
+    "CAM 软件应用": "不了解",
+    "刀具选择与管理": "精通",
+    "切削参数优化": "了解基础",
+    "测量与检测": "不了解"
+  },
+  "goals": [
+    "提升CNC 数控加工实践技能"
+  ],
+  "expected_difficulty": "intermediate",
+  "expected_level": "intermediate",
+  "expected_knowledge_score_range": [
+    30,
+    60
+  ],
+  "profile_id": 7
+}

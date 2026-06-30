@@ -25,6 +25,10 @@ async def lifespan(app: FastAPI):
     # 1. 清除配置缓存，确保加载最新 .env 和 config.py
     get_settings.cache_clear()
 
+    # 1½. 清除嵌入模型缓存（Mock 模式切换时确保重新判断）
+    import app.knowledge.embedder as embedder_mod
+    embedder_mod.get_embeddings.cache_clear()
+
     # 2. 重置知识库检索器单例，避免使用旧索引
     import app.knowledge.retriever as retriever_mod
     retriever_mod._retriever = None
@@ -41,6 +45,13 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Redis 连接正常: {health}")
         print(f"[启动] ✅ Redis 连接正常: {health}")
 
+    # 3½. 打印 Mock 模式状态
+    settings = get_settings()
+    if settings.MOCK_MODE:
+        print("[启动] 🟡 MOCK 模式已启用 — 所有 LLM / 嵌入 / 知识库调用使用本地模拟数据")
+    else:
+        print("[启动] 🟢 真实 API 模式 — LLM: {}({}), 嵌入: {}".format(
+            settings.LLM_PROVIDER, settings.LLM_MODEL, settings.EMBEDDING_MODEL))
     print("[启动] 配置已刷新")
 
     # 4. 创建数据库表（如果不存在）
@@ -99,8 +110,31 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """健康检查端点，包含 Redis 状态"""
+    """健康检查端点，包含 Redis 和 Mock 模式状态"""
+    settings = get_settings()
     return {
         "status": "ok",
+        "mock_mode": settings.MOCK_MODE,
+        "llm_provider": "mock" if settings.MOCK_MODE else settings.LLM_PROVIDER,
+        "llm_model": "mock" if settings.MOCK_MODE else settings.LLM_MODEL,
         "redis": check_redis_health(),
+    }
+
+@app.get("/mock-status")
+async def mock_status():
+    """查询当前 Mock 模式状态"""
+    settings = get_settings()
+    return {
+        "mock_mode": settings.MOCK_MODE,
+        "description": (
+            "🟡 Mock 模式：所有 LLM/嵌入/知识库调用返回本地模拟数据，不访问外部 API。"
+            if settings.MOCK_MODE else
+            "🟢 真实 API 模式：LLM 调用 {}, 嵌入调用 {}。".format(
+                settings.LLM_PROVIDER, settings.EMBEDDING_MODEL)
+        ),
+        "how_to_switch": (
+            "将 .env 中 MOCK_MODE 改为 true，然后重启服务即可切换到 Mock 模式。"
+            if not settings.MOCK_MODE else
+            "将 .env 中 MOCK_MODE 改为 false，然后重启服务即可切换到真实 API 模式。"
+        ),
     }

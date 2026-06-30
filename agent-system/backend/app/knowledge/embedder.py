@@ -7,8 +7,14 @@ from app.core.config import get_settings
 
 @lru_cache()
 def get_embeddings() -> OpenAIEmbeddings:
-    """获取嵌入模型实例（通过 OpenAI 兼容 API 调用，无需本地下载）"""
+    """获取嵌入模型实例（通过 OpenAI 兼容 API 调用，无需本地下载）。
+    MOCK_MODE=true 时返回 MockEmbeddings，不调用外部 API。"""
     settings = get_settings()
+
+    # Mock 模式：返回本地模拟嵌入，不调用外部 API
+    if settings.MOCK_MODE:
+        from app.mock.embeddings import MockEmbeddings
+        return MockEmbeddings()
 
     if not settings.EMBEDDING_API_KEY:
         raise ValueError(

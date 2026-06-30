@@ -1,0 +1,32 @@
+{
+  "profile_name": "相关专业-本科-beginner-#049",
+  "domain": "python_data_analysis",
+  "domain_name": "Python 数据分析",
+  "education_background": "本科",
+  "education_label": "bachelor",
+  "major": "数据科学",
+  "major_related": true,
+  "work_experience_years": 1,
+  "learning_style": "practice",
+  "self_assessment": {
+    "Python基础语法": "不了解",
+    "NumPy数组操作": "不了解",
+    "Pandas数据处理": "不了解",
+    "Matplotlib绘图": "了解基础",
+    "Seaborn可视化": "了解基础",
+    "数据清洗与预处理": "不了解",
+    "统计分析基础": "不了解",
+    "Jupyter Notebook使用": "不了解"
+  },
+  "goals": [
+    "掌握Python 数据分析入门知识",
+    "学习Python 数据分析基本操作"
+  ],
+  "expected_difficulty": "beginner",
+  "expected_level": "beginner",
+  "expected_knowledge_score_range": [
+    5,
+    30
+  ],
+  "profile_id": 49
+}

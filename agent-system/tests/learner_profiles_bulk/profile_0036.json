@@ -1,0 +1,32 @@
+{
+  "profile_name": "相关专业-硕士-advanced-#036",
+  "domain": "cnc",
+  "domain_name": "CNC 数控加工",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "机械工程",
+  "major_related": true,
+  "work_experience_years": 5,
+  "learning_style": "visual",
+  "self_assessment": {
+    "机械制图基础": "熟练",
+    "G 代码编程": "熟练",
+    "数控车床操作": "了解基础",
+    "数控铣床操作": "熟练",
+    "CAM 软件应用": "了解基础",
+    "刀具选择与管理": "熟练",
+    "切削参数优化": "不了解",
+    "测量与检测": "熟练"
+  },
+  "goals": [
+    "掌握CNC 数控加工复杂场景应用",
+    "精通CNC 数控加工高级技术"
+  ],
+  "expected_difficulty": "advanced",
+  "expected_level": "advanced",
+  "expected_knowledge_score_range": [
+    60,
+    85
+  ],
+  "profile_id": 36
+}

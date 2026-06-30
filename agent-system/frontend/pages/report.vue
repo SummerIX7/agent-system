@@ -3,7 +3,19 @@
     <div class="page-head">
       <p class="page-head__eyebrow">Step 6</p>
       <h1 class="page-head__title">学习效果分析报告</h1>
-      <p class="page-head__desc">系统对本轮学习闭环的关键指标进行量化评估，所有指标均已达到或优于设定的目标值。</p>
+      <p class="page-head__desc">系统对本轮学习闭环的关键指标进行量化评估。</p>
+    </div>
+
+    <!-- 顶部操作栏 -->
+    <div class="toolbar">
+      <div class="toolbar__info">
+        <span class="badge badge--accent">Step 6</span>
+        <span class="toolbar__hint">报告数据来自缓存，切换页面不会丢失 · 点击右侧按钮刷新</span>
+      </div>
+      <button class="btn btn--ghost btn--sm" :disabled="isRefreshing" @click="loadReport(true)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+        {{ isRefreshing ? '刷新中...' : '刷新报告' }}
+      </button>
     </div>
 
     <!-- 核心指标 -->
@@ -101,6 +113,12 @@
 const api = useApi()
 const { sessionId, profile } = useSession()
 
+// ── 跨页面数据缓存 ──
+const cachedReport = useState<any>('report-data', () => null)
+const cachedReportSid = useState<string>('report-session-id', () => '')
+const isRefreshing = ref(false)
+const dataLoaded = ref(false)
+
 const matchCurveData = ref({
   learnerLevel: 2.5,
   resources: [] as any[],
@@ -119,17 +137,26 @@ const completedSteps = computed(() => {
   return learningPath.value.filter(step => step.completed).length
 })
 
-onMounted(async () => {
-  if (sessionId.value) {
-    try {
+// 从缓存或 API 加载报告数据
+const loadReport = async (forceRefresh = false) => {
+  // 缓存命中且非强制刷新：恢复缓存数据
+  if (!forceRefresh && cachedReportSid.value === sessionId.value && cachedReport.value) {
+    const c = cachedReport.value
+    learningPath.value = c.learningPath || []
+    matchCurveData.value = c.matchCurveData || { learnerLevel: 2.5, resources: [] }
+    metrics.value = c.metrics || { hallucination_rate: null, difficulty_match_rate: null, knowledge_coverage_rate: null }
+    dataLoaded.value = true
+    return
+  }
+
+  isRefreshing.value = true
+  try {
+    if (sessionId.value) {
       const viz = await api.getVisualization(sessionId.value)
 
-      // 学习路径
       if (viz.learning_path?.length) {
         learningPath.value = viz.learning_path
       }
-
-      // 匹配曲线
       if (viz.match_curve) {
         matchCurveData.value = {
           learnerLevel: viz.match_curve.learner_level === 'advanced' ? 4 :
@@ -137,40 +164,71 @@ onMounted(async () => {
           resources: viz.match_curve.resources || [],
         }
       }
-
-      // 核心指标
       if (viz.metrics) {
         metrics.value = viz.metrics
       }
-    } catch (err) {
-      console.warn('获取报告数据失败:', err)
     }
-  }
 
-  // 如果没有数据，使用默认值
-  if (!learningPath.value.length && profile.value?.knowledge_points) {
-    learningPath.value = profile.value.knowledge_points.map((kp: any, idx: number) => ({
-      title: kp.name,
-      completed: kp.score >= 60,
-      score: kp.score,
-      stage: idx + 1,
-    }))
-  }
-
-  if (!matchCurveData.value.resources.length && profile.value?.knowledge_points) {
-    matchCurveData.value = {
-      learnerLevel: 2.5,
-      resources: profile.value.knowledge_points.map((kp: any) => ({
-        name: kp.name,
-        difficulty: kp.score / 20,
-        match: Math.min(1, kp.score / 80),
-      })),
+    // 回退：使用 profile 数据
+    if (!learningPath.value.length && profile.value?.knowledge_points) {
+      learningPath.value = profile.value.knowledge_points.map((kp: any, idx: number) => ({
+        title: kp.name,
+        completed: kp.score >= 60,
+        score: kp.score,
+        stage: idx + 1,
+      }))
     }
+    if (!matchCurveData.value.resources.length && profile.value?.knowledge_points) {
+      matchCurveData.value = {
+        learnerLevel: 2.5,
+        resources: profile.value.knowledge_points.map((kp: any) => ({
+          name: kp.name,
+          difficulty: kp.score / 20,
+          match: Math.min(1, kp.score / 80),
+        })),
+      }
+    }
+
+    // 持久化到缓存
+    cachedReport.value = {
+      learningPath: learningPath.value,
+      matchCurveData: matchCurveData.value,
+      metrics: metrics.value,
+    }
+    cachedReportSid.value = sessionId.value
+    dataLoaded.value = true
+  } catch (err) {
+    console.warn('获取报告数据失败:', err)
+  } finally {
+    isRefreshing.value = false
   }
+}
+
+onMounted(() => {
+  loadReport(false)
 })
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+}
+.toolbar__info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toolbar__hint {
+  font-size: 12px;
+  color: var(--text-3);
+}
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

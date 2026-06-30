@@ -12,9 +12,14 @@ def get_llm(provider: str | None = None, temperature: float = 0.7) -> ChatOpenAI
         temperature: 温度参数，控制随机性
 
     Returns:
-        ChatOpenAI 实例（兼容 DeepSeek/Qwen API）
+        ChatOpenAI 实例（兼容 DeepSeek/Qwen API），MOCK_MODE=true 时返回 MockLLM
     """
     settings = get_settings()
+
+    # Mock 模式：返回本地模拟 LLM，不调用外部 API
+    if settings.MOCK_MODE:
+        from app.mock.llm import MockLLM
+        return MockLLM()
     provider = provider or settings.LLM_PROVIDER
 
     if provider == "deepseek":

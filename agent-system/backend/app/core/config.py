@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # 知识库目录（多个目录用逗号分隔，相对于 backend 目录）
     KNOWLEDGE_BASE_DIRS: str = "../knowledge-base/cnc_domain"
 
+    # Mock 模式（MOCK_MODE=true 时所有 LLM/嵌入调用返回本地模拟数据，不访问外部 API）
+    MOCK_MODE: bool = False
+
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
