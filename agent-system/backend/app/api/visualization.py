@@ -80,10 +80,11 @@ async def get_visualization(
     ]
 
     # 学习路径：优先从 Learner 表读取 PathPlannerAgent 的真实输出
+    from app.models.learner import Learner as LearnerModel
+
     learning_path_data = None
     learner_id = session.get("learner_id")
     if learner_id:
-        from app.models.learner import Learner as LearnerModel
         stmt_path = select(LearnerModel).where(LearnerModel.id == learner_id)
         result_path = await db.execute(stmt_path)
         learner_record = result_path.scalar_one_or_none()

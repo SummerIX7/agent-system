@@ -95,6 +95,8 @@
 <script setup lang="ts">
 const router = useRouter()
 const { user, isLoggedIn, restoreToken, logout } = useAuth()
+const { setSession, setProfile } = useSession()
+const api = useApi()
 
 const mobileMenuOpen = ref(false)
 
@@ -114,9 +116,22 @@ const userInitial = computed(() => {
   return user.value?.username?.charAt(0)?.toUpperCase() || 'U'
 })
 
-// 页面加载时恢复 token 和用户信息
+// 页面加载时恢复 token 和 session
 onMounted(async () => {
   await restoreToken()
+
+  // 登录态恢复后，尝试恢复 session 上下文（解决 F5 刷新后 sessionId 丢失）
+  if (isLoggedIn.value) {
+    try {
+      const profile = await api.getMyProfile()
+      if (profile) {
+        setSession(profile.session_id || `user-${profile.id}`, String(profile.id))
+        setProfile(profile)
+      }
+    } catch {
+      // 404 = 用户尚未创建画像，正常情况
+    }
+  }
 })
 
 const handleLogout = () => {

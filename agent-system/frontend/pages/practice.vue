@@ -175,7 +175,7 @@
             </div>
           </div>
           <!-- 重新生成按钮 -->
-          <button class="btn btn--ghost" style="width: 100%; margin-top: 16px;" @click="fetchQuestions">
+          <button class="btn btn--ghost" style="width: 100%; margin-top: 16px;" @click="regenerateQuestions">
             重新生成试题
           </button>
         </div>
@@ -278,24 +278,51 @@ const fetchQuestions = async () => {
   loadError.value = ''
   try {
     const result = await api.getQuestions(sessionId.value)
-    questions.value = (result.questions || []).map((q: any) => ({
-      ...q,
-      correctIndex: resolveCorrectIndex(q),
-      selectedIndex: -1,
-      answered: false,
-      finalCorrect: null,
-      correctAnswer: q.correct_answer || '',
-      practicalAnswer: '',
-      practicalGraded: false,
-      practicalResult: null,
-    }))
-    currentIndex.value = 0
-    resetState()
+    applyQuestions(result)
+  } catch (err: any) {
+    loadError.value = '试题加载失败，请稍后重试'
+    console.error('获取试题失败:', err)
+  } finally {
+    loading.value = false
+  }
+}
 
-    // 尝试恢复之前的答题进度
-    if (sessionId.value) {
-      try {
-        const saved = await api.getPracticeState(sessionId.value)
+// === 重新生成试题（清除缓存后重新生成） ===
+const regenerateQuestions = async () => {
+  if (!sessionId.value) return
+  loading.value = true
+  loadError.value = ''
+  try {
+    const result = await api.regenerateQuestions(sessionId.value)
+    applyQuestions(result)
+  } catch (err: any) {
+    loadError.value = '试题重新生成失败，请稍后重试'
+    console.error('重新生成试题失败:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// === 应用试题数据（fetchQuestions / regenerateQuestions 共用） ===
+const applyQuestions = (result: any) => {
+  questions.value = (result.questions || []).map((q: any) => ({
+    ...q,
+    correctIndex: resolveCorrectIndex(q),
+    selectedIndex: -1,
+    answered: false,
+    finalCorrect: null,
+    correctAnswer: q.correct_answer || '',
+    practicalAnswer: '',
+    practicalGraded: false,
+    practicalResult: null,
+  }))
+  currentIndex.value = 0
+  resetState()
+
+  // 尝试恢复之前的答题进度
+  if (sessionId.value) {
+    try {
+      api.getPracticeState(sessionId.value).then(saved => {
         if (saved?.questions?.length > 0) {
           questions.value = questions.value.map((q: any) => {
             const match = saved.questions.find((s: any) => s.question === q.question)
@@ -316,13 +343,8 @@ const fetchQuestions = async () => {
           }
           resetState()
         }
-      } catch { /* 没有已保存的进度 */ }
-    }
-  } catch (err: any) {
-    loadError.value = '试题加载失败，请稍后重试'
-    console.error('获取试题失败:', err)
-  } finally {
-    loading.value = false
+      })
+    } catch { /* 没有已保存的进度 */ }
   }
 }
 

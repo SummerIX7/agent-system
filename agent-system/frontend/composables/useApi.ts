@@ -95,7 +95,7 @@ export function useApi() {
 
     // 反馈
     submitFeedback: (data: FeedbackInput) =>
-      request<FeedbackResponse>('/api/feedback', {
+      request<FeedbackResponse>('/api/feedback/', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -128,6 +128,12 @@ export function useApi() {
 
     getPracticeState: (sessionId: string) =>
       request<{ current_index: number; questions: any[] }>(`/api/questions/practice/state/${sessionId}`),
+
+    // 重新生成试题（清除缓存后重新调用 LLM 生成）
+    regenerateQuestions: (sessionId: string) =>
+      request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/practice/regenerate/${sessionId}`, {
+        method: 'POST',
+      }),
 
     // 领域
     getDomains: () =>

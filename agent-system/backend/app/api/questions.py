@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
-from app.core.store import get_session, save_practice_state, get_practice_state
+from app.core.store import get_session, save_practice_state, get_practice_state, save_cached_questions, get_cached_questions, clear_cached_questions
 from app.core.domains import get_domain_from_input, get_default_domain
 from app.models.database import get_db
 from app.models.learner import Learner
@@ -22,9 +22,21 @@ async def get_questions(
     session_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    regenerate: bool = False,
 ):
-    """根据学习者画像动态生成试题（需登录）"""
-    # 1. 从数据库获取 Learner 记录
+    """根据学习者画像动态生成试题（需登录）。默认优先返回缓存，传 regenerate=true 重新生成。"""
+    # ── 0. 先查缓存（非主动重新生成时） ──
+    if not regenerate:
+        cached = get_cached_questions(session_id)
+        if cached and cached.get("questions"):
+            print(f"[试题] 命中缓存，共 {len(cached['questions'])} 题")
+            return QuestionSet(
+                topic=cached.get("topic", ""),
+                difficulty=cached.get("difficulty", "beginner"),
+                questions=cached.get("questions", []),
+            )
+
+    # ── 1. 从数据库获取 Learner 记录 ──
     stmt = select(Learner).where(Learner.user_id == current_user.id)
     result = await db.execute(stmt)
     learner = result.scalar_one_or_none()
@@ -81,10 +93,21 @@ async def get_questions(
         print(f"[警告] 试题生成失败: {e}")
         result_dict = {"topic": topic, "difficulty": difficulty, "domain": domain.code, "questions": []}
 
+    # ── 6. 写入缓存 ──
+    cache_data = {
+        "topic": result_dict.get("topic", topic),
+        "difficulty": result_dict.get("difficulty", difficulty),
+        "questions": result_dict.get("questions", []),
+    }
+    save_cached_questions(session_id, cache_data)
+    # 新试题生成后清除旧进度
+    save_practice_state(session_id, {})
+    print(f"[试题] 生成并缓存完成，共 {len(cache_data['questions'])} 题")
+
     return QuestionSet(
-        topic=result_dict.get("topic", topic),
-        difficulty=result_dict.get("difficulty", difficulty),
-        questions=result_dict.get("questions", []),
+        topic=cache_data["topic"],
+        difficulty=cache_data["difficulty"],
+        questions=cache_data["questions"],
     )
 
 
@@ -106,3 +129,16 @@ async def save_state(session_id: str, state: PracticeStateRequest):
 async def get_state(session_id: str):
     """恢复答题进度"""
     return get_practice_state(session_id)
+
+
+@router.post("/practice/regenerate/{session_id}")
+async def regenerate_questions(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """清除缓存并重新生成试题"""
+    clear_cached_questions(session_id)
+    save_practice_state(session_id, {})
+    # 调用 get_questions 重新生成
+    return await get_questions(session_id, db, current_user, regenerate=True)

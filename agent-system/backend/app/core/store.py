@@ -93,9 +93,11 @@ def _new_session(session_id: str) -> dict:
 
 def _serialize(data: dict) -> dict:
     """将 Python dict 序列化为 Redis Hash 兼容格式（全字符串）"""
+    json_fields = {"profile", "resources", "feedback", "agent_logs", "trace_entries",
+                   "cached_questions", "practice_state"}
     result = {}
     for k, v in data.items():
-        if k in ("profile", "resources", "feedback", "agent_logs", "trace_entries"):
+        if k in json_fields and v is not None:
             result[k] = json.dumps(v, ensure_ascii=False)
         elif v is not None:
             result[k] = str(v)
@@ -107,12 +109,22 @@ def _serialize(data: dict) -> dict:
 def _deserialize(raw: dict) -> dict:
     """将 Redis Hash（全字符串）还原为 Python dict"""
     result = dict(raw)
-    for field in ("profile", "resources", "feedback", "agent_logs", "trace_entries"):
+    # 需要 JSON 反序列化的字段及其默认值
+    json_fields = {
+        "profile": {},
+        "resources": [],
+        "feedback": [],
+        "agent_logs": [],
+        "trace_entries": [],
+        "cached_questions": None,
+        "practice_state": {},
+    }
+    for field, default in json_fields.items():
         if field in result and isinstance(result[field], str):
             try:
                 result[field] = json.loads(result[field])
             except (json.JSONDecodeError, TypeError):
-                result[field] = {} if field == "profile" else []
+                result[field] = default
     return result
 
 
@@ -209,6 +221,31 @@ def save_practice_state(session_id: str, state: dict) -> None:
 def get_practice_state(session_id: str) -> dict:
     """从 session 读取答题进度"""
     return get_session(session_id).get("practice_state", {})
+
+
+def save_cached_questions(session_id: str, questions_data: dict) -> None:
+    """缓存试题到 session（避免每次刷新都重新生成）"""
+    _update_field(session_id, "cached_questions", questions_data)
+
+
+def get_cached_questions(session_id: str) -> dict | None:
+    """从 session 读取缓存的试题，没有则返回 None"""
+    data = get_session(session_id).get("cached_questions")
+    return data if data else None
+
+
+def clear_cached_questions(session_id: str) -> None:
+    """清除缓存的试题（用户主动重新生成时调用）"""
+    r = _get_redis()
+
+    if not _is_redis_ok(r):
+        session = _fallback_sessions.get(session_id, {})
+        session.pop("cached_questions", None)
+        return
+
+    key = f"{KEY_SESSION}:{session_id}"
+    if r.exists(key):
+        r.hdel(key, "cached_questions")
 
 
 def get_all_sessions() -> list[dict]:
