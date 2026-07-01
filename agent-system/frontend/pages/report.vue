@@ -12,97 +12,97 @@
       <p class="mt-4 text-text-2">加载学习路径...</p>
     </div>
 
-    <!-- 学习路径时间线（主视图） -->
-    <div v-else-if="nodes.length > 0" class="path-main">
-      <div class="card" style="margin-bottom: 24px">
-        <div class="card__head">
-          <h2 class="card__title"> 学习路径 — 共 {{ nodes.length }} 个节点</h2>
-          <span v-if="allCompleted" class="badge badge--ok">全部完成 </span>
-          <span v-else class="badge badge--accent">进度 {{ completedCount }} / {{ nodes.length }}</span>
+    <!-- 学习路径（主视图） -->
+    <div v-else-if="nodes.length > 0" class="path-section">
+      <!-- 总览卡片 -->
+      <div class="path-overview">
+        <div class="path-overview__left">
+          <div class="path-overview__title">学习路径</div>
+          <div class="path-overview__sub">{{ nodes.length }} 个节点 · 预估 {{ pathMeta.total_estimated_hours || '--' }} 小时</div>
         </div>
-        <p v-if="pathMeta.recommended_order" class="text-sm text-text-2 mb-4">{{ pathMeta.recommended_order }}</p>
+        <div class="path-overview__right">
+          <div class="path-progress-ring">
+            <svg viewBox="0 0 64 64" class="path-progress-ring__svg">
+              <circle cx="32" cy="32" r="28" fill="none" stroke="var(--line)" stroke-width="5" />
+              <circle
+                cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="5"
+                stroke-linecap="round"
+                :stroke-dasharray="2 * Math.PI * 28"
+                :stroke-dashoffset="2 * Math.PI * 28 * (1 - (nodes.length ? completedCount / nodes.length : 0))"
+                transform="rotate(-90 32 32)"
+              />
+            </svg>
+            <div class="path-progress-ring__text">
+              <span>{{ nodes.length ? Math.round(completedCount / nodes.length * 100) : 0 }}%</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 节点列表 -->
-      <div class="path-timeline">
+      <div class="path-steps">
         <div
-          v-for="node in nodes"
+          v-for="(node, idx) in nodes"
           :key="node.stage"
-          class="path-node-card"
+          class="path-step"
           :class="{
-            'is-current': node.stage === currentStage,
-            'is-done': node.advanced_test_passed || node.completed,
-            'is-active': node.basic_test_passed && !node.advanced_test_passed,
+            'is-done': node.advanced_test_passed,
+            'is-current': node.stage === currentStage && !node.advanced_test_passed,
           }"
         >
-          <!-- 节点编号 -->
-          <div class="path-node-badge" :class="nodeBadgeClass(node)">
-            <template v-if="node.advanced_test_passed"></template>
-            <template v-else>{{ node.stage }}</template>
+          <!-- 连接线 -->
+          <div v-if="idx < nodes.length - 1" class="path-step__line" :class="{ done: node.advanced_test_passed }" />
+
+          <!-- 步骤头 -->
+          <div class="path-step__head">
+            <div class="path-step__index" :class="{ done: node.advanced_test_passed, current: node.stage === currentStage && !node.advanced_test_passed }">
+              <span v-if="node.advanced_test_passed" class="path-step__check">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+              </span>
+              <span v-else>{{ node.stage }}</span>
+            </div>
+            <div class="path-step__info">
+              <span class="path-step__title">{{ node.title }}</span>
+              <span :class="['path-step__tag', node.advanced_test_passed ? 'done' : node.basic_test_passed ? 'active' : node.has_resources ? 'ready' : 'pending']">
+                {{ node.advanced_test_passed ? '已通过' : node.basic_test_passed ? '基础已过' : node.has_resources ? '待考核' : '待生成' }}
+              </span>
+            </div>
           </div>
 
-          <!-- 节点内容 -->
-          <div class="path-node-body">
-            <div class="path-node-header">
-              <span class="path-node-title">{{ node.title }}</span>
-              <span v-if="node.difficulty" class="badge" :class="difficultyBadgeClass(node.difficulty)">
-                {{ difficultyLabel(node.difficulty) }}
-              </span>
-              <span v-if="node.advanced_test_passed" class="badge badge--ok">已通过</span>
-              <span v-else-if="node.basic_test_passed" class="badge" style="background: var(--accent-soft); color: var(--accent)">基础已过</span>
-              <span v-else-if="node.has_resources" class="badge badge--warn">待考核</span>
+          <!-- 步骤体 -->
+          <div class="path-step__body">
+            <div v-if="node.topics?.length" class="path-step__topics">
+              {{ node.topics.join('  ·  ') }}
+            </div>
+            <div class="path-step__meta">
+              <span v-if="node.estimated_hours">{{ node.estimated_hours }}h</span>
+              <span v-if="node.difficulty">{{ difficultyLabel(node.difficulty) }}</span>
+              <span v-if="node.prerequisites?.length">前置: {{ node.prerequisites.join(', ') }}</span>
             </div>
 
-            <div v-if="node.topics?.length" class="path-node-topics">
-              {{ node.topics.join(' · ') }}
-            </div>
-
-            <div class="path-node-meta">
-              <span v-if="node.estimated_hours"> {{ node.estimated_hours }} 小时</span>
-              <span v-if="node.prerequisites?.length"> 前置：{{ node.prerequisites.join('、') }}</span>
-            </div>
-
-            <!-- 当前节点操作区 -->
-            <div v-if="node.stage === currentStage && !node.advanced_test_passed && !allCompleted" class="path-node-actions">
+            <!-- 操作按钮 -->
+            <div v-if="node.stage === currentStage && !node.advanced_test_passed && !allCompleted" class="path-step__actions">
               <button
                 v-if="!node.has_resources"
                 class="btn btn--primary"
                 :disabled="generatingNode === node.stage"
                 @click="handleGenerateNode(node)"
               >
-                {{ generatingNode === node.stage ? '正在生成...' : '生成节点学习资源' }}
+                {{ generatingNode === node.stage ? '生成中...' : '生成节点学习资源' }}
               </button>
-              <button v-if="node.has_resources" class="btn btn--primary" @click="goToResources(node)">
-                 查看学习资源
-              </button>
-              <button
-                v-if="node.has_resources && !node.basic_test_passed"
-                class="btn btn--accent"
-                @click="goToPractice('basic')"
-              >
-                 开始基础考核
-              </button>
-              <button
-                v-if="node.basic_test_passed && !node.advanced_test_passed"
-                class="btn btn--accent"
-                @click="goToPractice('advanced')"
-              >
-                 开始提升考核
-              </button>
-            </div>
-
-            <!-- 已完成节点提示 -->
-            <div v-if="node.advanced_test_passed" class="path-node-actions">
-              <span class="text-sm" style="color: var(--ok)"> 本节点已通过考核</span>
+              <template v-else>
+                <button class="btn btn--primary" @click="goToResources(node)">查看学习资源</button>
+                <button v-if="!node.basic_test_passed" class="btn btn--outline" @click="goToPractice('basic')">基础考核</button>
+                <button v-if="node.basic_test_passed && !node.advanced_test_passed" class="btn btn--outline" @click="goToPractice('advanced')">提升考核</button>
+              </template>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 全部完成 -->
-      <div v-if="allCompleted" class="card" style="margin-top: 24px; text-align: center; padding: 40px">
-        <div style="font-size: 48px; margin-bottom: 12px"></div>
-        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 8px">学习路径全部完成！</h2>
+      <div v-if="allCompleted" class="card" style="margin-top: 32px; text-align: center; padding: 40px">
+        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 8px">学习路径全部完成</h2>
         <p class="text-text-2 mb-6">你已通过所有节点的考核，建议回顾薄弱环节或探索更深入的主题。</p>
         <NuxtLink to="/" class="btn btn--primary">返回首页</NuxtLink>
       </div>
@@ -225,13 +225,6 @@ const currentNodeTitle = computed(() => {
   return node?.title || '暂无'
 })
 
-// 节点徽章样式
-const nodeBadgeClass = (node: any) => ({
-  'done': node.advanced_test_passed,
-  'active': node.basic_test_passed && !node.advanced_test_passed,
-  'current': node.stage === currentStage.value && !node.advanced_test_passed,
-})
-
 // 难度标签
 const difficultyLabel = (d: string) => {
   const map: Record<string, string> = { beginner: '初级', intermediate: '中级', advanced: '高级', expert: '专家' }
@@ -347,123 +340,190 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* ── 学习路径时间线 ── */
-.path-main {
+/* ── 学习路径步骤条 ── */
+.path-section {
   margin-bottom: 8px;
 }
-.path-timeline {
-  position: relative;
-  padding-left: 0;
-}
-.path-node-card {
+.path-overview {
   display: flex;
-  gap: 20px;
-  padding: 20px 24px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
   margin-bottom: 0;
-  border-left: 2px solid var(--line);
+}
+.path-overview__left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.path-overview__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.path-overview__sub {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.path-progress-ring {
   position: relative;
-  transition: border-color .2s;
+  width: 56px;
+  height: 56px;
 }
-.path-node-card:last-child {
-  border-left-color: transparent;
+.path-progress-ring__svg {
+  width: 100%;
+  height: 100%;
+  transition: stroke-dashoffset .5s ease;
 }
-.path-node-card.is-done {
-  border-left-color: var(--ok);
-}
-.path-node-card.is-active {
-  border-left-color: var(--accent);
-}
-.path-node-card.is-current {
-  border-left-color: var(--accent);
-  background: linear-gradient(90deg, var(--accent-soft) 0%, transparent 100%);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+.path-progress-ring__text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--accent);
 }
 
-/* 节点徽章 */
-.path-node-badge {
-  width: 36px;
-  height: 36px;
+.path-steps {
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+}
+.path-step {
+  padding: 22px 24px;
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+.path-step:last-child {
+  border-bottom: none;
+}
+.path-step.is-done {
+  background: var(--bg-muted);
+}
+.path-step.is-current {
+  background: linear-gradient(135deg, rgba(99,102,241,.04) 0%, transparent 50%);
+  border-left: 3px solid var(--accent);
+  margin-left: -1px;
+}
+
+.path-step__line {
+  display: none;
+}
+.path-step__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.path-step__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.path-step__index {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  font-family: var(--mono);
   background: var(--bg-muted);
   color: var(--text-3);
   border: 2px solid var(--line);
-  position: relative;
-  z-index: 1;
-  margin-left: -20px;
 }
-.path-node-badge.done {
+.path-step__index.done {
   background: var(--ok);
   color: #fff;
   border-color: var(--ok);
 }
-.path-node-badge.active {
+.path-step__index.current {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+  box-shadow: 0 0 0 5px rgba(99,102,241,.12);
 }
-.path-node-badge.current {
-  background: #fff;
-  color: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
-}
-
-/* 节点内容 */
-.path-node-body {
-  flex: 1;
-  min-width: 0;
-  padding-top: 2px;
-}
-.path-node-header {
+.path-step__info {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 }
-.path-node-title {
+.path-step__title {
   font-size: 15px;
   font-weight: 600;
 }
-.path-node-topics {
+.path-step__tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+.path-step__tag.done {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.path-step__tag.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.path-step__tag.ready {
+  background: #FEF3C7;
+  color: #D97706;
+}
+.path-step__tag.pending {
+  background: var(--bg-muted);
+  color: var(--text-3);
+}
+.path-step__body {
+  margin-top: 12px;
+  padding-left: 48px;
+}
+.path-step__topics {
   font-size: 13px;
   color: var(--text-2);
-  margin-top: 6px;
   line-height: 1.6;
 }
-.path-node-meta {
+.path-step__meta {
   font-size: 12px;
   color: var(--text-3);
-  margin-top: 8px;
+  margin-top: 6px;
   display: flex;
-  gap: 16px;
+  gap: 14px;
 }
-
-/* 当前节点操作按钮 */
-.path-node-actions {
+.path-step__actions {
   display: flex;
   gap: 10px;
   margin-top: 14px;
   flex-wrap: wrap;
 }
 
-.btn--accent {
-  background: var(--accent);
-  color: #fff;
-  border: none;
+.btn--outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line-2);
   border-radius: var(--radius-sm);
-  padding: 10px 20px;
+  padding: 10px 18px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: opacity .15s;
+  transition: all .15s;
 }
-.btn--accent:hover { opacity: .85; }
+.btn--outline:hover {
+  border-color: var(--text-3);
+  background: var(--bg-soft);
+}
 
 /* ── 分隔线 ── */
 .section-divider {
