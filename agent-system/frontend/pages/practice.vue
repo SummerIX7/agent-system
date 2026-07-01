@@ -48,7 +48,7 @@
            返回学习资源，重新学习
         </button>
         <button v-if="testLevel === 'advanced' && passed" class="btn btn--primary" @click="handleAdvance">
-          {{ advanceResult?.all_completed ? ' 查看完整报告' : ' 推进到下一节点' }}
+          {{ advanceResult?.all_completed ? '查看完整报告' : '更新学习路径' }}
         </button>
         <button v-if="testLevel === 'advanced' && !passed" class="btn btn--ghost" @click="goReport">
           返回学习路径
@@ -376,13 +376,12 @@ const retryTest = () => {
 const handleAdvance = async () => {
   advancing.value = true; advanceError.value = ''
   const feedback = questions.value.map(q => ({ topic: q.topic || '', question: q.question, is_correct: q.finalCorrect, finalCorrect: q.finalCorrect }))
-  // 基础考核分数从当前 testLevel=advanced 时推断(基础已过)或用准确率
   const basicScore = testLevel.value === 'advanced' ? PASS_THRESHOLD : accuracy.value
   const result = await useLearningPath().advanceNode(basicScore, accuracy.value, feedback)
   advancing.value = false
   if (result) {
     advanceResult.value = result
-    if (result.all_completed) setTimeout(() => router.push('/report'), 1500)
+    router.push('/report')
   } else {
     advanceError.value = '节点推进失败，请稍后重试'
   }
@@ -401,6 +400,11 @@ watch(testLevel, (newLevel, oldLevel) => {
     testCompleted.value = false
     loading.value = true
     loadError.value = ''
+    questions.value = []
+    currentIndex.value = 0
+    if (sessionId.value) {
+      api.savePracticeState(sessionId.value, { current_index: 0, questions: [] }).catch(() => {})
+    }
     initQuestions()
   }
 })

@@ -115,6 +115,11 @@ async def _get_learning_path_from_any_source(session_id: str, db: AsyncSession =
     从 session store 获取学习路径，无数据时从 DB 降级读取。
     返回 (learning_path_dict, current_stage_int)。
     """
+    # 先确保 session store 有用户上下文
+    from app.core.store import resolve_learner_context
+    if db is not None:
+        await resolve_learner_context(session_id, db)
+
     session_data = get_session(session_id)
 
     # 从 resources 中提取学习路径
@@ -128,17 +133,16 @@ async def _get_learning_path_from_any_source(session_id: str, db: AsyncSession =
 
     current_stage = int(session_data.get("current_stage", learning_path.get("current_stage", 1)))
 
-    # 如果 session store 没有路径数据，从 DB 降级读取
-    if not learning_path.get("path") and db is not None:
+    # DB 降级：优先以 DB 数据为准
+    if db is not None and not learning_path.get("path"):
         learner_id = session_data.get("learner_id", "")
         if learner_id and learner_id != "unknown":
             stmt = select(Learner).where(Learner.id == learner_id)
             r = await db.execute(stmt)
             learner = r.scalar_one_or_none()
-            if learner and learner.learning_path:
+            if learner and learner.learning_path and learner.learning_path.get("path"):
                 learning_path = learner.learning_path
                 current_stage = int(learning_path.get("current_stage", 1))
-                # 回写到 session store
                 _persist_learning_path(session_id, learning_path)
                 update_session(session_id, {"current_stage": current_stage})
 
@@ -258,46 +262,6 @@ async def advance_node(
             except Exception as e:
                 print(f"[警告] 更新学习者画像失败: {e}")
 
-        # ── 为新节点生成资源 + 试题 ──
-        if new_stage <= total_stages:
-            profile = session_data.get("profile", {})
-            from app.graph.workflow import generate_resources_for_stage, _generate_and_cache_questions
-            _broadcast(session_id, "知识生成 Agent", "running", f"正在为节点 {new_stage} 生成资源...", 90)
-            try:
-                new_resources = await generate_resources_for_stage(
-                    session_id, new_stage, profile, learning_path,
-                )
-                # 持久化资源到 DB
-                if learner_id and learner_id != "unknown":
-                    for res in new_resources:
-                        db_resource = Resource(
-                            learner_id=learner_id,
-                            session_id=session_id,
-                            resource_type=res["type"],
-                            content=res["content"],
-                            topic=res.get("topic", ""),
-                            difficulty=res.get("difficulty", "beginner"),
-                            stage=new_stage,
-                        )
-                        db.add(db_resource)
-                    await db.flush()
-
-                # 更新 node_states: 标记新节点 has_resources
-                learning_path = _update_node_state(learning_path, new_stage, {"has_resources": True})
-                _persist_learning_path(session_id, learning_path)
-                if learner_id and learner_id != "unknown":
-                    await _persist_learning_path_to_db(db, learner_id, learning_path)
-
-                # 生成新节点的试题
-                topic = res.get("topic", "") if new_resources else ""
-                difficulty = next((s.get("difficulty", "beginner") for s in path_stages if s.get("stage") == new_stage), "beginner")
-                domain_topic = f"{session_data.get('profile', {}).get('goals', [''])[0]}" if session_data.get('profile', {}).get('goals') else topic
-                await _generate_and_cache_questions(session_id, new_stage, domain_topic or topic, difficulty, profile, learning_path)
-
-                print(f"[节点推进] 节点{new_stage} 资源+试题生成完成")
-            except Exception as e:
-                print(f"[警告] 节点{new_stage} 资源生成失败: {e}")
-
         if new_stage > total_stages:
             result["message"] = "所有节点已完成，学习流程结束"
             result["new_stage"] = None
@@ -326,6 +290,83 @@ async def _persist_learning_path_to_db(db: AsyncSession, learner_id: str, learni
     if learner:
         learner.learning_path = learning_path
         await db.flush()
+
+
+class GenerateNodeRequest(BaseModel):
+    session_id: str
+    stage: int = 1
+
+
+@router.post("/{session_id}/generate-node-content")
+async def generate_node_content(
+    session_id: str,
+    req: GenerateNodeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    为指定节点按需生成资源+试题。在报告页点击「生成节点学习资源」时触发。
+    生成完自动调用 LLM，结果持久化到 DB + session store。
+    """
+    from app.graph.workflow import generate_resources_for_stage, _generate_and_cache_questions
+    from app.metrics.report_builder import build_report_cache
+
+    session_data = get_session(session_id)
+    learning_path, _ = await _get_learning_path_from_any_source(session_id, db)
+    profile = session_data.get("profile", {})
+    learner_id = session_data.get("learner_id", "")
+
+    # 生成资源
+    _broadcast(session_id, "知识生成 Agent", "running", f"正在生成节点 {req.stage} 资源...", 90)
+    new_resources = await generate_resources_for_stage(session_id, req.stage, profile, learning_path)
+
+    if learner_id and learner_id != "unknown":
+        for res in new_resources:
+            db.add(Resource(
+                learner_id=learner_id, session_id=session_id,
+                resource_type=res["type"], content=res["content"],
+                topic=res.get("topic", ""), difficulty=res.get("difficulty", "beginner"),
+                stage=req.stage,
+            ))
+        await db.flush()
+
+    # 生成试题
+    stage_data = next((s for s in learning_path.get("path", []) if s.get("stage") == req.stage), {})
+    topic = stage_data.get("topics", [""])[0] if stage_data.get("topics") else ""
+    difficulty = stage_data.get("difficulty", "beginner")
+    await _generate_and_cache_questions(session_id, req.stage, topic, difficulty, profile, learning_path)
+
+    # 标记 has_resources
+    learning_path = _update_node_state(learning_path, req.stage, {"has_resources": True})
+    _persist_learning_path(session_id, learning_path)
+    if learner_id and learner_id != "unknown":
+        await _persist_learning_path_to_db(db, learner_id, learning_path)
+
+    # 重新计算报告快照
+    try:
+        stmt_res = select(Resource).where(Resource.session_id == session_id, Resource.stage == req.stage)
+        res_result = await db.execute(stmt_res)
+        stage_resources = res_result.scalars().all()
+        cache = await build_report_cache(
+            all_content=[str(r.content) for r in stage_resources if r.content],
+            all_difficulties=[r.difficulty for r in stage_resources if r.difficulty],
+            topic=topic, profile=profile, learning_path=learning_path,
+        )
+        if learner_id and learner_id != "unknown":
+            stmt_l = select(Learner).where(Learner.id == learner_id)
+            r_l = await db.execute(stmt_l)
+            lr = r_l.scalar_one_or_none()
+            if lr:
+                lr.report_cache = cache
+                await db.flush()
+    except Exception as e:
+        print(f"[警告] 报告快照更新失败: {e}")
+
+    _broadcast(session_id, "知识生成 Agent", "completed",
+               f"节点{req.stage}资源+试题生成完成", 95)
+
+    resource_count = len(new_resources)
+    print(f"[按需生成] 节点{req.stage}: {resource_count}种资源")
+    return {"ok": True, "stage": req.stage, "resource_count": resource_count}
 
 
 async def _update_learner_profile(

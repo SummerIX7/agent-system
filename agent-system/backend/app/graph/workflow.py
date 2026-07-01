@@ -547,6 +547,8 @@ async def _generate_and_cache_questions(
         advanced_idx = 1
     advanced_difficulty = difficulty_levels[advanced_idx]
 
+    _broadcast(session_id, "试题生成 Agent", "running", f"正在生成节点{stage}试题...", 86)
+
     tiered = {}
     try:
         basic_result = await q_agent.generate_questions(topic, basic_difficulty, profile)
@@ -573,6 +575,8 @@ async def _generate_and_cache_questions(
         tiered["advanced"] = {"level": "advanced", "stage": stage, "questions": [], "topic": topic, "difficulty": advanced_difficulty}
 
     save_tiered_questions_for_stage(session_id, stage, tiered)
+    _broadcast(session_id, "试题生成 Agent", "completed",
+               f"试题生成完成: 基础{len(tiered['basic']['questions'])}题 + 提升{len(tiered['advanced']['questions'])}题", 94)
     print(f"[分阶试题] 节点{stage}: 基础{len(tiered['basic']['questions'])}题 + 提升{len(tiered['advanced']['questions'])}题")
     return tiered
 

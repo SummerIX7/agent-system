@@ -240,7 +240,10 @@ async def generate_tiered_questions(
 
 
 @router.get("/set/{session_id}/{level}")
-async def get_tiered_question_set(session_id: str, level: str, stage: int = 1):
+async def get_tiered_question_set(
+    session_id: str, level: str, stage: int = 1,
+    db: AsyncSession = Depends(get_db),
+):
     """
     获取指定等级+节点的缓存试题。
 
@@ -248,6 +251,9 @@ async def get_tiered_question_set(session_id: str, level: str, stage: int = 1):
     stage: 学习路径节点编号（默认 1）
     没有缓存时返回空列表。
     """
+    from app.core.store import resolve_learner_context
+    await resolve_learner_context(session_id, db)
+
     if level not in ("basic", "advanced"):
         return {"error": "level 必须为 basic 或 advanced", "questions": []}
 

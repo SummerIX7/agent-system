@@ -157,6 +157,12 @@ export function useApi() {
         body: JSON.stringify(data),
       }),
 
+    generateNodeContent: (sessionId: string, stage: number) =>
+      request<{ ok: boolean; stage: number; resource_count: number }>(`/api/learning-path/${sessionId}/generate-node-content`, {
+        method: 'POST',
+        body: JSON.stringify({ session_id: sessionId, stage }),
+      }),
+
     // 领域
     getDomains: () =>
       request<DomainConfig[]>('/api/domains'),

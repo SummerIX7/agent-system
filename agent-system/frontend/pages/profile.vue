@@ -85,7 +85,7 @@
 
     <div style="text-align: center; margin-top: 32px">
       <button class="btn btn--primary btn--lg" :disabled="loading" @click="submitProfile">
-        {{ profileLoaded ? '更新画像，重新诊断' : '提交画像，开始诊断' }} →
+        {{ loading ? '正在诊断...' : (profileLoaded ? '更新画像，重新诊断' : '提交画像，开始诊断') }} →
       </button>
     </div>
   </div>

@@ -16,11 +16,11 @@ import { graphic } from 'echarts'
 use([LineChart, GridComponent, MarkLineComponent, CanvasRenderer])
 
 interface MatchData {
-  learnerLevel: number
+  learnerLevel: number | string
   resources: {
     name: string
     difficulty: number
-    matchScore: number
+    match: number
   }[]
 }
 
@@ -43,7 +43,7 @@ const chartOption = computed(() => ({
       const idx = params[0]?.dataIndex
       if (idx === undefined) return ''
       const r = props.data.resources[idx]
-      return `${r.name}<br/>难度: ${r.difficulty.toFixed(1)}<br/>匹配度: ${(r.matchScore * 100).toFixed(0)}%`
+      return `${r.name}<br/>难度: ${r.difficulty.toFixed(1)}<br/>匹配度: ${(r.match * 100).toFixed(0)}%`
     },
   },
   xAxis: {

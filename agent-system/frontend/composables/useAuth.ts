@@ -56,6 +56,7 @@ export function useAuth() {
     if (import.meta.client) {
       localStorage.removeItem('auth_token')
     }
+    // 不清除 session——用户下次登录应继续之前的进度
   }
 
   return {

@@ -116,6 +116,40 @@ async def generate_resources(
                     stage["has_resources"] = (stage.get("stage", 0) == 1)  # 只有节点 1 初始有资源
             learner_record.learning_path = learning_path_data
 
+            # 计算并持久化报告指标快照
+            try:
+                from app.metrics.report_builder import build_report_cache
+                all_content = []
+                all_difficulties = []
+                for res in resources:
+                    content = res.content if hasattr(res, 'content') else str(res)
+                    if content:
+                        all_content.append(str(content))
+                    if res.difficulty:
+                        all_difficulties.append(res.difficulty)
+
+                profile_for_report = profile or {}
+                if learner_record:
+                    profile_for_report = {
+                        **profile_for_report,
+                        "knowledge_points": learner_record.knowledge_points or [],
+                        "blind_spots": learner_record.blind_spots or [],
+                        "overall_level": learner_record.overall_level or "beginner",
+                        "recommended_difficulty": learner_record.recommended_difficulty or "beginner",
+                    }
+
+                report_cache = await build_report_cache(
+                    all_content=all_content,
+                    all_difficulties=all_difficulties,
+                    topic=request.topic,
+                    profile=profile_for_report,
+                    learning_path=learning_path_data or {},
+                )
+                learner_record.report_cache = report_cache
+                print(f"[报告快照] 已计算并持久化")
+            except Exception as e:
+                print(f"[警告] 报告快照计算失败: {e}")
+
     await db.flush()
     return resources
 

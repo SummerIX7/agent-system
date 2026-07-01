@@ -64,6 +64,14 @@
 
             <!-- 当前节点操作区 -->
             <div v-if="node.stage === currentStage && !node.advanced_test_passed && !allCompleted" class="path-node-actions">
+              <button
+                v-if="!node.has_resources"
+                class="btn btn--primary"
+                :disabled="generatingNode === node.stage"
+                @click="handleGenerateNode(node)"
+              >
+                {{ generatingNode === node.stage ? '正在生成...' : '生成节点学习资源' }}
+              </button>
               <button v-if="node.has_resources" class="btn btn--primary" @click="goToResources(node)">
                  查看学习资源
               </button>
@@ -158,7 +166,12 @@
           <div class="legend-item"><span class="legend-line" style="background: var(--accent)"></span>资源难度</div>
           <div class="legend-item"><span class="legend-line" style="background: var(--text-3); border-top: 1.5px dashed var(--text-3)"></span>学习者水平</div>
         </div>
-        <ReportDifficultyMatchCurve :data="matchCurveData" />
+        <ClientOnly>
+          <ReportDifficultyMatchCurve :data="matchCurveData" />
+          <template #fallback>
+            <div style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: 14px">加载图表中...</div>
+          </template>
+        </ClientOnly>
       </div>
 
       <!-- 匹配曲线说明 -->
@@ -227,6 +240,22 @@ const difficultyLabel = (d: string) => {
 const difficultyBadgeClass = (d: string) => {
   const map: Record<string, string> = { beginner: 'badge--mute', intermediate: 'badge--accent', advanced: 'badge--warn', expert: 'badge--err' }
   return map[d] || 'badge--mute'
+}
+
+// 按需生成节点内容
+const generatingNode = ref(0)
+
+const handleGenerateNode = async (node: any) => {
+  if (!sessionId.value || generatingNode.value) return
+  generatingNode.value = node.stage
+  try {
+    await api.generateNodeContent(sessionId.value, node.stage)
+    node.has_resources = true
+  } catch (err) {
+    console.warn('节点内容生成失败:', err)
+  } finally {
+    generatingNode.value = 0
+  }
 }
 
 // 导航
