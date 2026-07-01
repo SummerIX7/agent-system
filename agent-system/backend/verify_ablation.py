@@ -20,15 +20,15 @@ def main():
     print("\n[1] 工作流构建测试:")
     try:
         workflow_with_debate = build_workflow()
-        print("  ✓ 有辩论工作流构建成功")
+        print("   有辩论工作流构建成功")
     except Exception as e:
-        print(f"  ✗ 有辩论工作流构建失败: {e}")
+        print(f"   有辩论工作流构建失败: {e}")
 
     try:
         workflow_no_debate = build_workflow_no_debate()
-        print("  ✓ 无辩论工作流构建成功")
+        print("   无辩论工作流构建成功")
     except Exception as e:
-        print(f"  ✗ 无辩论工作流构建失败: {e}")
+        print(f"   无辩论工作流构建失败: {e}")
 
     # 2. 验证工作流函数存在
     print("\n[2] 工作流函数存在性检查:")
@@ -40,7 +40,7 @@ def main():
     import os
     test_file = "tests/test_ablation.py"
     if os.path.exists(test_file):
-        print(f"  ✓ {test_file} 存在")
+        print(f"   {test_file} 存在")
         with open(test_file, "r", encoding="utf-8") as f:
             content = f.read()
             test_cases = [
@@ -51,20 +51,20 @@ def main():
             ]
             for tc in test_cases:
                 if tc in content:
-                    print(f"    ✓ 测试用例 {tc} 存在")
+                    print(f"     测试用例 {tc} 存在")
                 else:
-                    print(f"    ✗ 测试用例 {tc} 不存在")
+                    print(f"     测试用例 {tc} 不存在")
     else:
-        print(f"  ✗ {test_file} 不存在")
+        print(f"   {test_file} 不存在")
 
     # 4. 验证谬误检测器
     print("\n[4] 谬误检测器检查:")
     try:
         from app.metrics.hallucination_checker import HallucinationChecker, compute_hallucination_rate
-        print("  ✓ HallucinationChecker 类导入成功")
-        print("  ✓ compute_hallucination_rate 函数导入成功")
+        print("   HallucinationChecker 类导入成功")
+        print("   compute_hallucination_rate 函数导入成功")
     except ImportError as e:
-        print(f"  ✗ 导入失败: {e}")
+        print(f"   导入失败: {e}")
 
     # 5. 模拟消融实验对比
     print("\n[5] 模拟消融实验对比:")

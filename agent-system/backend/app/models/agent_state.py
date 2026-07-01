@@ -43,8 +43,10 @@ class FeedbackRecord(Base):
     user_answer = Column(Text, nullable=True, comment="用户答案")
     correct_answer = Column(Text, nullable=True, comment="正确答案")
     is_correct = Column(Integer, nullable=True, comment="是否正确 0/1")
+    stage = Column(Integer, nullable=True, comment="所属学习路径节点编号")
+    test_level = Column(String(20), nullable=True, comment="考核等级: basic/advanced")
     heuristic_question = Column(String(500), nullable=True, comment="启发式追问")
     created_at = Column(DateTime, default=_utcnow)
 
     def __repr__(self):
-        return f"<FeedbackRecord(topic={self.topic}, is_correct={self.is_correct})>"
+        return f"<FeedbackRecord(topic={self.topic}, is_correct={self.is_correct}, stage={self.stage}, level={self.test_level})>"

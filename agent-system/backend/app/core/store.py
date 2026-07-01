@@ -94,7 +94,8 @@ def _new_session(session_id: str) -> dict:
 def _serialize(data: dict) -> dict:
     """将 Python dict 序列化为 Redis Hash 兼容格式（全字符串）"""
     json_fields = {"profile", "resources", "feedback", "agent_logs", "trace_entries",
-                   "cached_questions", "practice_state"}
+                   "cached_questions", "practice_state", "node_states", "node_resources",
+                   "tiered_questions", "tiered_questions_map", "test_results"}
     result = {}
     for k, v in data.items():
         if k in json_fields and v is not None:
@@ -118,6 +119,11 @@ def _deserialize(raw: dict) -> dict:
         "trace_entries": [],
         "cached_questions": None,
         "practice_state": {},
+        "node_states": {},
+        "node_resources": {},
+        "tiered_questions": None,
+        "tiered_questions_map": {},
+        "test_results": {},
     }
     for field, default in json_fields.items():
         if field in result and isinstance(result[field], str):
@@ -241,11 +247,116 @@ def clear_cached_questions(session_id: str) -> None:
     if not _is_redis_ok(r):
         session = _fallback_sessions.get(session_id, {})
         session.pop("cached_questions", None)
+        session.pop("tiered_questions", None)
         return
 
     key = f"{KEY_SESSION}:{session_id}"
     if r.exists(key):
-        r.hdel(key, "cached_questions")
+        r.hdel(key, "cached_questions", "tiered_questions")
+
+
+# ═══════════════════════════════════════════
+# 分阶试题缓存（基础 / 提升）
+# ═══════════════════════════════════════════
+
+def save_tiered_questions(session_id: str, tiered: dict) -> None:
+    """缓存分阶试题 {basic: QuestionSet, advanced: QuestionSet}"""
+    _update_field(session_id, "tiered_questions", tiered)
+
+
+def get_tiered_questions(session_id: str) -> dict | None:
+    """获取缓存的分阶试题，没有则返回 None"""
+    data = get_session(session_id).get("tiered_questions")
+    return data if data else None
+
+
+def get_tier_questions(session_id: str, level: str) -> dict | None:
+    """获取指定等级的缓存试题（basic 或 advanced）"""
+    tiered = get_tiered_questions(session_id)
+    if tiered and isinstance(tiered, dict):
+        return tiered.get(level)
+    return None
+
+
+# ═══════════════════════════════════════════
+# 按阶段索引的分阶试题缓存
+# ═══════════════════════════════════════════
+
+def save_tiered_questions_for_stage(session_id: str, stage: int, tiered: dict) -> None:
+    """
+    缓存指定节点的分阶试题。
+    存储在 session 的 tiered_questions_map 字段中，以 stage 为 key。
+    """
+    session = get_session(session_id)
+    tq_map = session.get("tiered_questions_map", {})
+    if isinstance(tq_map, str):
+        try:
+            import json
+            tq_map = json.loads(tq_map)
+        except Exception:
+            tq_map = {}
+    tq_map[str(stage)] = tiered
+    _update_field(session_id, "tiered_questions_map", tq_map)
+
+
+def get_tiered_questions_for_stage(session_id: str, stage: int) -> dict | None:
+    """获取指定节点的分阶试题缓存"""
+    session = get_session(session_id)
+    tq_map = session.get("tiered_questions_map", {})
+    if isinstance(tq_map, str):
+        try:
+            import json
+            tq_map = json.loads(tq_map)
+        except Exception:
+            tq_map = {}
+    if not tq_map or not isinstance(tq_map, dict):
+        return None
+    return tq_map.get(str(stage))
+
+
+def get_tier_questions_for_stage(session_id: str, stage: int, level: str) -> dict | None:
+    """获取指定节点+等级的缓存试题"""
+    tiered = get_tiered_questions_for_stage(session_id, stage)
+    if tiered and isinstance(tiered, dict):
+        return tiered.get(level)
+    return None
+
+
+# ═══════════════════════════════════════════
+# 分阶考核结果
+# ═══════════════════════════════════════════
+
+def save_test_result(session_id: str, level: str, result: dict) -> None:
+    """保存某轮考核结果（basic 或 advanced）"""
+    results = get_session(session_id).get("test_results", {})
+    if isinstance(results, str):
+        results = {}
+    results[level] = result
+    _update_field(session_id, "test_results", results)
+
+
+def get_test_result(session_id: str, level: str) -> dict | None:
+    """获取某轮考核结果"""
+    results = get_session(session_id).get("test_results", {})
+    if isinstance(results, str):
+        try:
+            import json
+            results = json.loads(results)
+        except Exception:
+            results = {}
+    return results.get(level) if results else None
+
+
+def clear_test_results(session_id: str) -> None:
+    """清除所有考核结果（节点推进时调用）"""
+    r = _get_redis()
+    if not _is_redis_ok(r):
+        session = _fallback_sessions.get(session_id, {})
+        session.pop("test_results", None)
+        return
+    key = f"{KEY_SESSION}:{session_id}"
+    if r.exists(key):
+        r.hdel(key, "test_results")
 
 
 def get_all_sessions() -> list[dict]:
@@ -418,3 +529,35 @@ def get_trace_entries(session_id: str) -> list[dict]:
     """获取该 session 的完整追踪记录"""
     session = get_session(session_id)
     return session.get("trace_entries", [])
+
+
+# ═══════════════════════════════════════════
+# Agent 日志持久化到 DB
+# ═══════════════════════════════════════════
+
+async def flush_agent_logs_to_db(session_id: str, db_session) -> int:
+    """
+    将 session store 中缓存的 agent_logs 批量写入数据库。
+    工作流完成后调用，确保 Agent 执行记录持久化。
+    返回写入条数。
+    """
+    from app.models.agent_state import AgentLog
+
+    session = get_session(session_id)
+    logs = session.get("agent_logs", [])
+    if not logs:
+        return 0
+
+    count = 0
+    for log in logs:
+        db_session.add(AgentLog(
+            session_id=session_id,
+            agent_name=log.get("agent_name", ""),
+            status=log.get("status", "completed"),
+            message=log.get("message", ""),
+            progress=log.get("progress", 0),
+        ))
+        count += 1
+
+    await db_session.flush()
+    return count

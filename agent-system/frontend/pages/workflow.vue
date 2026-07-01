@@ -59,25 +59,6 @@
       </div>
     </div>
 
-    <!-- 调试面板 -->
-    <div v-if="debugLogs.length > 0" class="debug-panel">
-      <div class="debug-header" @click="debugOpen = !debugOpen">
-        <span>🔍 决策调试日志（{{ debugLogs.length }} 条）</span>
-        <span style="font-size:12px;color:var(--text-3)">{{ debugOpen ? '收起 ▲' : '展开 ▼' }}</span>
-      </div>
-      <div v-if="debugOpen" class="debug-body">
-        <div v-for="(log, i) in debugLogs" :key="i" class="debug-entry">
-          <div class="debug-entry__head">
-            <span :class="['badge', log.status === 'completed' ? 'badge--ok' : log.status === 'error' ? 'badge--err' : 'badge--accent']">
-              {{ log.agent_name }}
-            </span>
-            <span class="t2" style="font-size:12px">{{ log.status }}</span>
-          </div>
-          <pre class="debug-entry__msg">{{ log.message }}</pre>
-        </div>
-      </div>
-    </div>
-
     <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
       <button
         class="btn btn--primary btn--lg"
@@ -86,11 +67,8 @@
       >
         {{ generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : '触发资源生成' }}
       </button>
-      <NuxtLink to="/resources" class="btn btn--ghost btn--lg" :class="{ 'opacity-50 pointer-events-none': generating && currentProgress < 100 }">
-        查看生成结果 →
-      </NuxtLink>
-      <NuxtLink :to="`/trace?sessionId=${sessionId}`" class="btn btn--ghost btn--lg" style="font-size:13px">
-        🔍 查看完整追踪
+      <NuxtLink to="/report" class="btn btn--ghost btn--lg" :class="{ 'opacity-50 pointer-events-none': generating && currentProgress < 100 }">
+        查看学习报告 →
       </NuxtLink>
     </div>
   </div>
@@ -99,21 +77,13 @@
 <script setup lang="ts">
 const { sessionId, profile } = useSession()
 const api = useApi()
-const toast = useToast()
 
-// 调试日志
-const debugOpen = ref(false)
-const debugLogs = ref<any[]>([])
-
-// 真实进度和消息（来自 WebSocket）
 const currentProgress = ref(0)
 const currentMessage = ref('准备中...')
 const generating = ref(false)
 
-// WebSocket 连接
 const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
-// 初始化 6 个 Agent 状态
 if (agents.value.length === 0) {
   agents.value = [
     { name: '学情分析 Agent', status: 'idle', message: '等待启动', progress: 0 },
@@ -181,13 +151,10 @@ const startGenerate = async () => {
   generating.value = true
   currentProgress.value = 0
   currentMessage.value = '启动工作流...'
-  debugLogs.value = []
 
-  // 重置所有 Agent 状态为 idle
   agents.value = agents.value.map(a => ({ ...a, status: 'idle' as const, message: '等待启动', progress: 0 }))
 
   try {
-    // 从画像中获取学习目标作为主题，或以画像推荐难度对应的领域主题
     const goals = profile.value?.goals || []
     const topic = goals.length > 0 ? goals[0] : (profile.value?.knowledge_points?.[0]?.name || '基础知识')
     const result = await api.generateResources(
@@ -199,41 +166,12 @@ const startGenerate = async () => {
 
     currentProgress.value = 100
     currentMessage.value = `已生成 ${result.length} 个资源`
-
-    // 拉取调试日志
-    await fetchDebugLogs()
-
-    toast.add({
-      title: '生成成功',
-      description: `已生成 ${result.length} 个资源`,
-      color: 'green',
-    })
   } catch (err: any) {
     console.error('生成失败:', err)
-    await fetchDebugLogs()  // 失败也拉日志
-    toast.add({
-      title: '生成失败',
-      description: err.message || '请稍后重试',
-      color: 'red',
-    })
   } finally {
     setTimeout(() => {
       generating.value = false
     }, 2000)
-  }
-}
-
-const fetchDebugLogs = async () => {
-  if (!sessionId.value) return
-  try {
-    const config = useRuntimeConfig()
-    const data = await $fetch(`${config.public.apiBase}/api/trace/${sessionId.value}`)
-    debugLogs.value = (data as any).agent_logs || []
-    if (debugLogs.value.length > 0) {
-      debugOpen.value = true
-    }
-  } catch (e) {
-    console.error('调试日志获取失败:', e)
   }
 }
 </script>
@@ -319,61 +257,6 @@ const fetchDebugLogs = async () => {
 }
 .animate-spin {
   animation: spin 1s linear infinite;
-}
-
-/* 调试面板 */
-.debug-panel {
-  margin-top: 24px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.debug-header {
-  padding: 12px 20px;
-  background: var(--bg-soft);
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  font-size: 14px;
-  user-select: none;
-}
-.debug-header:hover {
-  background: var(--bg-muted);
-}
-.debug-body {
-  padding: 16px;
-  max-height: 480px;
-  overflow-y: auto;
-}
-.debug-entry {
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 14px;
-}
-.debug-entry:last-child {
-  margin-bottom: 0;
-  border-bottom: none;
-  padding-bottom: 0;
-}
-.debug-entry__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.debug-entry__msg {
-  font-size: 12.5px;
-  font-family: var(--mono);
-  color: var(--text-2);
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-all;
-  background: var(--bg-soft);
-  padding: 12px;
-  border-radius: 6px;
-  margin: 0;
 }
 
 @media (max-width: 760px) {

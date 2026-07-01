@@ -326,7 +326,7 @@ async def get_history(
     feedbacks = result.scalars().all()
     for fb in feedbacks:
         history.append({
-            "title": f"答题 {'✓' if fb.is_correct else '✗'}",
+            "title": f"答题 {'' if fb.is_correct else ''}",
             "date": fb.created_at.isoformat() if fb.created_at else "",
             "description": fb.question,
             "tags": ["反馈", "正确" if fb.is_correct else "错误"],

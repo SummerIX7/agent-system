@@ -105,9 +105,8 @@ const navItems = [
   { path: '/profile', label: '学习者画像' },
   { path: '/dashboard', label: '学情诊断' },
   { path: '/workflow', label: 'Agent 协同' },
-  { path: '/resources', label: '资源展示' },
-  { path: '/practice', label: '反馈交互' },
   { path: '/report', label: '分析报告' },
+  { path: '/resources', label: '资源展示' },
   { path: '/history', label: '历史记录' },
 ]
 

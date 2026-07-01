@@ -100,6 +100,8 @@ async def submit_feedback(
 
     # 只有确实存在 learner_id 时才写入数据库（避免 foreign key 约束报错）
     if learner_id and learner_id != "unknown":
+        current_stage = session.get("current_stage", 1)
+        test_level = feedback.model_dump().get("test_level", "") if hasattr(feedback, "model_dump") else ""
         record = FeedbackRecord(
             session_id=feedback.session_id,
             learner_id=learner_id,
@@ -108,6 +110,8 @@ async def submit_feedback(
             user_answer=feedback.user_answer,
             correct_answer=feedback.correct_answer,
             is_correct=correctness,
+            stage=current_stage,
+            test_level=test_level or None,
             heuristic_question=heuristic,
         )
         db.add(record)

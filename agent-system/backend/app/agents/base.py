@@ -69,8 +69,8 @@ class BaseAgent:
         source_type = metadata.get("source_type", "文档")
 
         # 来源类型映射
-        type_map = {"book": "📚", "paper": "📄", "standard": "📋", "website": "🔗", "文档": "📖"}
-        icon = type_map.get(source_type, "📖")
+        type_map = {"book": "", "paper": "", "standard": "", "website": "", "文档": ""}
+        icon = type_map.get(source_type, "")
 
         if source_name:
             parts.append(f"{icon} 来源：《{source_name}》")
@@ -83,12 +83,12 @@ class BaseAgent:
         if chapter:
             parts.append(f"章节：{chapter}")
         if url:
-            parts.append(f"🔗 链接：{url}")
+            parts.append(f" 链接：{url}")
 
         # 如果没有元数据，用文件路径
         if not parts:
             file_path = metadata.get("source", "未知来源")
-            parts.append(f"📖 来源：{file_path}")
+            parts.append(f" 来源：{file_path}")
 
         return " | ".join(parts)
 

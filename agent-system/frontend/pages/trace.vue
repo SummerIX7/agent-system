@@ -46,7 +46,7 @@
             <!-- 输入 -->
             <div class="tl-section">
               <div class="tl-section__title" @click="toggleSection(i, 'input')">
-                📥 输入 {{ openSections[i]?.input ? '▼' : '▶' }}
+                 输入 {{ openSections[i]?.input ? '▼' : '▶' }}
               </div>
               <pre v-if="openSections[i]?.input" class="tl-json">{{ fmtJson(node.input) }}</pre>
             </div>
@@ -54,7 +54,7 @@
             <!-- 输出 -->
             <div class="tl-section">
               <div class="tl-section__title" @click="toggleSection(i, 'output')">
-                📤 输出 {{ openSections[i]?.output ? '▼' : '▶' }}
+                 输出 {{ openSections[i]?.output ? '▼' : '▶' }}
               </div>
               <pre v-if="openSections[i]?.output" class="tl-json">{{ fmtJson(node.output) }}</pre>
             </div>
@@ -62,7 +62,7 @@
             <!-- LLM 调用 -->
             <div v-if="node.llm_calls && node.llm_calls.length > 0" class="tl-section">
               <div class="tl-section__title" @click="toggleSection(i, 'llm')">
-                🧠 LLM 调用 ×{{ node.llm_calls.length }} {{ openSections[i]?.llm ? '▼' : '▶' }}
+                 LLM 调用 ×{{ node.llm_calls.length }} {{ openSections[i]?.llm ? '▼' : '▶' }}
               </div>
               <div v-if="openSections[i]?.llm">
                 <div v-for="(call, ci) in node.llm_calls" :key="ci" class="tl-llm">
@@ -75,11 +75,11 @@
                   </div>
                   <div v-if="openLlmCalls[`${i}-${ci}`]" class="tl-llm__body">
                     <div class="tl-llm__col">
-                      <div class="tl-llm__label">📝 Prompt</div>
+                      <div class="tl-llm__label"> Prompt</div>
                       <pre class="tl-code">{{ truncate(call.prompt, 6000) }}</pre>
                     </div>
                     <div class="tl-llm__col">
-                      <div class="tl-llm__label">💬 Response</div>
+                      <div class="tl-llm__label"> Response</div>
                       <pre class="tl-code">{{ call.response }}</pre>
                     </div>
                   </div>
@@ -221,8 +221,8 @@ const outcomeClass = computed(() => {
 })
 
 const outcomeText = computed(() => {
-  if (traceData.value?.outcome?.result === 'degraded') return '⚠ 降级通过'
-  if (traceData.value?.outcome?.result === 'completed') return '✅ 正常完成'
+  if (traceData.value?.outcome?.result === 'degraded') return ' 降级通过'
+  if (traceData.value?.outcome?.result === 'completed') return ' 正常完成'
   return '未知'
 })
 </script>
