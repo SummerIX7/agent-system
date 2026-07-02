@@ -40,7 +40,7 @@ class Learner(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     # 关联
-    user = relationship("User", back_populates="learner")
+    user = relationship("User", back_populates="learner", foreign_keys=[user_id])
     resources = relationship("Resource", back_populates="learner", lazy="selectin")
 
     def __repr__(self):

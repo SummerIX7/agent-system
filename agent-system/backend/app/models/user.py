@@ -24,7 +24,7 @@ class User(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     # 关联：一个用户对应一个画像
-    learner = relationship("Learner", back_populates="user", uselist=False, lazy="selectin")
+    learner = relationship("Learner", back_populates="user", uselist=False, lazy="selectin", foreign_keys="Learner.user_id")
 
     def __repr__(self):
         return f"<User(id={self.id}, username={self.username})>"
