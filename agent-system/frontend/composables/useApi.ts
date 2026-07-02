@@ -90,12 +90,12 @@ export function useApi() {
         }),
       }),
 
-    getResources: (sessionId: string) =>
-      request<ResourceOutput[]>(`/api/resources/${sessionId}`),
+    getResources: (sessionId: string, stage?: number) =>
+      request<ResourceOutput[]>(`/api/resources/${sessionId}${stage !== undefined ? `?stage=${stage}` : ''}`),
 
     // 反馈
     submitFeedback: (data: FeedbackInput) =>
-      request<FeedbackResponse>('/api/feedback', {
+      request<FeedbackResponse>('/api/feedback/', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -128,6 +128,40 @@ export function useApi() {
 
     getPracticeState: (sessionId: string) =>
       request<{ current_index: number; questions: any[] }>(`/api/questions/practice/state/${sessionId}`),
+
+    // 重新生成试题（清除缓存后重新调用 LLM 生成）
+    regenerateQuestions: (sessionId: string) =>
+      request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/practice/regenerate/${sessionId}`, {
+        method: 'POST',
+      }),
+
+    // 分阶试题
+    generateTieredQuestions: (sessionId: string) =>
+      request<{ node_title: string; basic: any; advanced: any }>(`/api/questions/generate/${sessionId}`, {
+        method: 'POST',
+      }),
+
+    getTieredQuestions: (sessionId: string, level: 'basic' | 'advanced', stage?: number) =>
+      request<{ level: string; label: string; topic: string; difficulty: string; questions: any[] }>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
+
+    // 学习路径管理
+    getLearningPath: (sessionId: string) =>
+      request<{ nodes: any[]; total_estimated_hours: number; current_stage: number; recommended_order: string; all_completed: boolean }>(`/api/learning-path/${sessionId}`),
+
+    getCurrentNode: (sessionId: string) =>
+      request<{ current_node: any; total_nodes: number; all_completed: boolean }>(`/api/learning-path/${sessionId}/current-node`),
+
+    advanceNode: (sessionId: string, data: { basic_score: number; advanced_score: number; test_feedback: any[] }) =>
+      request<{ advanced_passed: boolean; current_stage: number; total_stages: number; message: string; new_stage: number | null; all_completed: boolean }>(`/api/learning-path/${sessionId}/advance`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    generateNodeContent: (sessionId: string, stage: number) =>
+      request<{ ok: boolean; stage: number; resource_count: number }>(`/api/learning-path/${sessionId}/generate-node-content`, {
+        method: 'POST',
+        body: JSON.stringify({ session_id: sessionId, stage }),
+      }),
 
     // 领域
     getDomains: () =>

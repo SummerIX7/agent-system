@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, domains, feedback, generation, profile, questions, visualization, ws
+from app.api import auth, domains, feedback, generation, learning_path, profile, questions, visualization, ws
 from app.core.config import get_settings
 from app.core.store import check_redis_health
 from app.models.database import engine, Base
@@ -37,13 +37,13 @@ async def lifespan(app: FastAPI):
     health = check_redis_health()
     if health["status"] == "degraded":
         logger.warning(
-            "⚠️ Redis 不可用，已降级为内存存储。"
+            "️ Redis 不可用，已降级为内存存储。"
             "多用户部署时请确保 Redis 已启动且配置正确。"
         )
-        print("[启动] ⚠️ Redis 不可用，已降级为内存存储")
+        print("[启动] ️ Redis 不可用，已降级为内存存储")
     else:
-        logger.info(f"✅ Redis 连接正常: {health}")
-        print(f"[启动] ✅ Redis 连接正常: {health}")
+        logger.info(f" Redis 连接正常: {health}")
+        print(f"[启动]  Redis 连接正常: {health}")
 
     # 3½. 打印 Mock 模式状态
     settings = get_settings()
@@ -89,6 +89,7 @@ app.include_router(domains.router)
 app.include_router(profile.router)
 app.include_router(generation.router)
 app.include_router(feedback.router)
+app.include_router(learning_path.router)
 app.include_router(visualization.router)
 app.include_router(questions.router)
 app.include_router(ws.router)

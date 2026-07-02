@@ -109,11 +109,11 @@ async def test_knowledge_accuracy():
     print(f"错误数量: {errors}")
     print(f"谬误率: {error_rate:.1%}")
     print(f"目标: < 5%")
-    print(f"结果: {'✅ 达标' if error_rate < 0.05 else '❌ 未达标'}")
+    print(f"结果: {' 达标' if error_rate < 0.05 else ' 未达标'}")
     print(f"{'='*60}")
 
     for r in results:
-        status = "✅" if r['passed'] else "❌"
+        status = "" if r['passed'] else ""
         print(f"  {status} [{r['profile']}] 质量分: {r['quality_score']:.2f}, "
               f"有效问题: {r['effective_issues_count']}, 有修正: {r['has_revision']}")
         if not r['passed']:
@@ -164,11 +164,11 @@ async def test_difficulty_match():
     print(f"匹配数量: {matched}")
     print(f"匹配率: {match_rate:.1%}")
     print(f"目标: ≥ 85%")
-    print(f"结果: {'✅ 达标' if match_rate >= 0.85 else '❌ 未达标'}")
+    print(f"结果: {' 达标' if match_rate >= 0.85 else ' 未达标'}")
     print(f"{'='*60}")
 
     for r in results:
-        status = "✅" if r['match'] else "❌"
+        status = "" if r['match'] else ""
         print(f"  {status} [{r['profile']}] 预期: {r['expected']}, 实际: {r['actual']}")
 
     return match_rate >= 0.85
@@ -225,11 +225,11 @@ async def test_knowledge_coverage():
     print(f"覆盖数量: {covered}")
     print(f"覆盖率: {coverage_rate:.1%}")
     print(f"目标: ≥ 90%")
-    print(f"结果: {'✅ 达标' if coverage_rate >= 0.9 else '❌ 未达标'}")
+    print(f"结果: {' 达标' if coverage_rate >= 0.9 else ' 未达标'}")
     print(f"{'='*60}")
 
     for r in results:
-        status = "✅" if r['covered'] else "❌"
+        status = "" if r['covered'] else ""
         print(f"  {status} [{r['topic']}] 内容长度: {r['content_length']}")
 
     return coverage_rate >= 0.9
@@ -237,9 +237,9 @@ async def test_knowledge_coverage():
 
 async def run_all_tests():
     """运行所有指标测试"""
-    print("\n" + "🎯" * 20)
+    print("\n" + "" * 20)
     print("三项核心指标验证")
-    print("🎯" * 20)
+    print("" * 20)
 
     r1 = await test_knowledge_accuracy()
     r2 = await test_difficulty_match()
@@ -248,10 +248,10 @@ async def run_all_tests():
     print(f"\n{'='*60}")
     print(f"总结")
     print(f"{'='*60}")
-    print(f"知识谬误率: {'✅' if r1 else '❌'}")
-    print(f"难度匹配率: {'✅' if r2 else '❌'}")
-    print(f"知识点覆盖率: {'✅' if r3 else '❌'}")
-    print(f"总体: {'✅ 全部达标' if all([r1, r2, r3]) else '❌ 部分未达标'}")
+    print(f"知识谬误率: {'' if r1 else ''}")
+    print(f"难度匹配率: {'' if r2 else ''}")
+    print(f"知识点覆盖率: {'' if r3 else ''}")
+    print(f"总体: {' 全部达标' if all([r1, r2, r3]) else ' 部分未达标'}")
     print(f"{'='*60}")
 
 

@@ -75,7 +75,7 @@ async def submit_feedback(
     reveal = False
     heuristic = None
 
-    # 提前获取 session 和领域配置（Bug#1 修复：domain 须在 generate_heuristic_question 调用前赋值）
+    # 提前获取 session 和领域配置（供后续追问和路径调整使用）
     session = get_session(feedback.session_id)
     learner_id = session.get("learner_id", "")
     profile = session.get("profile", {})
@@ -98,18 +98,24 @@ async def submit_feedback(
             except Exception as e:
                 print(f"[警告] 启发式追问生成失败: {e}")
 
-    record = FeedbackRecord(
-        session_id=feedback.session_id,
-        learner_id=learner_id or "unknown",
-        topic=feedback.topic,
-        question=feedback.question,
-        user_answer=feedback.user_answer,
-        correct_answer=feedback.correct_answer,
-        is_correct=correctness,
-        heuristic_question=heuristic,
-    )
-    db.add(record)
-    await db.flush()
+    # 只有确实存在 learner_id 时才写入数据库（避免 foreign key 约束报错）
+    if learner_id and learner_id != "unknown":
+        current_stage = session.get("current_stage", 1)
+        test_level = feedback.model_dump().get("test_level", "") if hasattr(feedback, "model_dump") else ""
+        record = FeedbackRecord(
+            session_id=feedback.session_id,
+            learner_id=learner_id,
+            topic=feedback.topic,
+            question=feedback.question,
+            user_answer=feedback.user_answer,
+            correct_answer=feedback.correct_answer,
+            is_correct=correctness,
+            stage=current_stage,
+            test_level=test_level or None,
+            heuristic_question=heuristic,
+        )
+        db.add(record)
+        await db.flush()
 
     add_feedback(feedback.session_id, {
         "topic": feedback.topic,

@@ -35,7 +35,7 @@ def main():
     print(f"嵌入模型: {settings.EMBEDDING_MODEL}")
     print(f"知识库目录:")
     for d in kb_dirs:
-        exists = "✓" if Path(d).exists() else "✗ (不存在)"
+        exists = "" if Path(d).exists() else " (不存在)"
         print(f"  - {d} {exists}")
     print("=" * 60)
 
@@ -46,7 +46,7 @@ def main():
     total = retriever.build_index_from_dirs(kb_dirs)
 
     print()
-    print(f"✅ 索引构建完成！共 {total} 个知识块")
+    print(f" 索引构建完成！共 {total} 个知识块")
     print(f"   ChromaDB 存储位置: {settings.CHROMA_PERSIST_DIR}")
 
 

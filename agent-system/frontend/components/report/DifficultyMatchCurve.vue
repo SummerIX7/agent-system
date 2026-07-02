@@ -16,11 +16,11 @@ import { graphic } from 'echarts'
 use([LineChart, GridComponent, MarkLineComponent, CanvasRenderer])
 
 interface MatchData {
-  learnerLevel: number
+  learnerLevel: number | string
   resources: {
     name: string
     difficulty: number
-    matchScore: number
+    match: number
   }[]
 }
 
@@ -34,7 +34,7 @@ const isValidData = computed(() => {
     props.data.resources.length > 0
 })
 
-// ✅ 使用origin的精美配置 + agent-system的动态数据
+//  使用origin的精美配置 + agent-system的动态数据
 const chartOption = computed(() => ({
   grid: { top: 30, right: 40, bottom: 40, left: 50 },
   tooltip: {
@@ -43,12 +43,12 @@ const chartOption = computed(() => ({
       const idx = params[0]?.dataIndex
       if (idx === undefined) return ''
       const r = props.data.resources[idx]
-      return `${r.name}<br/>难度: ${r.difficulty.toFixed(1)}<br/>匹配度: ${(r.matchScore * 100).toFixed(0)}%`
+      return `${r.name}<br/>难度: ${r.difficulty.toFixed(1)}<br/>匹配度: ${(r.match * 100).toFixed(0)}%`
     },
   },
   xAxis: {
     type: 'category',
-    data: props.data.resources.map((r) => r.name),  // ✅ 动态数据
+    data: props.data.resources.map((r) => r.name),  //  动态数据
     axisLine: { lineStyle: { color: '#E5E7EB' } },
     axisTick: { show: false },
     axisLabel: { color: '#9CA3AF', fontSize: 10 },
@@ -71,7 +71,7 @@ const chartOption = computed(() => ({
   series: [
     {
       type: 'line',  // origin: 纯折线图（非柱状图）
-      data: props.data.resources.map((r) => r.difficulty),  // ✅ 动态数据
+      data: props.data.resources.map((r) => r.difficulty),  //  动态数据
       smooth: false,
       symbol: 'circle',
       symbolSize: 7,
@@ -94,7 +94,7 @@ const chartOption = computed(() => ({
           color: '#9CA3AF',
           fontSize: 10,
         },
-        data: [{ yAxis: props.data.learnerLevel }],  // ✅ 动态数据
+        data: [{ yAxis: props.data.learnerLevel }],  //  动态数据
       },
     },
   ],

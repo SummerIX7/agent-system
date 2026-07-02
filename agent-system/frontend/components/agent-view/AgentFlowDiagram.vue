@@ -207,8 +207,8 @@ const getAgentDescription = (agentId: string): string => {
   }
 
   if (status === 'running' && agent?.progress) return `执行中... ${agent.progress}%`
-  if (status === 'completed') return '已完成 ✓'
-  if (status === 'error') return '执行出错 ✗'
+  if (status === 'completed') return '已完成 '
+  if (status === 'error') return '执行出错 '
   return defaultDesc[agentId] || ''
 }
 

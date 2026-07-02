@@ -29,7 +29,7 @@ const isValidData = computed(() => {
     props.knowledgePoints.every((kp) => kp && kp.name && typeof kp.score === 'number')
 })
 
-// ✅ 使用origin的精美配置 + agent-system的动态数据
+//  使用origin的精美配置 + agent-system的动态数据
 const chartOption = computed(() => ({
   radar: {
     indicator: props.knowledgePoints.map((kp) => ({
@@ -50,7 +50,7 @@ const chartOption = computed(() => ({
   series: [{
     type: 'radar',
     data: [{
-      value: props.knowledgePoints.map((kp) => kp.score),  // ✅ 动态数据
+      value: props.knowledgePoints.map((kp) => kp.score),  //  动态数据
       areaStyle: { color: 'rgba(79, 70, 229, 0.08)' },    // origin: 淡靛蓝半透明
       lineStyle: { color: '#4F46E5', width: 1.5 },         // origin: 靛蓝色线条
       itemStyle: { color: '#4F46E5', borderWidth: 0 },     // origin: 靛蓝色数据点

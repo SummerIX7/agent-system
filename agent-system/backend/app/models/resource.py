@@ -25,6 +25,7 @@ class Resource(Base):
     content = Column(JsonText, nullable=False, comment="生成内容")
     topic = Column(String(200), nullable=False, comment="主题")
     difficulty = Column(String(20), nullable=True, comment="难度等级")
+    stage = Column(Integer, nullable=True, comment="所属学习路径节点编号")
     sources = Column(JsonText, nullable=True, comment="知识溯源列表")
     review_score = Column(Float, nullable=True, comment="审核评分 0-1")
     review_passed = Column(
@@ -39,4 +40,4 @@ class Resource(Base):
     learner = relationship("Learner", back_populates="resources")
 
     def __repr__(self):
-        return f"<Resource(id={self.id}, type={self.resource_type}, topic={self.topic})>"
+        return f"<Resource(id={self.id}, type={self.resource_type}, topic={self.topic}, stage={self.stage})>"

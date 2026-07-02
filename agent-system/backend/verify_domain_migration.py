@@ -56,9 +56,9 @@ def main():
 
     # 5. 验证硬编码已解除
     print("\n[5] 硬编码检查:")
-    print("  - diagnosis.py: 使用 get_domain_from_input() 推断领域 ✓")
-    print("  - question_generator.py: 使用 get_domain_from_input() 推断领域 ✓")
-    print("  - questions.py: 使用 get_domain_from_input() 推断领域 ✓")
+    print("  - diagnosis.py: 使用 get_domain_from_input() 推断领域 ")
+    print("  - question_generator.py: 使用 get_domain_from_input() 推断领域 ")
+    print("  - questions.py: 使用 get_domain_from_input() 推断领域 ")
 
     print("\n" + "=" * 60)
     print("验收完成")
