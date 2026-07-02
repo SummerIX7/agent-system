@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 6</p>
+      <p class="page-head__eyebrow">步骤 6</p>
       <h1 class="page-head__title">学习分析报告</h1>
       <p class="page-head__desc">查看完整学习路径及各节点进度，根据需要进入学习或考核环节。</p>
     </div>
@@ -352,33 +352,6 @@ onMounted(async () => {
       machineStatus.value = (profile as any).machine_approval_status || 'none'
     } catch {
       // 忽略
-    }
-  }
-
-  // 降级：从 profile 填充
-  if (!nodes.value.length && profile.value?.knowledge_points) {
-    nodes.value = profile.value.knowledge_points.map((kp: any, idx: number) => ({
-      stage: idx + 1,
-      title: kp.name,
-      difficulty: kp.level || 'beginner',
-      topics: [kp.name],
-      estimated_hours: 4,
-      has_resources: true,
-      basic_test_passed: kp.score >= 60,
-      advanced_test_passed: kp.score >= 80,
-      completed: kp.score >= 80,
-    }))
-    currentStage.value = 1
-  }
-
-  if (!matchCurveData.value.resources.length && profile.value?.knowledge_points) {
-    matchCurveData.value = {
-      learnerLevel: 2.5,
-      resources: profile.value.knowledge_points.map((kp: any) => ({
-        name: kp.name,
-        difficulty: kp.score / 20,
-        match: Math.min(1, kp.score / 80),
-      })),
     }
   }
 

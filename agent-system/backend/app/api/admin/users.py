@@ -75,9 +75,11 @@ async def list_users(
         # 计算学习进度（学习路径中已完成节点占比）
         learning_path = row.learning_path
         progress = 0.0
-        if learning_path and isinstance(learning_path, list) and len(learning_path) > 0:
-            completed = sum(1 for node in learning_path if node.get("status") == "completed")
-            progress = round(completed / len(learning_path), 4)
+        if learning_path and isinstance(learning_path, dict):
+            path_nodes = learning_path.get("path", [])
+            if path_nodes and len(path_nodes) > 0:
+                completed = sum(1 for node in path_nodes if node.get("advanced_test_passed") or node.get("completed"))
+                progress = round(completed / len(path_nodes), 4)
 
         items.append({
             "id": row.id,
@@ -119,11 +121,12 @@ async def get_user_detail(
     learner, username, email = row
 
     # 学习进度
-    learning_path = learner.learning_path or []
+    learning_path = learner.learning_path or {}
+    path_nodes = learning_path.get("path", []) if isinstance(learning_path, dict) else []
     progress = 0.0
-    if learning_path and len(learning_path) > 0:
-        completed = sum(1 for node in learning_path if node.get("status") == "completed")
-        progress = round(completed / len(learning_path), 4)
+    if path_nodes and len(path_nodes) > 0:
+        completed = sum(1 for node in path_nodes if node.get("advanced_test_passed") or node.get("completed"))
+        progress = round(completed / len(path_nodes), 4)
 
     return {
         "id": learner.id,
@@ -139,7 +142,7 @@ async def get_user_detail(
         "blind_spots": learner.blind_spots,
         "overall_level": learner.overall_level,
         "recommended_difficulty": learner.recommended_difficulty,
-        "learning_path": learning_path,
+        "learning_path": path_nodes,
         "learning_progress": progress,
         "machine_approval_status": learner.machine_approval_status,
         "machine_approval_at": learner.machine_approval_at.isoformat() if learner.machine_approval_at else None,
@@ -185,8 +188,7 @@ async def get_learning_detail(
             "user_answer": fb.user_answer,
             "correct_answer": fb.correct_answer,
             "is_correct": fb.is_correct,
-            "explanation": fb.explanation,
-            "socratic_followup": fb.socratic_followup,
+            "heuristic_question": fb.heuristic_question,
             "created_at": fb.created_at.isoformat() if fb.created_at else None,
         })
 
@@ -209,7 +211,7 @@ async def get_learning_detail(
 
     return {
         "learner_id": learner_id,
-        "learning_path": learner.learning_path or [],
+        "learning_path": (learner.learning_path or {}).get("path", []) if isinstance(learner.learning_path, dict) else [],
         "recent_feedbacks": feedbacks,
         "approval_logs": approval_logs,
     }

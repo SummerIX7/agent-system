@@ -70,7 +70,7 @@ export function useApi() {
 
     // 学习者画像
     createProfile: (data: LearnerProfileInput) =>
-      request<LearnerProfile>('/api/profile', {
+      request<LearnerProfile>('/api/profile/', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -155,6 +155,12 @@ export function useApi() {
       request<{ advanced_passed: boolean; current_stage: number; total_stages: number; message: string; new_stage: number | null; all_completed: boolean }>(`/api/learning-path/${sessionId}/advance`, {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+
+    markBasicPassed: (sessionId: string, basicScore: number = 70) =>
+      request<{ ok: boolean; stage: number; basic_test_passed: boolean }>(`/api/learning-path/${sessionId}/mark-basic-passed`, {
+        method: 'POST',
+        body: JSON.stringify({ basic_score: basicScore }),
       }),
 
     generateNodeContent: (sessionId: string, stage: number) =>

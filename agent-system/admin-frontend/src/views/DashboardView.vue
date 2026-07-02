@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { dashboardApi } from '@/api/dashboard'
 import type { DashboardOverview } from '@/types/admin'
-import { formatPercent } from '@/utils/format'
+import { formatPercent, LEVEL_MAP } from '@/utils/format'
 import {
   PeopleOutline,
   HourglassOutline,
@@ -110,7 +110,7 @@ onMounted(() => {
             <template #header-extra>
               <NTag size="small" :bordered="false" type="info">全部领域</NTag>
             </template>
-            <div v-if="knowledgeChartData.length > 0" style="height: 300px">
+            <div v-if="knowledgeChartData.length > 0">
               <NDataTable
                 :columns="[
                   { title: '知识点', key: 'name', width: 140 },
@@ -131,7 +131,7 @@ onMounted(() => {
         <!-- 趋势图 -->
         <NGi :span="1">
           <NCard title="学习趋势（近30天）" :bordered="true" size="small">
-            <div v-if="trendDates.length > 0" style="height: 300px; display: flex; align-items: center; justify-content: center">
+            <div v-if="trendDates.length > 0">
               <NDataTable
                 :columns="[
                   { title: '日期', key: 'date' },
@@ -178,7 +178,7 @@ onMounted(() => {
                 :key="item.name"
                 style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #ECECEF"
               >
-                <span style="font-size: 13px; color: #4B5563">{{ item.name || '未知' }}</span>
+                <span style="font-size: 13px; color: #4B5563">{{ LEVEL_MAP[item.name] || item.name || '未知' }}</span>
                 <NTag size="small" :bordered="false">{{ item.value }} 人</NTag>
               </div>
             </div>

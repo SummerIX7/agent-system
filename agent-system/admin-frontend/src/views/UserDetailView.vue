@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usersApi } from '@/api/users'
-import { formatDate, APPROVAL_STATUS_MAP } from '@/utils/format'
+import { formatDate, APPROVAL_STATUS_MAP, LEVEL_MAP, LEARNING_STYLE_MAP } from '@/utils/format'
 import { formatPercent } from '@/utils/format'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowBackOutline } from '@vicons/ionicons5'
@@ -109,19 +109,19 @@ onMounted(() => loadData())
           <NGi :span="1">
             <div class="info-item">
               <span class="info-label">学习风格</span>
-              <span class="info-value">{{ detail.learning_style || '-' }}</span>
+              <span class="info-value">{{ LEARNING_STYLE_MAP[detail.learning_style] || detail.learning_style || '-' }}</span>
             </div>
           </NGi>
           <NGi :span="1">
             <div class="info-item">
               <span class="info-label">整体水平</span>
-              <NTag size="small" :bordered="false">{{ detail.overall_level || '-' }}</NTag>
+              <NTag size="small" :bordered="false">{{ LEVEL_MAP[detail.overall_level] || detail.overall_level || '-' }}</NTag>
             </div>
           </NGi>
           <NGi :span="1">
             <div class="info-item">
               <span class="info-label">推荐难度</span>
-              <span class="info-value">{{ detail.recommended_difficulty || '-' }}</span>
+              <span class="info-value">{{ LEVEL_MAP[detail.recommended_difficulty] || detail.recommended_difficulty || '-' }}</span>
             </div>
           </NGi>
         </NGrid>
@@ -156,7 +156,7 @@ onMounted(() => loadData())
                   <NTag :type="stageStatusTag(node.status).type" size="small" :bordered="false">
                     {{ stageStatusTag(node.status).label }}
                   </NTag>
-                  <div style="font-size: 12px; color: #9CA3AF; margin-top: 4px">难度 {{ node.difficulty }}</div>
+                  <div style="font-size: 12px; color: #9CA3AF; margin-top: 4px">难度 {{ LEVEL_MAP[node.difficulty] || node.difficulty }}</div>
                 </div>
               </div>
             </template>
@@ -183,7 +183,7 @@ onMounted(() => loadData())
                   {{ kp.score?.toFixed?.(0) || kp.score || 0 }}
                 </span>
                 <NTag size="small" :bordered="false" :style="{ color: levelColor(kp.level) }">
-                  {{ kp.level }}
+                  {{ LEVEL_MAP[kp.level] || kp.level }}
                 </NTag>
               </div>
             </template>
@@ -212,7 +212,7 @@ onMounted(() => loadData())
                   <NTag :type="fb.is_correct ? 'success' : 'error'" size="small" :bordered="false">
                     {{ fb.is_correct ? '正确' : '错误' }}
                   </NTag>
-                  <NTag size="small" :bordered="false">{{ fb.test_level }}</NTag>
+                  <NTag size="small" :bordered="false">{{ LEVEL_MAP[fb.test_level] || fb.test_level }}</NTag>
                   <span style="font-size: 12px; color: #9CA3AF">{{ formatDate(fb.created_at) }}</span>
                 </div>
                 <div style="font-size: 13px; color: #4B5563; line-height: 1.6">

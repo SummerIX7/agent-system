@@ -55,12 +55,12 @@ export const api = {
   get: <T = unknown>(url: string, params?: Record<string, unknown>) =>
     request<T>(`${url}${buildQuery(params)}`),
 
-  post: <T = unknown>(url: string, data?: unknown) =>
-    request<T>(url, { method: 'POST', body: JSON.stringify(data) }),
+  post: <T = unknown>(url: string, data?: unknown, params?: Record<string, unknown>) =>
+    request<T>(`${url}${buildQuery(params)}`, { method: 'POST', body: JSON.stringify(data) }),
 
   put: <T = unknown>(url: string, data?: unknown) =>
     request<T>(url, { method: 'PUT', body: JSON.stringify(data) }),
 
-  delete: <T = unknown>(url: string) =>
-    request<T>(url, { method: 'DELETE' }),
+  delete: <T = unknown>(url: string, params?: Record<string, unknown>) =>
+    request<T>(`${url}${buildQuery(params)}`, { method: 'DELETE' }),
 }

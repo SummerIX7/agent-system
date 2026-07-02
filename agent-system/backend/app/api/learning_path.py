@@ -37,6 +37,11 @@ class AdvanceRequest(BaseModel):
     test_feedback: list = []       # 答题反馈记录
 
 
+class MarkBasicPassedRequest(BaseModel):
+    """标记基础考核通过请求"""
+    basic_score: float = PASS_THRESHOLD * 100  # 基础考核正确率，默认 70%
+
+
 class NodeInfo(BaseModel):
     """学习路径节点信息"""
     stage: int
@@ -133,18 +138,20 @@ async def _get_learning_path_from_any_source(session_id: str, db: AsyncSession =
 
     current_stage = int(session_data.get("current_stage", learning_path.get("current_stage", 1)))
 
-    # DB 降级：优先以 DB 数据为准
-    if db is not None and not learning_path.get("path"):
-        learner_id = session_data.get("learner_id", "")
-        if learner_id and learner_id != "unknown":
-            stmt = select(Learner).where(Learner.id == learner_id)
+    # DB 降级：直接从 DB 恢复，不依赖 session store 中有 learner_id
+    if db is not None and not learning_path.get("path") and session_id.startswith("user-"):
+        try:
+            user_id = int(session_id.split("-", 1)[1])
+            stmt = select(Learner).where(Learner.user_id == user_id)
             r = await db.execute(stmt)
             learner = r.scalar_one_or_none()
             if learner and learner.learning_path and learner.learning_path.get("path"):
                 learning_path = learner.learning_path
                 current_stage = int(learning_path.get("current_stage", 1))
                 _persist_learning_path(session_id, learning_path)
-                update_session(session_id, {"current_stage": current_stage})
+                update_session(session_id, {"current_stage": current_stage, "learner_id": str(learner.id)})
+        except (ValueError, IndexError):
+            pass
 
     return learning_path, current_stage
 
@@ -239,10 +246,11 @@ async def advance_node(
         "basic_test_passed": req.basic_score >= PASS_THRESHOLD,
         "advanced_score": req.advanced_score,
         "advanced_test_passed": can_advance,
-        "completed": True,
     })
 
     if can_advance:
+        # 只有提升考核通过后才标记节点完成
+        learning_path = _update_node_state(learning_path, current_stage, {"completed": True})
         new_stage = current_stage + 1
         learning_path["current_stage"] = new_stage
 
@@ -280,6 +288,39 @@ async def advance_node(
         result["all_completed"] = False
 
     return result
+
+
+@router.post("/{session_id}/mark-basic-passed")
+async def mark_basic_passed(
+    session_id: str,
+    req: MarkBasicPassedRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    标记当前节点基础考核已通过。
+    基础考核通过后、进入提升考核前调用，用于持久化基础考核状态。
+    """
+    learning_path, current_stage = await _get_learning_path_from_any_source(session_id, db)
+
+    # 更新当前节点状态
+    learning_path = _update_node_state(learning_path, current_stage, {
+        "basic_score": req.basic_score,
+        "basic_test_passed": True,
+    })
+
+    _persist_learning_path(session_id, learning_path)
+
+    # 持久化到数据库
+    session_data = get_session(session_id)
+    learner_id = session_data.get("learner_id", "")
+    if learner_id and learner_id != "unknown":
+        await _persist_learning_path_to_db(db, learner_id, learning_path)
+
+    return {
+        "ok": True,
+        "stage": current_stage,
+        "basic_test_passed": True,
+    }
 
 
 async def _persist_learning_path_to_db(db: AsyncSession, learner_id: str, learning_path: dict):

@@ -2,7 +2,7 @@
 import { approvalApi } from '@/api/approval'
 import { usersApi } from '@/api/users'
 import type { LearnerItem } from '@/types/admin'
-import { formatPercent } from '@/utils/format'
+import { formatPercent, LEVEL_MAP } from '@/utils/format'
 import { CheckmarkOutline, CloseOutline, CheckmarkCircleOutline } from '@vicons/ionicons5'
 
 const message = useMessage()
@@ -119,7 +119,7 @@ onMounted(() => loadPendingList())
                 <NTag type="warning" size="small" :bordered="false">待审批</NTag>
               </div>
               <div style="display: flex; align-items: center; gap: 16px; font-size: 12px; color: #9CA3AF">
-                <span>{{ item.overall_level || '未知等级' }}</span>
+                <span>{{ LEVEL_MAP[item.overall_level] || item.overall_level || '未知等级' }}</span>
                 <span>进度 {{ formatPercent(item.learning_progress) }}</span>
               </div>
             </div>

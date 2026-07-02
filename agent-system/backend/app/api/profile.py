@@ -142,6 +142,7 @@ async def get_my_profile(
 
     return LearnerProfile(
         id=learner.id,
+        session_id=f"user-{current_user.id}",
         education_background=learner.education_background,
         major=learner.major,
         work_experience_years=learner.work_experience_years,

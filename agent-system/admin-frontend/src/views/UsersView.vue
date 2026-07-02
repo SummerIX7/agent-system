@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { usersApi } from '@/api/users'
 import type { LearnerItem } from '@/types/admin'
-import { formatDate, APPROVAL_STATUS_MAP } from '@/utils/format'
+import { formatDate, APPROVAL_STATUS_MAP, LEVEL_MAP } from '@/utils/format'
 import { formatPercent } from '@/utils/format'
 import type { DataTableColumns, DataTableSortState } from 'naive-ui'
 import { useRouter } from 'vue-router'
@@ -41,7 +41,15 @@ const columns: DataTableColumns<LearnerItem> = [
       ])
     },
   },
-  { title: '等级', key: 'overall_level', width: 90, sorter: true },
+  {
+    title: '等级',
+    key: 'overall_level',
+    width: 90,
+    sorter: true,
+    render(row) {
+      return h('span', { style: 'font-size:13px; color:#4B5563' }, LEVEL_MAP[row.overall_level] || row.overall_level || '-')
+    },
+  },
   {
     title: '审批状态',
     key: 'machine_approval_status',
@@ -181,6 +189,7 @@ onMounted(() => {
 
     <!-- 表格 -->
     <NCard :bordered="true" size="small">
+      <div style="overflow: auto">
       <NDataTable
         :columns="columns"
         :data="data"
@@ -198,6 +207,7 @@ onMounted(() => {
         }"
         @update:sorter="handleSorterChange"
       />
+      </div>
     </NCard>
   </div>
 </template>

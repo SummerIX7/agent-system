@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 1</p>
+      <p class="page-head__eyebrow">步骤 1</p>
       <h1 class="page-head__title">学习者画像</h1>
       <p class="page-head__desc">请填写您的学习背景和目标，以便系统为您生成个性化学习资源。画像越准确，学情诊断与资源生成就越贴合您的实际水平。</p>
     </div>

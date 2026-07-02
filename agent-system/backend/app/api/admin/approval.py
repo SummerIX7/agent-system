@@ -126,11 +126,12 @@ async def list_pending(
 
     items = []
     for learner, username in rows:
-        learning_path = learner.learning_path or []
+        learning_path = learner.learning_path or {}
+        path_nodes = learning_path.get("path", []) if isinstance(learning_path, dict) else []
         progress = 0.0
-        if learning_path and len(learning_path) > 0:
-            completed = sum(1 for node in learning_path if node.get("status") == "completed")
-            progress = round(completed / len(learning_path), 4)
+        if path_nodes and len(path_nodes) > 0:
+            completed = sum(1 for node in path_nodes if node.get("advanced_test_passed") or node.get("completed"))
+            progress = round(completed / len(path_nodes), 4)
 
         items.append({
             "id": learner.id,

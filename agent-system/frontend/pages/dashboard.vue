@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 2</p>
+      <p class="page-head__eyebrow">步骤 2</p>
       <h1 class="page-head__title">学情诊断仪表盘</h1>
       <p class="page-head__desc">基于您提交的学习者画像，系统将为您生成个性化学习路径。</p>
     </div>
@@ -90,7 +90,7 @@
         </div>
         <div style="font-size: 14px; font-weight: 600; font-family: var(--mono); width: 36px; text-align: right">{{ kp.score.toFixed(0) }}</div>
         <div style="width: 56px; text-align: right">
-          <span class="badge" :class="getBadgeClass(kp.score)">{{ kp.level }}</span>
+          <span class="badge" :class="getBadgeClass(kp.score)">{{ LEVEL_MAP[kp.level] || kp.level }}</span>
         </div>
       </div>
       <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-8">暂无能力维度数据</p>
