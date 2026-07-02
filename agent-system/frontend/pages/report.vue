@@ -103,8 +103,31 @@
       <!-- 全部完成 -->
       <div v-if="allCompleted" class="card" style="margin-top: 32px; text-align: center; padding: 40px">
         <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 8px">学习路径全部完成</h2>
-        <p class="text-text-2 mb-6">你已通过所有节点的考核，建议回顾薄弱环节或探索更深入的主题。</p>
-        <NuxtLink to="/" class="btn btn--primary">返回首页</NuxtLink>
+        <p class="text-text-2 mb-6">你已通过所有节点的考核，可以选择申请机台使用权限。</p>
+
+        <!-- 机台申请区域 -->
+        <div v-if="machineStatus === 'none' || machineStatus === 'rejected'" style="margin-bottom: 20px">
+          <button
+            class="btn btn--primary btn--lg"
+            :disabled="applyingMachine"
+            @click="handleApplyMachine"
+          >
+            {{ applyingMachine ? '提交中...' : '申请机台使用' }}
+          </button>
+          <p v-if="machineStatus === 'rejected'" style="margin-top: 12px; font-size: 13px; color: var(--err)">
+            上次申请未通过，可以重新提交申请
+          </p>
+        </div>
+        <div v-else-if="machineStatus === 'pending'" class="machine-status machine-status--pending">
+          <span class="machine-status__dot"></span>
+          审批中，请耐心等待管理员审核
+        </div>
+        <div v-else-if="machineStatus === 'approved'" class="machine-status machine-status--approved">
+          <span class="machine-status__dot"></span>
+          机台使用权限已批准，可以上机操作
+        </div>
+
+        <NuxtLink to="/" class="btn btn--text" style="margin-top: 16px">返回首页</NuxtLink>
       </div>
     </div>
 
@@ -199,6 +222,10 @@ const { nodes, currentStage, allCompleted, fetchLearningPath } = useLearningPath
 
 const loading = ref(true)
 
+// 机台申请状态
+const machineStatus = ref<string>('none')
+const applyingMachine = ref(false)
+
 const pathMeta = ref({
   total_estimated_hours: 0,
   recommended_order: '',
@@ -259,6 +286,18 @@ const goToResources = (node: any) => {
   })
 }
 
+const handleApplyMachine = async () => {
+  applyingMachine.value = true
+  try {
+    const result = await api.applyMachine()
+    machineStatus.value = result.status
+  } catch (err: any) {
+    console.warn('机台申请失败:', err)
+  } finally {
+    applyingMachine.value = false
+  }
+}
+
 const goToPractice = (level: string) => {
   router.push({
     path: '/practice',
@@ -305,6 +344,14 @@ onMounted(async () => {
       }
     } catch (err) {
       console.warn('获取报告数据失败:', err)
+    }
+
+    // 获取机台审批状态
+    try {
+      const profile = await api.getMyProfile()
+      machineStatus.value = (profile as any).machine_approval_status || 'none'
+    } catch {
+      // 忽略
     }
   }
 
@@ -595,6 +642,45 @@ onMounted(async () => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ── 机台申请状态 ── */
+.machine-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.machine-status--pending {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+.machine-status--approved {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+.machine-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.machine-status--pending .machine-status__dot {
+  background: #D97706;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+.machine-status--approved .machine-status__dot {
+  background: #059669;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .4; }
 }
 
 @media (max-width: 760px) {

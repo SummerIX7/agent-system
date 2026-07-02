@@ -3,7 +3,7 @@
  */
 export function useAuth() {
   const token = useState<string>('auth_token', () => '')
-  const user = useState<{ id: number; username: string } | null>('auth_user', () => null)
+  const user = useState<{ id: number; username: string; role: string } | null>('auth_user', () => null)
   const isLoading = useState<boolean>('auth_loading', () => true)
 
   const isLoggedIn = computed(() => !!token.value)
@@ -22,7 +22,7 @@ export function useAuth() {
           })
           if (response.ok) {
             const data = await response.json()
-            user.value = { id: data.id, username: data.username }
+            user.value = { id: data.id, username: data.username, role: data.role || 'learner' }
           } else {
             // token 过期，清除
             token.value = ''
@@ -45,7 +45,7 @@ export function useAuth() {
   }
 
   // 设置用户信息
-  const setUser = (userInfo: { id: number; username: string }) => {
+  const setUser = (userInfo: { id: number; username: string; role?: string }) => {
     user.value = userInfo
   }
 

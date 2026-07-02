@@ -81,7 +81,7 @@ const columns: DataTableColumns<LearnerItem> = [
   },
 ]
 
-const approvalStatusOptions = [
+const approvalStatusOptions: any[] = [
   { label: '全部', value: null },
   { label: '未申请', value: 'none' },
   { label: '审批中', value: 'pending' },
@@ -89,7 +89,7 @@ const approvalStatusOptions = [
   { label: '未通过', value: 'rejected' },
 ]
 
-const levelOptions = [
+const levelOptions: any[] = [
   { label: '全部', value: null },
   { label: '初级', value: 'beginner' },
   { label: '中级', value: 'intermediate' },

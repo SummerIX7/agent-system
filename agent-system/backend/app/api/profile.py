@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +8,7 @@ from app.core.auth import get_current_user
 from app.models.database import get_db
 from app.models.schemas import LearnerProfileInput, LearnerProfile
 from app.models.learner import Learner
+from app.models.approval_log import ApprovalLog
 from app.models.user import User
 from app.agents.diagnosis import DiagnosisAgent
 from app.core.store import update_session, get_all_sessions
@@ -150,4 +153,44 @@ async def get_my_profile(
         overall_level=overall_level,
         recommended_difficulty=recommended_difficulty,
         learning_path=learner.learning_path or None,
+        machine_approval_status=learner.machine_approval_status or "none",
     )
+
+
+@router.post("/apply-machine")
+async def apply_machine_usage(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """学员申请机台使用权限"""
+    # 查找学员画像
+    stmt = select(Learner).where(Learner.user_id == current_user.id)
+    result = await db.execute(stmt)
+    learner = result.scalar_one_or_none()
+
+    if not learner:
+        raise HTTPException(status_code=404, detail="请先完成学习者画像")
+
+    if learner.machine_approval_status == "pending":
+        raise HTTPException(status_code=400, detail="已有审批中的申请，请耐心等待")
+
+    if learner.machine_approval_status == "approved":
+        raise HTTPException(status_code=400, detail="机台使用权限已批准，无需重复申请")
+
+    # 更新状态为 pending
+    learner.machine_approval_status = "pending"
+
+    # 记录申请日志
+    log = ApprovalLog(
+        learner_id=learner.id,
+        action="submit",
+        operator_id=current_user.id,
+        reason=None,
+    )
+    db.add(log)
+    await db.flush()
+
+    return {
+        "message": "申请已提交，请等待管理员审批",
+        "status": "pending",
+    }

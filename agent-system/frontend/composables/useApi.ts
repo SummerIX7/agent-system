@@ -54,19 +54,19 @@ export function useApi() {
   return {
     // 认证
     register: (data: { username: string; password: string; email?: string }) =>
-      request<{ access_token: string; user_id: number; username: string }>('/api/auth/register', {
+      request<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
     login: (data: { username: string; password: string }) =>
-      request<{ access_token: string; user_id: number; username: string }>('/api/auth/login', {
+      request<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
     getMe: () =>
-      request<{ id: number; username: string; email?: string }>('/api/auth/me'),
+      request<{ id: number; username: string; email?: string; role: string }>('/api/auth/me'),
 
     // 学习者画像
     createProfile: (data: LearnerProfileInput) =>
@@ -166,5 +166,11 @@ export function useApi() {
     // 领域
     getDomains: () =>
       request<DomainConfig[]>('/api/domains'),
+
+    // 机台使用申请
+    applyMachine: () =>
+      request<{ message: string; status: string }>('/api/profile/apply-machine', {
+        method: 'POST',
+      }),
   }
 }

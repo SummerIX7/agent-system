@@ -52,6 +52,7 @@ class LearnerProfile(BaseModel):
     overall_level: str = "beginner"
     recommended_difficulty: str = "beginner"
     learning_path: Optional[dict] = None
+    machine_approval_status: str = "none"
 
 
 # === 资源生成 ===
