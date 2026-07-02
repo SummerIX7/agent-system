@@ -35,12 +35,14 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     username: str
+    role: str
 
 
 class UserInfo(BaseModel):
     id: int
     username: str
     email: Optional[str] = None
+    role: str
 
 
 # ========== 注册 ==========
@@ -73,6 +75,7 @@ async def register(
         access_token=token,
         user_id=user.id,
         username=user.username,
+        role=user.role,
     )
 
 
@@ -99,6 +102,7 @@ async def login(
         access_token=token,
         user_id=user.id,
         username=user.username,
+        role=user.role,
     )
 
 
@@ -113,4 +117,5 @@ async def get_me(
         id=current_user.id,
         username=current_user.username,
         email=current_user.email,
+        role=current_user.role,
     )

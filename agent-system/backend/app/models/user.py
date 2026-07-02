@@ -19,6 +19,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True, comment="用户名")
     password_hash = Column(String(255), nullable=False, comment="密码哈希")
     email = Column(String(100), nullable=True, comment="邮箱")
+    role = Column(String(20), default="learner", nullable=False, index=True, comment="角色: learner | admin")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

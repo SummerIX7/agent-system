@@ -31,6 +31,11 @@ class Learner(Base):
     learning_path = Column(JsonText, nullable=True, comment="学习路径 [{stage, title, topics, estimated_hours, difficulty, prerequisites, resources_type}]")
     report_cache = Column(JsonText, nullable=True, comment="报告指标快照 {hallucination_rate, difficulty_match_rate, knowledge_coverage_rate, match_curve, learning_stats}")
 
+    # 机台使用审批
+    machine_approval_status = Column(String(20), default="none", nullable=False, index=True, comment="机器使用审批: none | pending | approved | rejected")
+    machine_approval_at = Column(DateTime, nullable=True, comment="审批时间")
+    machine_approval_by = Column(Integer, ForeignKey("users.id"), nullable=True, comment="审批人ID")
+
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

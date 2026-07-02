@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import get_settings
 from app.models.database import Base
 # 导入所有模型，确保 Alembic 能检测到
-from app.models import Learner, Resource, AgentLog, FeedbackRecord
+from app.models import Learner, Resource, AgentLog, FeedbackRecord, User, ApprovalLog
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL_SYNC)
