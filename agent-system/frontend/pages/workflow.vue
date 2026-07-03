@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 3</p>
+      <p class="page-head__eyebrow">步骤 3</p>
       <h1 class="page-head__title">Agent 协同</h1>
       <p class="page-head__desc">实时查看6个AI Agent的协同工作状态，从学情分析到试题生成的完整流程。</p>
     </div>
@@ -13,7 +13,7 @@
         {{ isConnected ? '实时已连接' : '未连接' }}
       </span>
       <span class="muted">·</span>
-      <span class="t2">Session: <span class="mono">{{ sessionId || '未设置' }}</span></span>
+      <span class="t2">会话: <span class="mono">{{ sessionId || '未设置' }}</span></span>
       <span style="margin-left: auto" :class="['badge', generating ? (currentProgress >= 100 ? 'badge--ok' : 'badge--accent') : 'badge--mute']">
         {{ generating ? (currentProgress >= 100 ? '生成完成' : '生成中...') : '等待触发' }}
       </span>

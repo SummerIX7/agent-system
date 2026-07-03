@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 5</p>
+      <p class="page-head__eyebrow">步骤 5</p>
       <h1 class="page-head__title">{{ testLabel }}</h1>
       <p class="page-head__desc">{{ testDescription }}</p>
     </div>
@@ -364,7 +364,15 @@ const saveProgress = () => {
 }
 
 // === 结果页操作 ===
-const goAdvanced = () => router.push({ path: '/practice', query: { level: 'advanced' } })
+const goAdvanced = async () => {
+  // 持久化基础考核通过状态，确保报告页能显示"提升考核"按钮
+  try {
+    await api.markBasicPassed(sessionId.value, accuracy.value)
+  } catch (err) {
+    console.warn('标记基础考核通过失败:', err)
+  }
+  router.push({ path: '/practice', query: { level: 'advanced' } })
+}
 const goResources = () => router.push('/resources')
 const goReport = () => router.push('/report')
 
