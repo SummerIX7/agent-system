@@ -1,0 +1,27 @@
+{
+  "profile_name": "编程师-相关专业-硕士-advanced-#054",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "材料成型及控制工程",
+  "major_related": true,
+  "work_experience_years": 15,
+  "learning_style": "visual",
+  "self_assessment": {
+    "手工G代码编程": "熟练",
+    "CAM软件编程(UG/Mastercam)": "熟练",
+    "工艺路线设计": "精通",
+    "刀具路径优化": "熟练",
+    "宏程序编写": "精通",
+    "多轴编程": "精通",
+    "加工仿真验证": "熟练",
+    "工艺文件编制": "熟练"
+  },
+  "goals": [
+    "学习编程师优化方法",
+    "精通编程师高级技术"
+  ],
+  "expected_difficulty": "advanced",
+  "profile_id": 54
+}

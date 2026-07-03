@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     MOCK_MODE: bool = False
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
 
     @property
     def DATABASE_URL(self) -> str:

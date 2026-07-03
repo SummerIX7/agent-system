@@ -8,6 +8,7 @@ import type {
   PracticalFeedbackInput,
   PracticalFeedbackResponse,
   VisualizationData,
+  CareerTrackConfig,
   DomainConfig,
 } from '~/types/api'
 
@@ -54,23 +55,23 @@ export function useApi() {
   return {
     // 认证
     register: (data: { username: string; password: string; email?: string }) =>
-      request<{ access_token: string; user_id: number; username: string }>('/api/auth/register', {
+      request<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
     login: (data: { username: string; password: string }) =>
-      request<{ access_token: string; user_id: number; username: string }>('/api/auth/login', {
+      request<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
     getMe: () =>
-      request<{ id: number; username: string; email?: string }>('/api/auth/me'),
+      request<{ id: number; username: string; email?: string; role: string }>('/api/auth/me'),
 
     // 学习者画像
     createProfile: (data: LearnerProfileInput) =>
-      request<LearnerProfile>('/api/profile', {
+      request<LearnerProfile>('/api/profile/', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -112,7 +113,7 @@ export function useApi() {
       request<VisualizationData>(`/api/visualization/${sessionId}`),
 
     // 历史
-    getHistory: (learnerId: number) =>
+    getHistory: (learnerId: number | string) =>
       request<any[]>(`/api/history/${learnerId}`),
 
     // 试题
@@ -157,14 +158,45 @@ export function useApi() {
         body: JSON.stringify(data),
       }),
 
+    markBasicPassed: (sessionId: string, basicScore: number = 70) =>
+      request<{ ok: boolean; stage: number; basic_test_passed: boolean }>(`/api/learning-path/${sessionId}/mark-basic-passed`, {
+        method: 'POST',
+        body: JSON.stringify({ basic_score: basicScore }),
+      }),
+
     generateNodeContent: (sessionId: string, stage: number) =>
       request<{ ok: boolean; stage: number; resource_count: number }>(`/api/learning-path/${sessionId}/generate-node-content`, {
         method: 'POST',
         body: JSON.stringify({ session_id: sessionId, stage }),
       }),
 
-    // 领域
+    // 职业方向
+    getCareerTracks: () =>
+      request<CareerTrackConfig[]>('/api/career-tracks'),
+    // 兼容
     getDomains: () =>
-      request<DomainConfig[]>('/api/domains'),
+      request<CareerTrackConfig[]>('/api/domains'),
+
+    // 知识图谱
+    getKnowledgeGraph: () =>
+      request<any>('/api/knowledge-graph'),
+
+    getKnowledgeGraphProgress: () =>
+      request<{ username: string; completed_nodes: string[]; total: number; percentage: number }>('/api/knowledge-graph/progress'),
+
+    getKnowledgeGraphTreeWithProgress: () =>
+      request<any>('/api/knowledge-graph/progress/tree'),
+
+    markKnowledgeNode: (nodeId: string, completed: boolean) =>
+      request<{ username: string; completed_nodes: string[]; total: number; percentage: number }>('/api/knowledge-graph/progress', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: nodeId, completed }),
+      }),
+
+    // 机台使用申请
+    applyMachine: () =>
+      request<{ message: string; status: string }>('/api/profile/apply-machine', {
+        method: 'POST',
+      }),
   }
 }

@@ -1,31 +1,26 @@
 {
-  "profile_name": "相关专业-本科-beginner-#034",
-  "domain": "python_data_analysis",
-  "domain_name": "Python 数据分析",
-  "education_background": "本科",
-  "education_label": "bachelor",
-  "major": "统计学",
+  "profile_name": "编程师-相关专业-大专-intermediate-#034",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "大专",
+  "education_label": "associate",
+  "major": "工业工程",
   "major_related": true,
-  "work_experience_years": 5,
+  "work_experience_years": 0.5,
   "learning_style": "theory",
   "self_assessment": {
-    "Python基础语法": "了解基础",
-    "NumPy数组操作": "不了解",
-    "Pandas数据处理": "不了解",
-    "Matplotlib绘图": "不了解",
-    "Seaborn可视化": "不了解",
-    "数据清洗与预处理": "不了解",
-    "统计分析基础": "不了解",
-    "Jupyter Notebook使用": "不了解"
+    "手工G代码编程": "不了解",
+    "CAM软件编程(UG/Mastercam)": "了解基础",
+    "工艺路线设计": "了解基础",
+    "刀具路径优化": "了解基础",
+    "宏程序编写": "了解基础",
+    "多轴编程": "了解基础",
+    "加工仿真验证": "了解基础",
+    "工艺文件编制": "熟练"
   },
   "goals": [
-    "掌握Python 数据分析入门知识"
+    "掌握编程师常用技术"
   ],
-  "expected_difficulty": "beginner",
-  "expected_level": "beginner",
-  "expected_knowledge_score_range": [
-    5,
-    30
-  ],
+  "expected_difficulty": "intermediate",
   "profile_id": 34
 }

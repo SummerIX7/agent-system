@@ -1,0 +1,27 @@
+{
+  "profile_name": "操机工-相关专业-本科-expert-#053",
+  "career_track": "operator",
+  "career_track_name": "操机工",
+  "education_background": "本科",
+  "education_label": "bachelor",
+  "major": "数控技术",
+  "major_related": true,
+  "work_experience_years": 15,
+  "learning_style": "visual",
+  "self_assessment": {
+    "机床操作面板使用": "精通",
+    "工件装夹与找正": "熟练",
+    "量具使用(卡尺/千分尺)": "了解基础",
+    "G代码阅读能力": "精通",
+    "刀具装卸操作": "熟练",
+    "切削液管理": "熟练",
+    "加工异常识别": "熟练",
+    "安全操作规范执行": "精通"
+  },
+  "goals": [
+    "成为操机工领域专家",
+    "研究操机工前沿技术"
+  ],
+  "expected_difficulty": "expert",
+  "profile_id": 53
+}

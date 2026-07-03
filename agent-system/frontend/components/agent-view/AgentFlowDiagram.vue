@@ -125,8 +125,10 @@
 
 <script setup lang="ts">
 import { useAgentWebSocket } from '~/composables/useAgentWebSocket'
+import { useSession } from '~/composables/useSession'
 
-const { agents, isConnected } = useAgentWebSocket()
+const { sessionId } = useSession()
+const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
 // Agent ID 映射（与后端 WebSocket 广播名称对应）
 const AGENT_MAP: Record<string, string> = {
@@ -142,7 +144,7 @@ const AGENT_MAP: Record<string, string> = {
 
 const getAgentStatus = (agentId: string): string => {
   const realId = AGENT_MAP[agentId]
-  const agent = agents.value.find(a => a.id === realId)
+  const agent = agents.value.find(a => a.name === realId)
   return agent?.status || 'idle'
 }
 

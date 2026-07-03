@@ -8,12 +8,12 @@
 
     <!-- 输入栏 -->
     <div class="trace-bar">
-      <input v-model="inputSid" class="inp" placeholder="输入 Session ID（如 user-1）" @keyup.enter="loadTrace" />
+      <input v-model="inputSid" class="inp" placeholder="输入会话 ID（如 user-1）" @keyup.enter="loadTrace" />
       <button class="btn btn--primary" :disabled="loading" @click="loadTrace">
         {{ loading ? '加载中...' : '加载追踪' }}
       </button>
       <span v-if="traceData" class="t2">
-        Topic: <b>{{ traceData.topic }}</b> ·
+        主题: <b>{{ traceData.topic }}</b> ·
         结果: <b :class="outcomeClass">{{ outcomeText }}</b>
       </span>
     </div>
@@ -24,7 +24,7 @@
         <!-- 连线 -->
         <div v-if="i > 0" class="tl-connector">
           <div class="tl-line" :class="{ 'tl-line--retry': isRetryEdge(i) }"></div>
-          <span v-if="isRetryEdge(i)" class="tl-retry-badge">retry</span>
+          <span v-if="isRetryEdge(i)" class="tl-retry-badge">重试</span>
         </div>
 
         <!-- 节点卡片 -->
@@ -75,11 +75,11 @@
                   </div>
                   <div v-if="openLlmCalls[`${i}-${ci}`]" class="tl-llm__body">
                     <div class="tl-llm__col">
-                      <div class="tl-llm__label"> Prompt</div>
+                      <div class="tl-llm__label"> 提示词</div>
                       <pre class="tl-code">{{ truncate(call.prompt, 6000) }}</pre>
                     </div>
                     <div class="tl-llm__col">
-                      <div class="tl-llm__label"> Response</div>
+                      <div class="tl-llm__label"> 响应</div>
                       <pre class="tl-code">{{ call.response }}</pre>
                     </div>
                   </div>
@@ -98,7 +98,7 @@
 
     <!-- 空状态 -->
     <div v-if="!traceData && !loading" class="tl-empty">
-      输入 Session ID 查看工作流追踪数据
+      输入会话 ID 查看工作流追踪数据
     </div>
   </div>
 </template>

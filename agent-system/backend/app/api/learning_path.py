@@ -2,7 +2,6 @@
 学习路径节点管理 API
 支持学习路径查看、当前节点获取、节点推进等功能
 """
-import json
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -15,7 +14,9 @@ from app.models.database import get_db
 from app.models.learner import Learner
 from app.models.resource import Resource
 from app.models.user import User
+from app.api.knowledge_graph import build_kg_progress_for_learner
 from app.agents.diagnosis import DiagnosisAgent
+from app.utils.db_helpers import retry_on_deadlock
 try:
     from app.graph.workflow import _broadcast
 except ImportError:
@@ -35,6 +36,11 @@ class AdvanceRequest(BaseModel):
     basic_score: float = 0.0       # 基础考核正确率
     advanced_score: float = 0.0    # 提升考核正确率
     test_feedback: list = []       # 答题反馈记录
+
+
+class MarkBasicPassedRequest(BaseModel):
+    """标记基础考核通过请求"""
+    basic_score: float = PASS_THRESHOLD * 100  # 基础考核正确率，默认 70%
 
 
 class NodeInfo(BaseModel):
@@ -133,18 +139,20 @@ async def _get_learning_path_from_any_source(session_id: str, db: AsyncSession =
 
     current_stage = int(session_data.get("current_stage", learning_path.get("current_stage", 1)))
 
-    # DB 降级：优先以 DB 数据为准
-    if db is not None and not learning_path.get("path"):
-        learner_id = session_data.get("learner_id", "")
-        if learner_id and learner_id != "unknown":
-            stmt = select(Learner).where(Learner.id == learner_id)
+    # DB 降级：直接从 DB 恢复，不依赖 session store 中有 learner_id
+    if db is not None and not learning_path.get("path") and session_id.startswith("user-"):
+        try:
+            user_id = int(session_id.split("-", 1)[1])
+            stmt = select(Learner).where(Learner.user_id == user_id)
             r = await db.execute(stmt)
             learner = r.scalar_one_or_none()
             if learner and learner.learning_path and learner.learning_path.get("path"):
                 learning_path = learner.learning_path
                 current_stage = int(learning_path.get("current_stage", 1))
                 _persist_learning_path(session_id, learning_path)
-                update_session(session_id, {"current_stage": current_stage})
+                update_session(session_id, {"current_stage": current_stage, "learner_id": str(learner.id)})
+        except (ValueError, IndexError):
+            pass
 
     return learning_path, current_stage
 
@@ -239,10 +247,11 @@ async def advance_node(
         "basic_test_passed": req.basic_score >= PASS_THRESHOLD,
         "advanced_score": req.advanced_score,
         "advanced_test_passed": can_advance,
-        "completed": True,
     })
 
     if can_advance:
+        # 只有提升考核通过后才标记节点完成
+        learning_path = _update_node_state(learning_path, current_stage, {"completed": True})
         new_stage = current_stage + 1
         learning_path["current_stage"] = new_stage
 
@@ -272,6 +281,22 @@ async def advance_node(
             result["all_completed"] = False
 
         _clear_node_cache(session_id)
+
+        # 节点推进成功后初始化知识图谱进度（如果尚未设置）
+        try:
+            from app.api.knowledge_graph import build_kg_progress_for_learner
+            if learner_id and learner_id != "unknown":
+                try:
+                    lid = int(learner_id)
+                    lr_stmt = select(Learner).where(Learner.id == lid)
+                    lr_result = await db.execute(lr_stmt)
+                    kg_learner = lr_result.scalar_one_or_none()
+                    if kg_learner and kg_learner.kg_progress is None:
+                        kg_learner.kg_progress = build_kg_progress_for_learner("")
+                except (ValueError, TypeError):
+                    pass
+        except Exception as e:
+            print(f"[警告] 知识图谱进度初始化失败: {e}")
     else:
         learning_path = _update_node_state(learning_path, current_stage, {"need_review": True})
         _persist_learning_path(session_id, learning_path)
@@ -282,13 +307,71 @@ async def advance_node(
     return result
 
 
-async def _persist_learning_path_to_db(db: AsyncSession, learner_id: str, learning_path: dict):
-    """将 learning_path 持久化到 learners 表"""
+@router.post("/{session_id}/mark-basic-passed")
+async def mark_basic_passed(
+    session_id: str,
+    req: MarkBasicPassedRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    标记当前节点基础考核已通过。
+    基础考核通过后、进入提升考核前调用，用于持久化基础考核状态。
+    """
+    learning_path, current_stage = await _get_learning_path_from_any_source(session_id, db)
+
+    # 更新当前节点状态
+    learning_path = _update_node_state(learning_path, current_stage, {
+        "basic_score": req.basic_score,
+        "basic_test_passed": True,
+    })
+
+    _persist_learning_path(session_id, learning_path)
+
+    # 持久化到数据库
+    session_data = get_session(session_id)
+    learner_id = session_data.get("learner_id", "")
+    if learner_id and learner_id != "unknown":
+        await _persist_learning_path_to_db(db, learner_id, learning_path)
+
+    return {
+        "ok": True,
+        "stage": current_stage,
+        "basic_test_passed": True,
+    }
+
+
+@retry_on_deadlock()
+async def _persist_learning_path_to_db(db: AsyncSession, learner_id: str | int, learning_path: dict):
+    """将 learning_path 持久化到 learners 表（含死锁重试）"""
+    try:
+        lid = int(learner_id)
+    except (ValueError, TypeError):
+        return
+    stmt = select(Learner).where(Learner.id == lid)
+    r = await db.execute(stmt)
+    learner = r.scalar_one_or_none()
+    if learner:
+        learner.learning_path = learning_path
+        await db.flush()
+
+
+@retry_on_deadlock()
+async def _persist_learner_path_and_cache(
+    db: AsyncSession, learner_id: str, learning_path: dict, report_cache=None
+):
+    """合并写入 learner 的 learning_path 和 report_cache（单次 flush，防死锁）。
+
+    用于 generate_node_content 端点：将原来两次 UPDATE learners
+    （_persist_learning_path_to_db + report_cache flush）合并为一次，
+    消除同一事务内多次 flush 同一行的死锁风险。
+    """
     stmt = select(Learner).where(Learner.id == learner_id)
     r = await db.execute(stmt)
     learner = r.scalar_one_or_none()
     if learner:
         learner.learning_path = learning_path
+        if report_cache is not None:
+            learner.report_cache = report_cache
         await db.flush()
 
 
@@ -338,10 +421,9 @@ async def generate_node_content(
     # 标记 has_resources
     learning_path = _update_node_state(learning_path, req.stage, {"has_resources": True})
     _persist_learning_path(session_id, learning_path)
-    if learner_id and learner_id != "unknown":
-        await _persist_learning_path_to_db(db, learner_id, learning_path)
 
-    # 重新计算报告快照
+    # 重新计算报告快照（先计算 cache，再合并写入 DB）
+    cache = None
     try:
         stmt_res = select(Resource).where(Resource.session_id == session_id, Resource.stage == req.stage)
         res_result = await db.execute(stmt_res)
@@ -351,15 +433,12 @@ async def generate_node_content(
             all_difficulties=[r.difficulty for r in stage_resources if r.difficulty],
             topic=topic, profile=profile, learning_path=learning_path,
         )
-        if learner_id and learner_id != "unknown":
-            stmt_l = select(Learner).where(Learner.id == learner_id)
-            r_l = await db.execute(stmt_l)
-            lr = r_l.scalar_one_or_none()
-            if lr:
-                lr.report_cache = cache
-                await db.flush()
     except Exception as e:
         print(f"[警告] 报告快照更新失败: {e}")
+
+    # 合并写入 DB：learning_path + report_cache 一次 UPDATE，避免多次 flush 同一行引发死锁
+    if learner_id and learner_id != "unknown":
+        await _persist_learner_path_and_cache(db, learner_id, learning_path, cache)
 
     _broadcast(session_id, "知识生成 Agent", "completed",
                f"节点{req.stage}资源+试题生成完成", 95)
@@ -369,9 +448,15 @@ async def generate_node_content(
     return {"ok": True, "stage": req.stage, "resource_count": resource_count}
 
 
+@retry_on_deadlock()
+async def _flush_learner_profile(db: AsyncSession, learner: Learner, next_stage: int):
+    """死锁重试：仅执行 db.flush()，learner 属性已在 _update_learner_profile 中更新"""
+    await db.flush()
+
+
 async def _update_learner_profile(
     db: AsyncSession,
-    learner_id: str,
+    learner_id: str | int,
     profile: dict,
     test_feedback: list,
     completed_stage: int,
@@ -379,7 +464,12 @@ async def _update_learner_profile(
 ):
     """根据答题反馈更新学习者画像和学情诊断"""
     # 1. 从数据库获取 Learner 记录
-    stmt = select(Learner).where(Learner.id == learner_id)
+    try:
+        lid = int(learner_id)
+    except (ValueError, TypeError):
+        print(f"[警告] 无效的 learner_id: {learner_id}")
+        return
+    stmt = select(Learner).where(Learner.id == lid)
     result = await db.execute(stmt)
     learner = result.scalar_one_or_none()
 
@@ -424,7 +514,7 @@ async def _update_learner_profile(
         new_profile = profile
         new_difficulty = profile.get("recommended_difficulty", "beginner")
 
-    # 5. 持久化到数据库
+    # 5. 持久化到数据库（对象属性已在内存中更新，flush 带死锁重试）
     learner.knowledge_points = new_profile.get("knowledge_points", kps)
     learner.blind_spots = new_profile.get("blind_spots", [])
     learner.overall_level = new_profile.get("overall_level", learner.overall_level)
@@ -437,7 +527,7 @@ async def _update_learner_profile(
             lp["current_stage"] = next_stage
             learner.learning_path = lp
 
-    await db.flush()
+    await _flush_learner_profile(db, learner, next_stage)
     print(f"[学情更新] learner_id={learner_id} 画像已更新，推进到第 {next_stage} 节点")
 
 

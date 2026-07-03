@@ -1,31 +1,27 @@
 {
-  "profile_name": "非相关专业-大专-beginner-#043",
-  "domain": "cnc",
-  "domain_name": "CNC 数控加工",
-  "education_background": "大专",
-  "education_label": "associate",
-  "major": "历史学",
-  "major_related": false,
-  "work_experience_years": 3,
+  "profile_name": "调机工-相关专业-高中-beginner-#043",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
+  "education_background": "高中",
+  "education_label": "high_school",
+  "major": "自动化",
+  "major_related": true,
+  "work_experience_years": 5,
   "learning_style": "visual",
   "self_assessment": {
-    "机械制图基础": "不了解",
-    "G 代码编程": "不了解",
-    "数控车床操作": "不了解",
-    "数控铣床操作": "不了解",
-    "CAM 软件应用": "不了解",
-    "刀具选择与管理": "不了解",
-    "切削参数优化": "不了解",
-    "测量与检测": "不了解"
+    "对刀操作": "不了解",
+    "刀具偏置设置": "不了解",
+    "夹具安装与调试": "不了解",
+    "切削参数调整": "不了解",
+    "首件试切与检测": "了解基础",
+    "程序试运行": "了解基础",
+    "加工精度调整": "不了解",
+    "设备故障排查": "熟练"
   },
   "goals": [
-    "掌握CNC 数控加工入门知识"
+    "学习调机工基本操作",
+    "掌握调机工入门知识"
   ],
   "expected_difficulty": "beginner",
-  "expected_level": "beginner",
-  "expected_knowledge_score_range": [
-    5,
-    30
-  ],
   "profile_id": 43
 }

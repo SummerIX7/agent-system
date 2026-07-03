@@ -28,6 +28,14 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ],
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' },
+      ],
     },
+  },
+
+  // 强制 knowledge-graph 页面禁用 SSR（vue-echarts 依赖浏览器 DOM API）
+  routeRules: {
+    '/knowledge-graph': { ssr: false },
   },
 })

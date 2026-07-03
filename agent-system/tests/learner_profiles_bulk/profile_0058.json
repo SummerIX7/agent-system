@@ -1,0 +1,26 @@
+{
+  "profile_name": "编程师-相关专业-博士-intermediate-#058",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "博士",
+  "education_label": "doctor",
+  "major": "自动化",
+  "major_related": true,
+  "work_experience_years": 1,
+  "learning_style": "practice",
+  "self_assessment": {
+    "手工G代码编程": "不了解",
+    "CAM软件编程(UG/Mastercam)": "了解基础",
+    "工艺路线设计": "了解基础",
+    "刀具路径优化": "熟练",
+    "宏程序编写": "了解基础",
+    "多轴编程": "熟练",
+    "加工仿真验证": "不了解",
+    "工艺文件编制": "不了解"
+  },
+  "goals": [
+    "掌握编程师常用技术"
+  ],
+  "expected_difficulty": "intermediate",
+  "profile_id": 58
+}

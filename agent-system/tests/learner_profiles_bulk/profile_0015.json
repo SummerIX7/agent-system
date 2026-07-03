@@ -1,31 +1,26 @@
 {
-  "profile_name": "相关专业-高中-beginner-#015",
-  "domain": "python_data_analysis",
-  "domain_name": "Python 数据分析",
+  "profile_name": "调机工-相关专业-高中-beginner-#015",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
   "education_background": "高中",
   "education_label": "high_school",
-  "major": "人工智能",
+  "major": "智能制造工程",
   "major_related": true,
   "work_experience_years": 0.5,
   "learning_style": "practice",
   "self_assessment": {
-    "Python基础语法": "不了解",
-    "NumPy数组操作": "不了解",
-    "Pandas数据处理": "了解基础",
-    "Matplotlib绘图": "不了解",
-    "Seaborn可视化": "不了解",
-    "数据清洗与预处理": "不了解",
-    "统计分析基础": "不了解",
-    "Jupyter Notebook使用": "不了解"
+    "对刀操作": "不了解",
+    "刀具偏置设置": "不了解",
+    "夹具安装与调试": "了解基础",
+    "切削参数调整": "不了解",
+    "首件试切与检测": "不了解",
+    "程序试运行": "不了解",
+    "加工精度调整": "不了解",
+    "设备故障排查": "不了解"
   },
   "goals": [
-    "了解Python 数据分析基础概念"
+    "了解调机工基础概念"
   ],
   "expected_difficulty": "beginner",
-  "expected_level": "beginner",
-  "expected_knowledge_score_range": [
-    5,
-    30
-  ],
   "profile_id": 15
 }

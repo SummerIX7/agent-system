@@ -8,8 +8,9 @@ from app.models.database import get_db
 from app.models.schemas import FeedbackInput, FeedbackResponse, PracticalFeedbackInput, PracticalFeedbackResponse
 from app.models.agent_state import FeedbackRecord
 from app.models.learner import Learner
+from app.models.user import User
 from app.core.llm import get_llm
-from app.core.store import add_feedback, get_session, get_all_sessions
+from app.core.store import add_feedback, get_session
 from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
 from app.agents.orchestrator import DecisionOrchestrator
 
@@ -101,21 +102,26 @@ async def submit_feedback(
     # 只有确实存在 learner_id 时才写入数据库（避免 foreign key 约束报错）
     if learner_id and learner_id != "unknown":
         current_stage = session.get("current_stage", 1)
-        test_level = feedback.model_dump().get("test_level", "") if hasattr(feedback, "model_dump") else ""
-        record = FeedbackRecord(
-            session_id=feedback.session_id,
-            learner_id=learner_id,
-            topic=feedback.topic,
-            question=feedback.question,
-            user_answer=feedback.user_answer,
-            correct_answer=feedback.correct_answer,
-            is_correct=correctness,
-            stage=current_stage,
-            test_level=test_level or None,
-            heuristic_question=heuristic,
-        )
-        db.add(record)
-        await db.flush()
+        try:
+            learner_id_int = int(learner_id)
+        except (ValueError, TypeError):
+            learner_id_int = None
+
+        if learner_id_int is not None:
+            record = FeedbackRecord(
+                session_id=feedback.session_id,
+                learner_id=learner_id_int,
+                topic=feedback.topic,
+                question=feedback.question,
+                user_answer=feedback.user_answer,
+                correct_answer=feedback.correct_answer,
+                is_correct=1 if is_correct else 0,
+                stage=current_stage,
+                test_level=None,
+                heuristic_question=heuristic,
+            )
+            db.add(record)
+            await db.flush()
 
     add_feedback(feedback.session_id, {
         "topic": feedback.topic,
@@ -130,32 +136,50 @@ async def submit_feedback(
 
     # P2-2: 学习路径二次更新闭环
     # 根据答题反馈动态调整学习路径，并持久化到数据库
-    if learner_id:
+    if learner_id and learner_id != "unknown":
         try:
-            # 获取当前学习路径
-            current_path = session.get("learning_path", {})
-            feedback_history = session.get("feedback", [])
+            try:
+                learner_id_int = int(learner_id)
+            except (ValueError, TypeError):
+                learner_id_int = None
 
-            if current_path and feedback_history:
-                # 调用决策调度 Agent 调整学习路径
-                adjusted_path = await orchestrator.adjust_learning_path(
-                    current_path,
-                    feedback_history
-                )
+            if learner_id_int is not None:
+                # 获取当前学习路径
+                current_path = session.get("learning_path", {})
+                feedback_history = session.get("feedback", [])
 
-                # 如果路径有变化，持久化到数据库
-                if adjusted_path != current_path:
-                    # 更新内存 store
-                    session["learning_path"] = adjusted_path
+                if current_path and feedback_history:
+                    # 调用决策调度 Agent 调整学习路径
+                    adjusted_path = await orchestrator.adjust_learning_path(
+                        current_path,
+                        feedback_history
+                    )
 
-                    # 持久化到数据库
-                    stmt = select(Learner).where(Learner.id == learner_id)
-                    result = await db.execute(stmt)
-                    learner = result.scalar_one_or_none()
-                    if learner:
-                        learner.learning_path = adjusted_path
-                        await db.flush()
-                        print(f"[学习路径] 已根据答题反馈调整并持久化: learner_id={learner_id}")
+                    # 如果路径有变化，持久化到数据库
+                    if adjusted_path != current_path:
+                        # 更新内存 store
+                        session["learning_path"] = adjusted_path
+
+                        # 持久化到数据库
+                        stmt = select(Learner).where(Learner.id == learner_id_int)
+                        result = await db.execute(stmt)
+                        learner = result.scalar_one_or_none()
+                        if learner:
+                            learner.learning_path = adjusted_path
+                            await db.flush()
+                            print(f"[学习路径] 已根据答题反馈调整并持久化: learner_id={learner_id_int}")
+
+                # 回答正确时初始化知识图谱进度（如果尚未设置）
+                if is_correct and learner_id_int is not None:
+                    try:
+                        from app.api.knowledge_graph import build_kg_progress_for_learner
+                        learner_stmt = select(Learner).where(Learner.id == learner_id_int)
+                        lr = await db.execute(learner_stmt)
+                        kg_learner = lr.scalar_one_or_none()
+                        if kg_learner and kg_learner.kg_progress is None:
+                            kg_learner.kg_progress = build_kg_progress_for_learner("")
+                    except Exception as e:
+                        print(f"[警告] 知识图谱进度初始化失败: {e}")
         except Exception as e:
             print(f"[警告] 学习路径调整失败: {e}")
             # 路径调整失败不影响反馈返回
@@ -268,19 +292,25 @@ async def submit_practical_feedback(
     # 2. 存入数据库（需要有效的 learner_id）
     learner_id = session.get("learner_id", "")
 
-    if learner_id:
-        record = FeedbackRecord(
-            session_id=feedback.session_id,
-            learner_id=learner_id,
-            topic=feedback.topic,
-            question=feedback.question[:500],
-            user_answer=feedback.user_answer,
-            correct_answer=feedback.correct_answer,
-            is_correct=1.0 if is_correct else 0.0,
-            heuristic_question=None,
-        )
-        db.add(record)
-        await db.flush()
+    if learner_id and learner_id != "unknown":
+        try:
+            learner_id_int = int(learner_id)
+        except (ValueError, TypeError):
+            learner_id_int = None
+
+        if learner_id_int is not None:
+            record = FeedbackRecord(
+                session_id=feedback.session_id,
+                learner_id=learner_id_int,
+                topic=feedback.topic,
+                question=feedback.question[:500],
+                user_answer=feedback.user_answer,
+                correct_answer=feedback.correct_answer,
+                is_correct=1 if is_correct else 0,
+                heuristic_question=None,
+            )
+            db.add(record)
+            await db.flush()
 
     # 3. 存入内存 store
     add_feedback(feedback.session_id, {
@@ -293,6 +323,22 @@ async def submit_practical_feedback(
         "feedback": grading.get("feedback", ""),
         "key_points": grading.get("key_points", []),
     })
+
+    # 3½. 初始化知识图谱进度（如果尚未设置）
+    try:
+        plid = int(learner_id) if learner_id and learner_id != "unknown" else None
+    except (ValueError, TypeError):
+        plid = None
+    if plid is not None:
+        try:
+            from app.api.knowledge_graph import build_kg_progress_for_learner
+            pl_stmt = select(Learner).where(Learner.id == plid)
+            pl_result = await db.execute(pl_stmt)
+            kg_learner = pl_result.scalar_one_or_none()
+            if kg_learner and kg_learner.kg_progress is None:
+                kg_learner.kg_progress = build_kg_progress_for_learner("")
+        except Exception:
+            pass
 
     # 4. 返回结果
     return PracticalFeedbackResponse(

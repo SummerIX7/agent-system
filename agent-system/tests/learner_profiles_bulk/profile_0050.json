@@ -1,32 +1,26 @@
 {
-  "profile_name": "非相关专业-硕士-expert-#050",
-  "domain": "python_data_analysis",
-  "domain_name": "Python 数据分析",
-  "education_background": "硕士",
-  "education_label": "master",
-  "major": "英语",
-  "major_related": false,
-  "work_experience_years": 5,
+  "profile_name": "操机工-相关专业-博士-beginner-#050",
+  "career_track": "operator",
+  "career_track_name": "操机工",
+  "education_background": "博士",
+  "education_label": "doctor",
+  "major": "数控技术",
+  "major_related": true,
+  "work_experience_years": 2,
   "learning_style": "visual",
   "self_assessment": {
-    "Python基础语法": "熟练",
-    "NumPy数组操作": "熟练",
-    "Pandas数据处理": "精通",
-    "Matplotlib绘图": "精通",
-    "Seaborn可视化": "精通",
-    "数据清洗与预处理": "精通",
-    "统计分析基础": "精通",
-    "Jupyter Notebook使用": "精通"
+    "机床操作面板使用": "不了解",
+    "工件装夹与找正": "了解基础",
+    "量具使用(卡尺/千分尺)": "不了解",
+    "G代码阅读能力": "不了解",
+    "刀具装卸操作": "不了解",
+    "切削液管理": "不了解",
+    "加工异常识别": "不了解",
+    "安全操作规范执行": "熟练"
   },
   "goals": [
-    "掌握Python 数据分析系统级优化",
-    "研究Python 数据分析前沿技术"
+    "了解操机工基础概念"
   ],
-  "expected_difficulty": "expert",
-  "expected_level": "expert",
-  "expected_knowledge_score_range": [
-    85,
-    100
-  ],
+  "expected_difficulty": "beginner",
   "profile_id": 50
 }

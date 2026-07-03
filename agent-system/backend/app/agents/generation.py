@@ -2,7 +2,7 @@ import json
 from typing import List, Optional
 
 from app.agents.base import BaseAgent
-from app.core.domains import DomainConfig, build_domain_prompt, get_default_domain
+from app.core.career_tracks import CareerTrackConfig, build_career_prompt, get_default_career_track
 
 
 class GenerationAgent(BaseAgent):
@@ -25,13 +25,13 @@ class GenerationAgent(BaseAgent):
 5. 多个知识点可引用同一来源，但每个知识点必须单独标注"""
 
     async def generate_lecture_notes(self, topic: str, profile: dict,
-                                     domain: Optional[DomainConfig] = None,
+                                     track: Optional[CareerTrackConfig] = None,
                                      retry_context: str = "") -> str:
         """生成定制化讲义（含知识溯源）"""
-        domain = domain or get_default_domain()
-        context = self.retrieve_context(f"{domain.name} {topic}")
+        track = track or get_default_career_track()
+        context = self.retrieve_context(f"{track.name} {topic}")
         difficulty = profile.get("recommended_difficulty", "beginner")
-        domain_prompt = build_domain_prompt(domain)
+        track_prompt = build_career_prompt(track)
 
         # 重试上下文：注入上一轮审核未通过的问题
         retry_section = ""
@@ -43,10 +43,10 @@ class GenerationAgent(BaseAgent):
 请特别注意修正上述问题，确保本轮内容不再出现同样错误。
 """
 
-        prompt = f"""你是一位资深的教育专家，专精于{domain.name}领域。请根据以下学习者画像和知识库内容，为该学习者生成一份个性化的学习讲义。
+        prompt = f"""你是一位资深的教育专家，专精于{track.name}领域。请根据以下学习者画像和知识库内容，为该学习者生成一份个性化的学习讲义。
 {retry_section}
 
-{domain_prompt}
+{track_prompt}
 
 [学习者画像]
 - 当前水平: {json.dumps(profile.get('knowledge_points', []), ensure_ascii=False)}
@@ -92,12 +92,12 @@ class GenerationAgent(BaseAgent):
         return await self.call_llm(prompt, label="生成讲义")
 
     async def generate_practical_guide(self, topic: str, profile: dict,
-                                       domain: Optional[DomainConfig] = None,
+                                       track: Optional[CareerTrackConfig] = None,
                                        retry_context: str = "") -> str:
         """生成实验指导（含知识溯源）"""
-        domain = domain or get_default_domain()
-        context = self.retrieve_context(f"{domain.name} {topic} 实践操作")
-        domain_prompt = build_domain_prompt(domain)
+        track = track or get_default_career_track()
+        context = self.retrieve_context(f"{track.name} {topic} 实践操作")
+        track_prompt = build_career_prompt(track)
 
         retry_section = ""
         if retry_context:
@@ -108,9 +108,9 @@ class GenerationAgent(BaseAgent):
 请特别注意修正上述问题，确保本轮内容不再出现同样错误。
 """
 
-        prompt = f"""你是一位资深的实验指导专家，专精于{domain.name}领域。请根据以下主题和知识库内容，生成一份实验指导手册。
+        prompt = f"""你是一位资深的实验指导专家，专精于{track.name}领域。请根据以下主题和知识库内容，生成一份实验指导手册。
 {retry_section}
-{domain_prompt}
+{track_prompt}
 
 [主题]
 {topic}
@@ -145,12 +145,12 @@ class GenerationAgent(BaseAgent):
         return await self.call_llm(prompt, label="生成实验指导")
 
     async def generate_project_case(self, topic: str, profile: dict,
-                                    domain: Optional[DomainConfig] = None,
+                                    track: Optional[CareerTrackConfig] = None,
                                     retry_context: str = "") -> str:
         """生成项目案例（含知识溯源）"""
-        domain = domain or get_default_domain()
-        context = self.retrieve_context(f"{domain.name} {topic} 项目案例 实战")
-        domain_prompt = build_domain_prompt(domain)
+        track = track or get_default_career_track()
+        context = self.retrieve_context(f"{track.name} {topic} 项目案例 实战")
+        track_prompt = build_career_prompt(track)
 
         retry_section = ""
         if retry_context:
@@ -161,10 +161,10 @@ class GenerationAgent(BaseAgent):
 请特别注意修正上述问题，确保本轮内容不再出现同样错误。
 """
 
-        prompt = f"""你是一位资深的项目实战导师，专精于{domain.name}领域。请根据以下主题，生成一个端到端的项目案例。
+        prompt = f"""你是一位资深的项目实战导师，专精于{track.name}领域。请根据以下主题，生成一个端到端的项目案例。
 {retry_section}
 
-{domain_prompt}
+{track_prompt}
 
 [主题]
 {topic}
@@ -202,21 +202,21 @@ class GenerationAgent(BaseAgent):
 
     async def run(self, topic: str = "", profile: dict = None,
                   resource_types: List[str] = None,
-                  domain: Optional[DomainConfig] = None,
+                  track: Optional[CareerTrackConfig] = None,
                   retry_context: str = "", **kwargs) -> dict:
         """执行资源生成（讲义 + 实验指导 + 项目案例）"""
         profile = profile or {}
         resource_types = resource_types or ["lecture", "guide", "project"]
-        domain = domain or get_default_domain()
+        track = track or get_default_career_track()
         results = {}
 
         if "lecture" in resource_types:
-            results["lecture"] = await self.generate_lecture_notes(topic, profile, domain, retry_context)
+            results["lecture"] = await self.generate_lecture_notes(topic, profile, track, retry_context)
 
         if "guide" in resource_types:
-            results["guide"] = await self.generate_practical_guide(topic, profile, domain, retry_context)
+            results["guide"] = await self.generate_practical_guide(topic, profile, track, retry_context)
 
         if "project" in resource_types:
-            results["project"] = await self.generate_project_case(topic, profile, domain, retry_context)
+            results["project"] = await self.generate_project_case(topic, profile, track, retry_context)
 
         return results

@@ -42,7 +42,7 @@
       </div>
       <div class="steps-grid">
         <div v-for="step in steps" :key="step.no">
-          <div style="font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 10px">Step {{ step.no }}</div>
+          <div style="font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 10px">步骤 {{ step.no }}</div>
           <div style="font-size: 14px; font-weight: 600">{{ step.title }}</div>
           <div style="font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.6">{{ step.desc }}</div>
         </div>

@@ -2,9 +2,10 @@
 批量生成 50+ 组差异化学习者画像（用于竞赛测试数据提交）。
 
 生成策略：
-- 2 个领域 × 4 个难度 × 多种学历 × 多种专业 = 50+ 组合
+- 3 个 CNC 职业方向 × 4 个难度 × 多种学历 × 多种专业 = 50+ 组合
+- 职业方向：操机工(operator) → 调机工(setup_tech) → 编程师(programmer)
 - 每个画像包含完整的输入输出字段
-- 输出到 tests/test_data/learner_profiles_bulk/ 目录
+- 输出到 tests/learner_profiles_bulk/ 目录
 """
 
 import json
@@ -18,25 +19,35 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 # ── 参数池 ──
 
-DOMAINS = [
+CAREER_TRACKS = [
     {
-        "code": "cnc",
-        "name": "CNC 数控加工",
-        "core_topics": ["数控编程", "G代码", "切削参数", "刀具管理", "加工工艺"],
+        "code": "operator",
+        "name": "操机工",
+        "description": "数控机床操作人员",
         "skills": [
-            "机械制图基础", "G 代码编程", "数控车床操作",
-            "数控铣床操作", "CAM 软件应用", "刀具选择与管理",
-            "切削参数优化", "测量与检测",
+            "机床操作面板使用", "工件装夹与找正", "量具使用(卡尺/千分尺)",
+            "G代码阅读能力", "刀具装卸操作", "切削液管理",
+            "加工异常识别", "安全操作规范执行",
         ],
     },
     {
-        "code": "python_data_analysis",
-        "name": "Python 数据分析",
-        "core_topics": ["Python基础", "NumPy", "Pandas", "数据可视化", "数据清洗"],
+        "code": "setup_tech",
+        "name": "调机工",
+        "description": "数控机床调试与设置人员",
         "skills": [
-            "Python基础语法", "NumPy数组操作", "Pandas数据处理",
-            "Matplotlib绘图", "Seaborn可视化", "数据清洗与预处理",
-            "统计分析基础", "Jupyter Notebook使用",
+            "对刀操作", "刀具偏置设置", "夹具安装与调试",
+            "切削参数调整", "首件试切与检测", "程序试运行",
+            "加工精度调整", "设备故障排查",
+        ],
+    },
+    {
+        "code": "programmer",
+        "name": "编程师",
+        "description": "数控编程与工艺规划人员",
+        "skills": [
+            "手工G代码编程", "CAM软件编程(UG/Mastercam)", "工艺路线设计",
+            "刀具路径优化", "宏程序编写", "多轴编程",
+            "加工仿真验证", "工艺文件编制",
         ],
     },
 ]
@@ -49,21 +60,12 @@ EDUCATION_LEVELS = [
     {"bg": "博士", "label": "doctor"},
 ]
 
-# 与领域相关的专业
-RELATED_MAJORS_BY_DOMAIN = {
-    "cnc": [
-        "机械工程", "机械设计制造及其自动化", "材料成型及控制工程",
-        "车辆工程", "机电一体化", "模具设计与制造", "数控技术",
-        "智能制造工程", "工业工程", "自动化",
-    ],
-    "python_data_analysis": [
-        "计算机科学与技术", "软件工程", "数据科学", "统计学",
-        "信息管理与信息系统", "数学与应用数学", "金融工程",
-        "人工智能", "电子信息工程", "电子商务",
-    ],
-}
+RELATED_MAJORS = [
+    "机械工程", "机械设计制造及其自动化", "材料成型及控制工程",
+    "车辆工程", "机电一体化", "模具设计与制造", "数控技术",
+    "智能制造工程", "工业工程", "自动化",
+]
 
-# 与领域无关的专业
 UNRELATED_MAJORS = [
     "英语", "会计学", "市场营销", "人力资源管理", "法学",
     "汉语言文学", "历史学", "行政管理", "旅游管理", "艺术设计",
@@ -74,38 +76,38 @@ EXPERIENCE_YEARS = [0, 0.5, 1, 2, 3, 5, 8, 10, 15]
 LEARNING_STYLES = ["practice", "theory", "visual"]
 GOAL_TEMPLATES = {
     "beginner": [
-        "了解{domain_name}基础概念",
-        "掌握{domain_name}入门知识",
-        "学习{domain_name}基本操作",
+        "了解{track_name}基础概念",
+        "掌握{track_name}入门知识",
+        "学习{track_name}基本操作",
     ],
     "intermediate": [
-        "提升{domain_name}实践技能",
-        "系统学习{domain_name}核心内容",
-        "掌握{domain_name}常用技术",
+        "提升{track_name}实践技能",
+        "系统学习{track_name}核心内容",
+        "掌握{track_name}常用技术",
     ],
     "advanced": [
-        "精通{domain_name}高级技术",
-        "学习{domain_name}优化方法",
-        "掌握{domain_name}复杂场景应用",
+        "精通{track_name}高级技术",
+        "学习{track_name}优化方法",
+        "掌握{track_name}复杂场景应用",
     ],
     "expert": [
-        "研究{domain_name}前沿技术",
-        "掌握{domain_name}系统级优化",
-        "成为{domain_name}领域专家",
+        "研究{track_name}前沿技术",
+        "掌握{track_name}系统级优化",
+        "成为{track_name}领域专家",
     ],
 }
 
 SELF_ASSESSMENT_LEVELS = ["不了解", "了解基础", "熟练", "精通"]
 
 
-def generate_profile(profile_id: int, domain: dict, difficulty: str,
+def generate_profile(profile_id: int, track: dict, difficulty: str,
                      education: dict, major: str, is_related: bool,
                      experience: float, learning_style: str) -> dict:
     """生成单个学习者画像"""
 
     # 根据难度级别设置技能自评
     if difficulty == "beginner":
-        skill_weights = [0.80, 0.15, 0.04, 0.01]  # 大部分"不了解"
+        skill_weights = [0.80, 0.15, 0.04, 0.01]
     elif difficulty == "intermediate":
         skill_weights = [0.30, 0.50, 0.15, 0.05]
     elif difficulty == "advanced":
@@ -114,20 +116,20 @@ def generate_profile(profile_id: int, domain: dict, difficulty: str,
         skill_weights = [0.01, 0.04, 0.35, 0.60]
 
     self_assessment = {}
-    for skill in domain["skills"]:
+    for skill in track["skills"]:
         level = random.choices(SELF_ASSESSMENT_LEVELS, weights=skill_weights, k=1)[0]
         self_assessment[skill] = level
 
     # 生成学习目标
     goal_template = random.choice(GOAL_TEMPLATES[difficulty])
-    goals = [goal_template.format(domain_name=domain["name"])]
-    # 50% 概率添加第二个目标
+    goals = [goal_template.format(track_name=track["name"])]
     if random.random() > 0.5:
         extra = random.choice(GOAL_TEMPLATES[difficulty])
         if extra != goal_template:
-            goals.append(extra.format(domain_name=domain["name"]))
+            goals.append(extra.format(track_name=track["name"]))
 
     profile_name = (
+        f"{track['name']}-"
         f"{'相关' if is_related else '非相关'}专业-"
         f"{education['bg']}-"
         f"{difficulty}-"
@@ -136,8 +138,8 @@ def generate_profile(profile_id: int, domain: dict, difficulty: str,
 
     return {
         "profile_name": profile_name,
-        "domain": domain["code"],
-        "domain_name": domain["name"],
+        "career_track": track["code"],
+        "career_track_name": track["name"],
         "education_background": education["bg"],
         "education_label": education["label"],
         "major": major,
@@ -147,27 +149,17 @@ def generate_profile(profile_id: int, domain: dict, difficulty: str,
         "self_assessment": self_assessment,
         "goals": goals,
         "expected_difficulty": difficulty,
-        "expected_level": difficulty,
-        "expected_knowledge_score_range": {
-            "beginner": [5, 30],
-            "intermediate": [30, 60],
-            "advanced": [60, 85],
-            "expert": [85, 100],
-        }[difficulty],
         "profile_id": profile_id,
     }
 
 
 def main():
-    random.seed(42)  # 确定性生成，便于复现
+    random.seed(42)
     profiles = []
     profile_id = 0
 
-    for domain in DOMAINS:
-        related_majors = RELATED_MAJORS_BY_DOMAIN[domain["code"]]
-
+    for track in CAREER_TRACKS:
         for difficulty in ["beginner", "intermediate", "advanced", "expert"]:
-            # 为每个 领域×难度 组合生成多个画像
             count_per_difficulty = {
                 "beginner": 5,
                 "intermediate": 4,
@@ -176,9 +168,8 @@ def main():
             }[difficulty]
 
             for i in range(count_per_difficulty):
-                # 交替相关专业和非相关专业
                 if i % 2 == 0 or difficulty in ("advanced", "expert"):
-                    major = random.choice(related_majors)
+                    major = random.choice(RELATED_MAJORS)
                     is_related = True
                 else:
                     major = random.choice(UNRELATED_MAJORS)
@@ -187,7 +178,6 @@ def main():
                 education = random.choice(EDUCATION_LEVELS)
                 experience = random.choice(EXPERIENCE_YEARS)
 
-                # 高级/专家级应有更多经验
                 if difficulty == "advanced" and experience < 2:
                     experience = random.choice([3, 5, 8])
                 elif difficulty == "expert" and experience < 5:
@@ -196,46 +186,40 @@ def main():
                 learning_style = random.choice(LEARNING_STYLES)
 
                 profile_id += 1
-                profile = generate_profile(
-                    profile_id, domain, difficulty, education,
+                profiles.append(generate_profile(
+                    profile_id, track, difficulty, education,
                     major, is_related, experience, learning_style,
-                )
-                profiles.append(profile)
+                ))
 
-    # 额外生成一批：更多变体覆盖边缘情况
-    for _ in range(22):  # 确保总数 >= 50
-        domain = random.choice(DOMAINS)
+    # 额外生成
+    for _ in range(22):
+        track = random.choice(CAREER_TRACKS)
         difficulty = random.choice(["beginner", "intermediate", "advanced", "expert"])
-        major = random.choice(
-            RELATED_MAJORS_BY_DOMAIN[domain["code"]]
-            if random.random() > 0.3
-            else UNRELATED_MAJORS
-        )
-        is_related = major in RELATED_MAJORS_BY_DOMAIN[domain["code"]]
+        major = random.choice(RELATED_MAJORS if random.random() > 0.3 else UNRELATED_MAJORS)
+        is_related = major in RELATED_MAJORS
         education = random.choice(EDUCATION_LEVELS)
         experience = random.choice(EXPERIENCE_YEARS)
         learning_style = random.choice(LEARNING_STYLES)
 
         profile_id += 1
-        profile = generate_profile(
-            profile_id, domain, difficulty, education,
+        profiles.append(generate_profile(
+            profile_id, track, difficulty, education,
             major, is_related, experience, learning_style,
-        )
-        profiles.append(profile)
+        ))
 
     # 输出
     print(f"共生成 {len(profiles)} 组学习者画像")
 
     # 统计
-    by_domain = {}
+    by_track = {}
     by_difficulty = {}
     for p in profiles:
-        d = p["domain"]
-        by_domain[d] = by_domain.get(d, 0) + 1
+        t = p["career_track"]
+        by_track[t] = by_track.get(t, 0) + 1
         diff = p["expected_difficulty"]
         by_difficulty[diff] = by_difficulty.get(diff, 0) + 1
 
-    print(f"领域分布: {by_domain}")
+    print(f"职业分布: {by_track}")
     print(f"难度分布: {by_difficulty}")
 
     # 写入 JSON 文件
@@ -256,7 +240,7 @@ def main():
     # 打印前 5 个画像作为预览
     print("\n━━━ 前 5 个画像预览 ━━━")
     for p in profiles[:5]:
-        print(f"  {p['profile_name']} | {p['domain']} | {p['education_background']} | {p['major']}")
+        print(f"  {p['profile_name']} | {p['career_track']} | {p['education_background']} | {p['major']}")
 
 
 if __name__ == "__main__":

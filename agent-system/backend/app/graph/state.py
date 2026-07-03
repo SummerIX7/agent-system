@@ -39,3 +39,4 @@ class AgentState(TypedDict, total=False):
     # 会话信息
     session_id: str              # 会话 ID
     learner_id: str              # 学习者 ID
+    career_track: str            # 职业方向代码 (operator/setup_tech/programmer)

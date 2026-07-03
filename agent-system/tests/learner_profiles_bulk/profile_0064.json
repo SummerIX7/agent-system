@@ -1,0 +1,26 @@
+{
+  "profile_name": "调机工-非相关专业-硕士-expert-#064",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "英语",
+  "major_related": false,
+  "work_experience_years": 3,
+  "learning_style": "visual",
+  "self_assessment": {
+    "对刀操作": "精通",
+    "刀具偏置设置": "熟练",
+    "夹具安装与调试": "精通",
+    "切削参数调整": "精通",
+    "首件试切与检测": "熟练",
+    "程序试运行": "精通",
+    "加工精度调整": "精通",
+    "设备故障排查": "精通"
+  },
+  "goals": [
+    "掌握调机工系统级优化"
+  ],
+  "expected_difficulty": "expert",
+  "profile_id": 64
+}

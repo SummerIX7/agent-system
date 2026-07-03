@@ -1,31 +1,26 @@
 {
-  "profile_name": "相关专业-博士-expert-#028",
-  "domain": "python_data_analysis",
-  "domain_name": "Python 数据分析",
+  "profile_name": "调机工-相关专业-博士-expert-#028",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
   "education_background": "博士",
   "education_label": "doctor",
-  "major": "数据科学",
+  "major": "材料成型及控制工程",
   "major_related": true,
   "work_experience_years": 8,
   "learning_style": "practice",
   "self_assessment": {
-    "Python基础语法": "精通",
-    "NumPy数组操作": "熟练",
-    "Pandas数据处理": "精通",
-    "Matplotlib绘图": "精通",
-    "Seaborn可视化": "精通",
-    "数据清洗与预处理": "熟练",
-    "统计分析基础": "精通",
-    "Jupyter Notebook使用": "熟练"
+    "对刀操作": "精通",
+    "刀具偏置设置": "熟练",
+    "夹具安装与调试": "精通",
+    "切削参数调整": "精通",
+    "首件试切与检测": "精通",
+    "程序试运行": "熟练",
+    "加工精度调整": "精通",
+    "设备故障排查": "熟练"
   },
   "goals": [
-    "研究Python 数据分析前沿技术"
+    "研究调机工前沿技术"
   ],
   "expected_difficulty": "expert",
-  "expected_level": "expert",
-  "expected_knowledge_score_range": [
-    85,
-    100
-  ],
   "profile_id": 28
 }

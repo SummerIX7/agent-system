@@ -4,6 +4,7 @@ export interface LearnerProfileInput {
   education_background: string
   major: string
   work_experience_years: number
+  career_track?: string
   self_assessment: Record<string, string>
   learning_style: string
   goals: string[]
@@ -23,6 +24,7 @@ export interface LearnerProfile {
   education_background: string
   major: string
   work_experience_years: number
+  career_track?: string
   self_assessment: Record<string, string>
   learning_style: string
   goals: string[]
@@ -30,6 +32,8 @@ export interface LearnerProfile {
   blind_spots: string[]
   overall_level: string
   recommended_difficulty: string
+  learning_path?: any
+  machine_approval_status?: string
 }
 
 // === 资源生成 ===
@@ -118,13 +122,17 @@ export interface AgentStatus {
   progress: number
 }
 
-// === 领域配置 ===
+// === 职业方向配置 ===
 
-export interface DomainConfig {
+export interface CareerTrackConfig {
   code: string
   name: string
   description: string
-  core_topics: string[]
+  order: number
   difficulty_levels: string[]
   self_assessment_skills: string[]
+  prerequisite_knowledge: string
 }
+
+// 兼容别名
+export type DomainConfig = CareerTrackConfig

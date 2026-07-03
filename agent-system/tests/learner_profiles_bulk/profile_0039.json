@@ -1,31 +1,26 @@
 {
-  "profile_name": "相关专业-博士-intermediate-#039",
-  "domain": "cnc",
-  "domain_name": "CNC 数控加工",
-  "education_background": "博士",
-  "education_label": "doctor",
-  "major": "机械设计制造及其自动化",
+  "profile_name": "编程师-相关专业-硕士-advanced-#039",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "机械工程",
   "major_related": true,
-  "work_experience_years": 0,
-  "learning_style": "theory",
+  "work_experience_years": 3,
+  "learning_style": "visual",
   "self_assessment": {
-    "机械制图基础": "了解基础",
-    "G 代码编程": "熟练",
-    "数控车床操作": "了解基础",
-    "数控铣床操作": "熟练",
-    "CAM 软件应用": "不了解",
-    "刀具选择与管理": "了解基础",
-    "切削参数优化": "熟练",
-    "测量与检测": "不了解"
+    "手工G代码编程": "熟练",
+    "CAM软件编程(UG/Mastercam)": "精通",
+    "工艺路线设计": "了解基础",
+    "刀具路径优化": "熟练",
+    "宏程序编写": "熟练",
+    "多轴编程": "熟练",
+    "加工仿真验证": "熟练",
+    "工艺文件编制": "精通"
   },
   "goals": [
-    "掌握CNC 数控加工常用技术"
+    "学习编程师优化方法"
   ],
-  "expected_difficulty": "intermediate",
-  "expected_level": "intermediate",
-  "expected_knowledge_score_range": [
-    30,
-    60
-  ],
+  "expected_difficulty": "advanced",
   "profile_id": 39
 }

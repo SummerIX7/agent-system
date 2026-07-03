@@ -1,31 +1,26 @@
 {
-  "profile_name": "相关专业-本科-expert-#047",
-  "domain": "cnc",
-  "domain_name": "CNC 数控加工",
+  "profile_name": "调机工-相关专业-本科-advanced-#047",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
   "education_background": "本科",
   "education_label": "bachelor",
-  "major": "智能制造工程",
+  "major": "机电一体化",
   "major_related": true,
-  "work_experience_years": 8,
-  "learning_style": "theory",
+  "work_experience_years": 3,
+  "learning_style": "practice",
   "self_assessment": {
-    "机械制图基础": "精通",
-    "G 代码编程": "熟练",
-    "数控车床操作": "精通",
-    "数控铣床操作": "熟练",
-    "CAM 软件应用": "精通",
-    "刀具选择与管理": "精通",
-    "切削参数优化": "熟练",
-    "测量与检测": "熟练"
+    "对刀操作": "了解基础",
+    "刀具偏置设置": "了解基础",
+    "夹具安装与调试": "了解基础",
+    "切削参数调整": "熟练",
+    "首件试切与检测": "熟练",
+    "程序试运行": "了解基础",
+    "加工精度调整": "熟练",
+    "设备故障排查": "熟练"
   },
   "goals": [
-    "研究CNC 数控加工前沿技术"
+    "掌握调机工复杂场景应用"
   ],
-  "expected_difficulty": "expert",
-  "expected_level": "expert",
-  "expected_knowledge_score_range": [
-    85,
-    100
-  ],
+  "expected_difficulty": "advanced",
   "profile_id": 47
 }

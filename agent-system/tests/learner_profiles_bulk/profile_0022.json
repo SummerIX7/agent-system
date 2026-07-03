@@ -1,31 +1,26 @@
 {
-  "profile_name": "相关专业-本科-intermediate-#022",
-  "domain": "python_data_analysis",
-  "domain_name": "Python 数据分析",
+  "profile_name": "调机工-相关专业-本科-intermediate-#022",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
   "education_background": "本科",
   "education_label": "bachelor",
-  "major": "电子信息工程",
+  "major": "工业工程",
   "major_related": true,
   "work_experience_years": 0.5,
   "learning_style": "practice",
   "self_assessment": {
-    "Python基础语法": "不了解",
-    "NumPy数组操作": "熟练",
-    "Pandas数据处理": "了解基础",
-    "Matplotlib绘图": "不了解",
-    "Seaborn可视化": "不了解",
-    "数据清洗与预处理": "不了解",
-    "统计分析基础": "了解基础",
-    "Jupyter Notebook使用": "了解基础"
+    "对刀操作": "不了解",
+    "刀具偏置设置": "熟练",
+    "夹具安装与调试": "了解基础",
+    "切削参数调整": "不了解",
+    "首件试切与检测": "不了解",
+    "程序试运行": "不了解",
+    "加工精度调整": "了解基础",
+    "设备故障排查": "了解基础"
   },
   "goals": [
-    "系统学习Python 数据分析核心内容"
+    "系统学习调机工核心内容"
   ],
   "expected_difficulty": "intermediate",
-  "expected_level": "intermediate",
-  "expected_knowledge_score_range": [
-    30,
-    60
-  ],
   "profile_id": 22
 }

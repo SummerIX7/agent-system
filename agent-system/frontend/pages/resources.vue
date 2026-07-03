@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 4</p>
+      <p class="page-head__eyebrow">步骤 4</p>
       <h1 class="page-head__title">个性化学习资源</h1>
       <p class="page-head__desc">系统已为你生成多类资源，每条知识点均标注来源出处，难度适配你的当前水平。</p>
     </div>

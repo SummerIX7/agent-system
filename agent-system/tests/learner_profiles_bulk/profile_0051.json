@@ -1,0 +1,26 @@
+{
+  "profile_name": "编程师-非相关专业-大专-intermediate-#051",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "大专",
+  "education_label": "associate",
+  "major": "会计学",
+  "major_related": false,
+  "work_experience_years": 2,
+  "learning_style": "practice",
+  "self_assessment": {
+    "手工G代码编程": "了解基础",
+    "CAM软件编程(UG/Mastercam)": "不了解",
+    "工艺路线设计": "了解基础",
+    "刀具路径优化": "了解基础",
+    "宏程序编写": "了解基础",
+    "多轴编程": "不了解",
+    "加工仿真验证": "不了解",
+    "工艺文件编制": "不了解"
+  },
+  "goals": [
+    "系统学习编程师核心内容"
+  ],
+  "expected_difficulty": "intermediate",
+  "profile_id": 51
+}

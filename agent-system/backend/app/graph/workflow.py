@@ -9,7 +9,7 @@ from app.agents.question_generator import QuestionGeneratorAgent
 from app.agents.orchestrator import DecisionOrchestrator
 from app.agents.review import ReviewAgent
 from app.graph.state import AgentState
-from app.core.domains import get_domain_from_input
+from app.core.career_tracks import get_career_track_from_input
 
 # Agent 实例
 diagnosis_agent = DiagnosisAgent()
@@ -126,8 +126,8 @@ async def generate_node(state: AgentState) -> dict:
 
     topic = state.get("topic", "")
     profile = state.get("profile", {})
-    domain_code = state.get("domain", "")
-    domain = get_domain_from_input({"domain": domain_code, **profile})
+    career_code = state.get("career_track", "operator")
+    track = get_career_track_from_input({"career_track": career_code, **profile})
     retry_count = state.get("retry_count", 0)
     generated = {}
     logs = []
@@ -147,17 +147,17 @@ async def generate_node(state: AgentState) -> dict:
 
     _broadcast(session_id, "知识生成 Agent", "running",
                "正在重新生成讲义（已注入审核反馈）..." if retry_context else "正在生成讲义...", 35)
-    generated["lecture"] = await generation_agent.generate_lecture_notes(topic, profile, domain, retry_context)
+    generated["lecture"] = await generation_agent.generate_lecture_notes(topic, profile, track, retry_context)
     logs.append("讲义生成完成")
 
     _broadcast(session_id, "知识生成 Agent", "running",
                "正在重新生成实验指导..." if retry_context else "正在生成实验指导...", 45)
-    generated["guide"] = await generation_agent.generate_practical_guide(topic, profile, domain, retry_context)
+    generated["guide"] = await generation_agent.generate_practical_guide(topic, profile, track, retry_context)
     logs.append("实验指导生成完成")
 
     _broadcast(session_id, "知识生成 Agent", "running",
                "正在重新生成项目案例..." if retry_context else "正在生成项目案例...", 55)
-    generated["project"] = await generation_agent.generate_project_case(topic, profile, domain, retry_context)
+    generated["project"] = await generation_agent.generate_project_case(topic, profile, track, retry_context)
     logs.append("项目案例生成完成")
 
     _broadcast(session_id, "知识生成 Agent", "running", "内容已生成，等待审核验证...", 58)
@@ -633,8 +633,8 @@ async def run_workflow(learner_input: dict, topic: str, session_id: str = "", pr
     if profile:
         learner_input = {**learner_input, **profile}
 
-    # 解析领域配置
-    domain = get_domain_from_input(learner_input)
+    # 解析职业方向配置
+    track = get_career_track_from_input(learner_input)
 
     initial_state: AgentState = {
         "learner_input": learner_input,
@@ -648,7 +648,7 @@ async def run_workflow(learner_input: dict, topic: str, session_id: str = "", pr
         "feedback_history": [],
         "decision_log": [],
         "session_id": session_id,
-        "domain": domain.code,
+        "career_track": track.code,
     }
 
     result = await workflow.ainvoke(initial_state)
@@ -768,8 +768,8 @@ async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: st
     if profile:
         learner_input = {**learner_input, **profile}
 
-    # 解析领域配置
-    domain = get_domain_from_input(learner_input)
+    # 解析职业方向配置
+    track = get_career_track_from_input(learner_input)
 
     initial_state: AgentState = {
         "learner_input": learner_input,
@@ -783,7 +783,7 @@ async def run_workflow_no_debate(learner_input: dict, topic: str, session_id: st
         "feedback_history": [],
         "decision_log": [],
         "session_id": session_id,
-        "domain": domain.code,
+        "career_track": track.code,
     }
 
     result = await workflow.ainvoke(initial_state)

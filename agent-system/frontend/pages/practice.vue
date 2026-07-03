@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 5</p>
+      <p class="page-head__eyebrow">步骤 5</p>
       <h1 class="page-head__title">{{ testLabel }}</h1>
       <p class="page-head__desc">{{ testDescription }}</p>
     </div>
@@ -50,7 +50,10 @@
         <button v-if="testLevel === 'advanced' && passed" class="btn btn--primary" @click="handleAdvance">
           {{ advanceResult?.all_completed ? '查看完整报告' : '更新学习路径' }}
         </button>
-        <button v-if="testLevel === 'advanced' && !passed" class="btn btn--ghost" @click="goReport">
+        <button v-if="testLevel === 'advanced' && !passed" class="btn btn--ghost" @click="goResources">
+          返回学习资源，重新学习
+        </button>
+        <button class="btn btn--ghost" @click="goReport">
           返回学习路径
         </button>
         <button class="btn btn--ghost" @click="retryTest">重新答题</button>
@@ -363,8 +366,21 @@ const saveProgress = () => {
   }).catch(() => {})
 }
 
+// 基础考核成绩（持久化到 session store 中，供高级考核推进时读取）
+const persistedBasicScore = useState<number>('basicTestScore', () => 0)
+
 // === 结果页操作 ===
-const goAdvanced = () => router.push({ path: '/practice', query: { level: 'advanced' } })
+const goAdvanced = async () => {
+  // 持久化基础考核通过状态，确保报告页能显示"提升考核"按钮
+  try {
+    await api.markBasicPassed(sessionId.value, accuracy.value)
+    // 保存基础考核成绩，供后续推进时使用
+    persistedBasicScore.value = accuracy.value
+  } catch (err) {
+    console.warn('标记基础考核通过失败:', err)
+  }
+  router.push({ path: '/practice', query: { level: 'advanced' } })
+}
 const goResources = () => router.push('/resources')
 const goReport = () => router.push('/report')
 
@@ -376,8 +392,10 @@ const retryTest = () => {
 const handleAdvance = async () => {
   advancing.value = true; advanceError.value = ''
   const feedback = questions.value.map(q => ({ topic: q.topic || '', question: q.question, is_correct: q.finalCorrect, finalCorrect: q.finalCorrect }))
-  const basicScore = testLevel.value === 'advanced' ? PASS_THRESHOLD : accuracy.value
-  const result = await useLearningPath().advanceNode(basicScore, accuracy.value, feedback)
+  // 在高级考核模式下使用之前保存的基础考核成绩，而非硬编码的阈值
+  const basicScore = testLevel.value === 'advanced' ? (persistedBasicScore.value || PASS_THRESHOLD) : accuracy.value
+  const { advanceNode } = useLearningPath()
+  const result = await advanceNode(basicScore, accuracy.value, feedback)
   advancing.value = false
   if (result) {
     advanceResult.value = result

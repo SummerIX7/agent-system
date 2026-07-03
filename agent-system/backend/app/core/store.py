@@ -419,6 +419,10 @@ def pop_ws_messages(session_id: str) -> list[dict]:
 # 频率限制（多用户部署必备）
 # ═══════════════════════════════════════════
 
+# ── 降级内存限流器（Redis 不可用时使用）──
+_fallback_ratelimits: dict[str, tuple[int, float]] = {}  # key → (count, window_start)
+
+
 def check_rate_limit(key: str, max_requests: int = 30, window_seconds: int = 60) -> bool:
     """
     检查频率限制，返回 True 表示允许通过。
@@ -429,10 +433,27 @@ def check_rate_limit(key: str, max_requests: int = 30, window_seconds: int = 60)
       - "ip:{client_ip}:generate"    按 IP 限流
       - "global:generate"            全局限流
     """
+    import time as _time_module
+
     r = _get_redis()
 
     if not _is_redis_ok(r):
-        return True  # Redis 不可用时放行（降级策略）
+        # ── 降级：内存限流器 ──
+        now = _time_module.time()
+        rkey = f"{KEY_RATELIMIT}:{key}"
+        if rkey in _fallback_ratelimits:
+            count, window_start = _fallback_ratelimits[rkey]
+            if now - window_start > window_seconds:
+                # 窗口过期，重置
+                _fallback_ratelimits[rkey] = (1, now)
+                return True
+            if count >= max_requests:
+                return False
+            _fallback_ratelimits[rkey] = (count + 1, window_start)
+            return True
+        else:
+            _fallback_ratelimits[rkey] = (1, now)
+            return True
 
     rkey = f"{KEY_RATELIMIT}:{key}"
     current = r.incr(rkey)

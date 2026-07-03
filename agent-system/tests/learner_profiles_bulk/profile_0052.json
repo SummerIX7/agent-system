@@ -1,0 +1,27 @@
+{
+  "profile_name": "操机工-相关专业-大专-advanced-#052",
+  "career_track": "operator",
+  "career_track_name": "操机工",
+  "education_background": "大专",
+  "education_label": "associate",
+  "major": "自动化",
+  "major_related": true,
+  "work_experience_years": 8,
+  "learning_style": "practice",
+  "self_assessment": {
+    "机床操作面板使用": "熟练",
+    "工件装夹与找正": "熟练",
+    "量具使用(卡尺/千分尺)": "精通",
+    "G代码阅读能力": "精通",
+    "刀具装卸操作": "了解基础",
+    "切削液管理": "了解基础",
+    "加工异常识别": "熟练",
+    "安全操作规范执行": "熟练"
+  },
+  "goals": [
+    "掌握操机工复杂场景应用",
+    "学习操机工优化方法"
+  ],
+  "expected_difficulty": "advanced",
+  "profile_id": 52
+}

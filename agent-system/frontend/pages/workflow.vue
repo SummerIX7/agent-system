@@ -1,7 +1,7 @@
 <template>
   <div class="page page--wide">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 3</p>
+      <p class="page-head__eyebrow">步骤 3</p>
       <h1 class="page-head__title">Agent 协同</h1>
       <p class="page-head__desc">实时查看6个AI Agent的协同工作状态，从学情分析到试题生成的完整流程。</p>
     </div>
@@ -13,9 +13,9 @@
         {{ isConnected ? '实时已连接' : '未连接' }}
       </span>
       <span class="muted">·</span>
-      <span class="t2">Session: <span class="mono">{{ sessionId || '未设置' }}</span></span>
-      <span style="margin-left: auto" :class="['badge', generating ? (currentProgress >= 100 ? 'badge--ok' : 'badge--accent') : 'badge--mute']">
-        {{ generating ? (currentProgress >= 100 ? '生成完成' : '生成中...') : '等待触发' }}
+      <span class="t2">会话: <span class="mono">{{ sessionId || '未设置' }}</span></span>
+      <span style="margin-left: auto" :class="['badge', hasExistingResources ? 'badge--ok' : generating ? (currentProgress >= 100 ? 'badge--ok' : 'badge--accent') : 'badge--mute']">
+        {{ hasExistingResources ? '已有资源' : generating ? (currentProgress >= 100 ? '生成完成' : '生成中...') : '等待触发' }}
       </span>
     </div>
 
@@ -62,10 +62,10 @@
     <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
       <button
         class="btn btn--primary btn--lg"
-        :disabled="!sessionId || generating"
+        :disabled="!sessionId || generating || checkingResources"
         @click="startGenerate"
       >
-        {{ generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : '触发资源生成' }}
+        {{ checkingResources ? '检查中...' : generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : hasExistingResources ? '重新生成资源' : '触发资源生成' }}
       </button>
       <NuxtLink to="/report" class="btn btn--ghost btn--lg" :class="{ 'opacity-50 pointer-events-none': generating && currentProgress < 100 }">
         查看学习报告 →
@@ -75,16 +75,21 @@
 </template>
 
 <script setup lang="ts">
+// 保持页面状态：避免每次切换都重新初始化 agent 并触发 WS 重连
+definePageMeta({ keepalive: true })
+
 const { sessionId, profile } = useSession()
 const api = useApi()
 
 const currentProgress = ref(0)
 const currentMessage = ref('准备中...')
 const generating = ref(false)
+const hasExistingResources = ref(false)
+const checkingResources = ref(true)
 
 const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
-if (agents.value.length === 0) {
+function initAgents() {
   agents.value = [
     { name: '学情分析 Agent', status: 'idle', message: '等待启动', progress: 0 },
     { name: '路径规划 Agent', status: 'idle', message: '等待启动', progress: 0 },
@@ -94,6 +99,41 @@ if (agents.value.length === 0) {
     { name: '决策调度 Agent', status: 'idle', message: '等待启动', progress: 0 },
   ]
 }
+
+if (agents.value.length === 0) {
+  initAgents()
+}
+
+// 页面加载时检查是否已有资源，有则恢复完成状态
+async function checkExistingResources() {
+  if (!sessionId.value) {
+    checkingResources.value = false
+    return
+  }
+  try {
+    const resources = await api.getResources(sessionId.value)
+    if (resources && resources.length > 0) {
+      hasExistingResources.value = true
+      currentProgress.value = 100
+      currentMessage.value = `已有 ${resources.length} 个资源（无需重新生成）`
+      // 恢复 Agent 完成状态
+      agents.value = agents.value.map((a, i) => ({
+        ...a,
+        status: 'completed' as const,
+        message: ['学情分析完成', '路径规划完成', '知识生成完成', '审核纠偏完成', '试题生成完成', '决策调度完成'][i] || '已完成',
+        progress: 100,
+      }))
+    }
+  } catch {
+    // 忽略，可能没有资源
+  } finally {
+    checkingResources.value = false
+  }
+}
+
+onMounted(() => {
+  checkExistingResources()
+})
 
 // 获取状态徽章样式
 const getStatusBadgeClass = (status: string): string => {
@@ -146,13 +186,15 @@ watch(() => agents.value, (newAgents) => {
 }, { deep: true })
 
 const startGenerate = async () => {
-  if (!sessionId.value) return
+  if (!sessionId.value || generating.value) return
 
   generating.value = true
   currentProgress.value = 0
   currentMessage.value = '启动工作流...'
+  hasExistingResources.value = false
 
-  agents.value = agents.value.map(a => ({ ...a, status: 'idle' as const, message: '等待启动', progress: 0 }))
+  // 重置 agent 状态
+  initAgents()
 
   try {
     const goals = profile.value?.goals || []
@@ -166,7 +208,9 @@ const startGenerate = async () => {
 
     currentProgress.value = 100
     currentMessage.value = `已生成 ${result.length} 个资源`
+    hasExistingResources.value = true
   } catch (err: any) {
+    currentMessage.value = `生成失败: ${err.message || '未知错误'}`
     console.error('生成失败:', err)
   } finally {
     setTimeout(() => {

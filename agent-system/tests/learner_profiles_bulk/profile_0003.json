@@ -1,7 +1,7 @@
 {
-  "profile_name": "相关专业-高中-beginner-#003",
-  "domain": "cnc",
-  "domain_name": "CNC 数控加工",
+  "profile_name": "操机工-相关专业-高中-beginner-#003",
+  "career_track": "operator",
+  "career_track_name": "操机工",
   "education_background": "高中",
   "education_label": "high_school",
   "major": "数控技术",
@@ -9,24 +9,19 @@
   "work_experience_years": 5,
   "learning_style": "theory",
   "self_assessment": {
-    "机械制图基础": "不了解",
-    "G 代码编程": "了解基础",
-    "数控车床操作": "不了解",
-    "数控铣床操作": "不了解",
-    "CAM 软件应用": "熟练",
-    "刀具选择与管理": "不了解",
-    "切削参数优化": "不了解",
-    "测量与检测": "了解基础"
+    "机床操作面板使用": "不了解",
+    "工件装夹与找正": "了解基础",
+    "量具使用(卡尺/千分尺)": "不了解",
+    "G代码阅读能力": "不了解",
+    "刀具装卸操作": "熟练",
+    "切削液管理": "不了解",
+    "加工异常识别": "不了解",
+    "安全操作规范执行": "了解基础"
   },
   "goals": [
-    "学习CNC 数控加工基本操作",
-    "掌握CNC 数控加工入门知识"
+    "学习操机工基本操作",
+    "掌握操机工入门知识"
   ],
   "expected_difficulty": "beginner",
-  "expected_level": "beginner",
-  "expected_knowledge_score_range": [
-    5,
-    30
-  ],
   "profile_id": 3
 }

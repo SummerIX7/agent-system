@@ -76,33 +76,47 @@ async def generate_resources(
         )
         resources.append(resource_data)
 
-        # 只有标准资源类型才写入数据库
-        if res_type in DB_RESOURCE_TYPES:
-            review = review_results.get(res_type, {})
-            db_resource = Resource(
-                learner_id=learner_id or "unknown",
-                session_id=request.session_id,
-                resource_type=res_type,
-                content=res.get("content", ""),
-                topic=res.get("topic", request.topic),
-                difficulty=res.get("difficulty", "beginner"),
-                stage=res_stage,
-                sources=res.get("sources", None),
-                review_score=review.get("score", None),
-                review_passed="passed" if review.get("passed", True) else "failed",
-            )
-            db.add(db_resource)
+        # 只有标准资源类型才写入数据库，且需要有效 learner_id
+        if res_type in DB_RESOURCE_TYPES and learner_id and learner_id != "unknown":
+            try:
+                learner_id_int = int(learner_id)
+            except (ValueError, TypeError):
+                learner_id_int = None
+
+            if learner_id_int is not None:
+                review = review_results.get(res_type, {})
+                db_resource = Resource(
+                    learner_id=learner_id_int,
+                    session_id=request.session_id,
+                    resource_type=res_type,
+                    content=res.get("content", ""),
+                    topic=res.get("topic", request.topic),
+                    difficulty=res.get("difficulty", "beginner"),
+                    stage=res_stage,
+                    sources=res.get("sources", None),
+                    review_score=review.get("score", None),
+                    review_passed="passed" if review.get("passed", True) else "failed",
+                )
+                db.add(db_resource)
 
         # 所有资源都存入内存 store（包括 learning_path）
         add_resource(request.session_id, {**resource_data.model_dump(), "stage": res_stage})
 
     # 将学习路径持久化到 Learner 表（含 node_states 初始化）
     learning_path_data = result.get("learning_path", {})
-    if learning_path_data and learner_id:
-        from app.models.learner import Learner as LearnerModel
-        stmt_lp = select(LearnerModel).where(LearnerModel.id == learner_id)
-        result_lp = await db.execute(stmt_lp)
-        learner_record = result_lp.scalar_one_or_none()
+    if learning_path_data and learner_id and learner_id != "unknown":
+        try:
+            lp_learner_id = int(learner_id)
+        except (ValueError, TypeError):
+            lp_learner_id = None
+        if lp_learner_id is not None:
+            from app.models.learner import Learner as LearnerModel
+            stmt_lp = select(LearnerModel).where(LearnerModel.id == lp_learner_id)
+            result_lp = await db.execute(stmt_lp)
+            learner_record = result_lp.scalar_one_or_none()
+        else:
+            learner_record = None
+
         if learner_record:
             # 初始化每个节点的 node_states 到 learning_path 中
             for stage in learning_path_data.get("path", []):
@@ -147,8 +161,14 @@ async def generate_resources(
                 )
                 learner_record.report_cache = report_cache
                 print(f"[报告快照] 已计算并持久化")
+
             except Exception as e:
                 print(f"[警告] 报告快照计算失败: {e}")
+
+            # 初始化知识图谱进度（如果尚未设置）
+            if learner_record and learner_record.kg_progress is None:
+                from app.api.knowledge_graph import build_kg_progress_for_learner
+                learner_record.kg_progress = build_kg_progress_for_learner("")
 
     await db.flush()
     return resources

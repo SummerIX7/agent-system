@@ -1,0 +1,27 @@
+{
+  "profile_name": "操机工-相关专业-硕士-intermediate-#056",
+  "career_track": "operator",
+  "career_track_name": "操机工",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "自动化",
+  "major_related": true,
+  "work_experience_years": 10,
+  "learning_style": "practice",
+  "self_assessment": {
+    "机床操作面板使用": "不了解",
+    "工件装夹与找正": "了解基础",
+    "量具使用(卡尺/千分尺)": "熟练",
+    "G代码阅读能力": "了解基础",
+    "刀具装卸操作": "了解基础",
+    "切削液管理": "不了解",
+    "加工异常识别": "精通",
+    "安全操作规范执行": "了解基础"
+  },
+  "goals": [
+    "提升操机工实践技能",
+    "系统学习操机工核心内容"
+  ],
+  "expected_difficulty": "intermediate",
+  "profile_id": 56
+}

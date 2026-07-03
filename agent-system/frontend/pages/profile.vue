@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-head">
-      <p class="page-head__eyebrow">Step 1</p>
+      <p class="page-head__eyebrow">步骤 1</p>
       <h1 class="page-head__title">学习者画像</h1>
       <p class="page-head__desc">请填写您的学习背景和目标，以便系统为您生成个性化学习资源。画像越准确，学情诊断与资源生成就越贴合您的实际水平。</p>
     </div>
@@ -35,9 +35,29 @@
         </div>
 
         <div class="field">
-          <label class="field__label">学习领域 <span style="color: var(--err)">*</span></label>
-          <select v-model="formState.domain" class="select" @change="onDomainChange">
-            <option v-for="d in domains" :key="d.code" :value="d.code">{{ d.name }}</option>
+          <label class="field__label">职业方向 <span style="color: var(--err)">*</span></label>
+          <div class="career-ladder">
+            <button
+              v-for="t in careerTracks"
+              :key="t.code"
+              class="career-ladder__btn"
+              :class="{ active: formState.career_track === t.code }"
+              @click="onCareerChange(t.code)"
+            >
+              <span class="career-ladder__order">L{{ t.order }}</span>
+              <span class="career-ladder__name">{{ t.name }}</span>
+            </button>
+          </div>
+          <p v-if="selectedTrack" class="career-desc">{{ selectedTrack.description }}</p>
+        </div>
+
+        <div class="field">
+          <label class="field__label">当前水平</label>
+          <select v-model="formState.current_level" class="select">
+            <option value="beginner">入门（零基础）</option>
+            <option value="intermediate">熟练（能独立工作）</option>
+            <option value="advanced">精通（能指导他人）</option>
+            <option value="expert">专家（行业标杆）</option>
           </select>
         </div>
 
@@ -92,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import type { DomainConfig } from '~/types/api'
+import type { CareerTrackConfig } from '~/types/api'
 
 const router = useRouter()
 const api = useApi()
@@ -102,8 +122,9 @@ const { setSession, setProfile } = useSession()
 const loading = ref(false)
 const profileLoaded = ref(false)
 
-// 领域列表
-const domains = ref<DomainConfig[]>([])
+// 职业方向列表
+const careerTracks = ref<CareerTrackConfig[]>([])
+const selectedTrack = computed(() => careerTracks.value.find(t => t.code === formState.career_track))
 
 // 等认证状态恢复后再判断
 watch(authLoading, async (val) => {
@@ -112,15 +133,15 @@ watch(authLoading, async (val) => {
   }
 }, { immediate: true })
 
-// 登录后自动加载已有画像 + 领域列表
+// 登录后自动加载已有画像 + 职业方向列表
 onMounted(async () => {
   if (!isLoggedIn.value) return
 
-  // 加载可用领域
+  // 加载可用职业方向
   try {
-    domains.value = await api.getDomains()
+    careerTracks.value = await api.getCareerTracks()
   } catch {
-    console.warn('加载领域列表失败')
+    console.warn('加载职业方向列表失败')
   }
 
   // 加载已有画像
@@ -134,7 +155,8 @@ onMounted(async () => {
       formState.major = existing.major || ''
       formState.work_experience_years = existing.work_experience_years || 0
       formState.learning_style = existing.learning_style || 'practice'
-      formState.domain = (existing as any).domain || 'cnc'
+      formState.career_track = existing.career_track || 'operator'
+      formState.current_level = existing.recommended_difficulty || 'beginner'
       formState.self_assessment = existing.self_assessment || {}
       formState.goals = existing.goals?.length ? existing.goals : ['']
       profileLoaded.value = true
@@ -144,14 +166,15 @@ onMounted(async () => {
   }
 })
 
-// 当前领域的技能自评项
+// 当前职业方向的技能自评项
 const skillOptions = computed(() => {
-  const selected = domains.value.find(d => d.code === formState.domain)
+  const selected = careerTracks.value.find(t => t.code === formState.career_track)
   return selected?.self_assessment_skills || []
 })
 
-// 领域切换时重置技能评估
-function onDomainChange() {
+// 职业方向切换时重置技能评估
+function onCareerChange(code: string) {
+  formState.career_track = code
   formState.self_assessment = {}
 }
 
@@ -160,7 +183,8 @@ const formState = reactive({
   major: '',
   work_experience_years: 0,
   learning_style: 'practice',
-  domain: 'cnc',
+  career_track: 'operator',
+  current_level: 'beginner',
   self_assessment: {} as Record<string, string>,
   goals: [''],
 })
@@ -192,7 +216,7 @@ const submitProfile = async () => {
       self_assessment: formState.self_assessment,
       learning_style: formState.learning_style || 'practice',
       goals: formState.goals.filter(g => g.trim()),
-      domain: formState.domain || undefined,
+      career_track: formState.career_track || 'operator',
     })
 
     // 存入全局状态
@@ -234,6 +258,51 @@ const submitProfile = async () => {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
+}
+.career-ladder {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.career-ladder__btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+}
+.career-ladder__btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.career-ladder__btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.career-ladder__order {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  font-family: var(--mono);
+  margin-bottom: 2px;
+}
+.career-ladder__btn.active .career-ladder__order {
+  color: var(--accent);
+}
+.career-ladder__name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.career-desc {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-top: 8px;
+  line-height: 1.6;
 }
 @media (max-width: 760px) {
   .profile-grid { grid-template-columns: 1fr; }

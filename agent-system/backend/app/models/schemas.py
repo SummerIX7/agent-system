@@ -33,6 +33,7 @@ class LearnerProfileInput(BaseModel):
     education_background: str
     major: str
     work_experience_years: float = 0
+    career_track: str = "operator"  # 职业方向: operator / setup_tech / programmer
     self_assessment: Dict[str, str] = {}
     learning_style: str = "practice"
     goals: List[str] = []
@@ -44,6 +45,7 @@ class LearnerProfile(BaseModel):
     education_background: str
     major: str
     work_experience_years: float
+    career_track: str = "operator"  # 职业方向
     self_assessment: Dict[str, str]
     learning_style: str
     goals: List[str]
@@ -52,6 +54,7 @@ class LearnerProfile(BaseModel):
     overall_level: str = "beginner"
     recommended_difficulty: str = "beginner"
     learning_path: Optional[dict] = None
+    machine_approval_status: str = "none"
 
 
 # === 资源生成 ===

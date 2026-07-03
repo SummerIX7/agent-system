@@ -1,7 +1,7 @@
 import json
 
 from app.agents.base import BaseAgent
-from app.core.domains import get_domain_from_input, build_domain_prompt
+from app.core.career_tracks import get_career_track_from_input, build_career_prompt
 
 
 class QuestionGeneratorAgent(BaseAgent):
@@ -10,17 +10,17 @@ class QuestionGeneratorAgent(BaseAgent):
     async def generate_questions(self, topic: str, difficulty: str, profile: dict = None, count: int = 6) -> dict:
         """生成三种题型的试题"""
         # 从 profile 推断领域配置
-        domain = get_domain_from_input(profile or {})
+        track = get_career_track_from_input(profile or {})
 
         # 使用领域关键词检索，避免泛化 topic 导致检索偏移
-        context = self.retrieve_context(f"{domain.name} {topic}")
+        context = self.retrieve_context(f"{track.name} {topic}")
 
         # 构建领域上下文 prompt
-        domain_prompt = build_domain_prompt(domain)
+        track_prompt = build_career_prompt(track)
 
-        prompt = f"""你是一位{domain.name}领域的出题专家。请根据以下信息生成 {count} 道试题。
+        prompt = f"""你是一位{track.name}领域的出题专家。请根据以下信息生成 {count} 道试题。
 
-{domain_prompt}
+{track_prompt}
 
 [主题] {topic}
 [难度] {difficulty}
@@ -36,7 +36,7 @@ class QuestionGeneratorAgent(BaseAgent):
 {{
     "topic": "{topic}",
     "difficulty": "{difficulty}",
-    "domain": "{domain.code}",
+    "track": "{track.code}",
     "questions": [
         {{
             "question": "题目内容",
@@ -67,9 +67,9 @@ class QuestionGeneratorAgent(BaseAgent):
         response = await self.call_llm(prompt)
         try:
             result = json.loads(response.strip().strip("```json").strip("```"))
-            result["domain"] = result.get("domain", domain.code)
+            result["track"] = result.get("track", track.code)
         except json.JSONDecodeError:
-            result = {"topic": topic, "difficulty": difficulty, "domain": domain.code, "questions": []}
+            result = {"topic": topic, "difficulty": difficulty, "track": track.code, "questions": []}
         return result
 
     async def run(self, topic: str = "", difficulty: str = "beginner", profile: dict = None, **kwargs) -> dict:

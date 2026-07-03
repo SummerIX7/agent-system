@@ -1,7 +1,7 @@
 {
-  "profile_name": "相关专业-博士-advanced-#012",
-  "domain": "cnc",
-  "domain_name": "CNC 数控加工",
+  "profile_name": "操机工-相关专业-博士-advanced-#012",
+  "career_track": "operator",
+  "career_track_name": "操机工",
   "education_background": "博士",
   "education_label": "doctor",
   "major": "工业工程",
@@ -9,23 +9,18 @@
   "work_experience_years": 8,
   "learning_style": "practice",
   "self_assessment": {
-    "机械制图基础": "精通",
-    "G 代码编程": "熟练",
-    "数控车床操作": "熟练",
-    "数控铣床操作": "熟练",
-    "CAM 软件应用": "熟练",
-    "刀具选择与管理": "熟练",
-    "切削参数优化": "熟练",
-    "测量与检测": "精通"
+    "机床操作面板使用": "精通",
+    "工件装夹与找正": "熟练",
+    "量具使用(卡尺/千分尺)": "熟练",
+    "G代码阅读能力": "熟练",
+    "刀具装卸操作": "熟练",
+    "切削液管理": "熟练",
+    "加工异常识别": "熟练",
+    "安全操作规范执行": "精通"
   },
   "goals": [
-    "学习CNC 数控加工优化方法"
+    "学习操机工优化方法"
   ],
   "expected_difficulty": "advanced",
-  "expected_level": "advanced",
-  "expected_knowledge_score_range": [
-    60,
-    85
-  ],
   "profile_id": 12
 }

@@ -5,7 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, domains, feedback, generation, learning_path, profile, questions, visualization, ws
+from app.api import auth, career_tracks, domains, feedback, generation, knowledge_graph, learning_path, profile, questions, visualization, ws
+from app.api.admin.router import router as admin_router
 from app.core.config import get_settings
 from app.core.store import check_redis_health
 from app.models.database import engine, Base
@@ -14,6 +15,7 @@ from app.models.user import User
 from app.models.learner import Learner
 from app.models.resource import Resource
 from app.models.agent_state import AgentLog, FeedbackRecord
+from app.models.approval_log import ApprovalLog
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +87,17 @@ app.add_middleware(
 
 # 挂载路由
 app.include_router(auth.router)
+app.include_router(career_tracks.router)
 app.include_router(domains.router)
 app.include_router(profile.router)
 app.include_router(generation.router)
 app.include_router(feedback.router)
 app.include_router(learning_path.router)
 app.include_router(visualization.router)
+app.include_router(knowledge_graph.router)
 app.include_router(questions.router)
 app.include_router(ws.router)
+app.include_router(admin_router)
 
 
 @app.exception_handler(Exception)

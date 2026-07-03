@@ -1,31 +1,27 @@
 {
-  "profile_name": "相关专业-硕士-beginner-#046",
-  "domain": "python_data_analysis",
-  "domain_name": "Python 数据分析",
+  "profile_name": "调机工-相关专业-硕士-expert-#046",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
   "education_background": "硕士",
   "education_label": "master",
-  "major": "金融工程",
+  "major": "车辆工程",
   "major_related": true,
-  "work_experience_years": 0.5,
-  "learning_style": "visual",
+  "work_experience_years": 10,
+  "learning_style": "theory",
   "self_assessment": {
-    "Python基础语法": "不了解",
-    "NumPy数组操作": "不了解",
-    "Pandas数据处理": "不了解",
-    "Matplotlib绘图": "不了解",
-    "Seaborn可视化": "不了解",
-    "数据清洗与预处理": "精通",
-    "统计分析基础": "不了解",
-    "Jupyter Notebook使用": "不了解"
+    "对刀操作": "精通",
+    "刀具偏置设置": "熟练",
+    "夹具安装与调试": "熟练",
+    "切削参数调整": "精通",
+    "首件试切与检测": "熟练",
+    "程序试运行": "精通",
+    "加工精度调整": "精通",
+    "设备故障排查": "精通"
   },
   "goals": [
-    "学习Python 数据分析基本操作"
+    "掌握调机工系统级优化",
+    "成为调机工领域专家"
   ],
-  "expected_difficulty": "beginner",
-  "expected_level": "beginner",
-  "expected_knowledge_score_range": [
-    5,
-    30
-  ],
+  "expected_difficulty": "expert",
   "profile_id": 46
 }

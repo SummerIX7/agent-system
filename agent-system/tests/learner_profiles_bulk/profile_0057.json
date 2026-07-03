@@ -1,0 +1,26 @@
+{
+  "profile_name": "编程师-相关专业-大专-beginner-#057",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "大专",
+  "education_label": "associate",
+  "major": "机械设计制造及其自动化",
+  "major_related": true,
+  "work_experience_years": 0.5,
+  "learning_style": "theory",
+  "self_assessment": {
+    "手工G代码编程": "了解基础",
+    "CAM软件编程(UG/Mastercam)": "不了解",
+    "工艺路线设计": "不了解",
+    "刀具路径优化": "了解基础",
+    "宏程序编写": "不了解",
+    "多轴编程": "不了解",
+    "加工仿真验证": "不了解",
+    "工艺文件编制": "不了解"
+  },
+  "goals": [
+    "掌握编程师入门知识"
+  ],
+  "expected_difficulty": "beginner",
+  "profile_id": 57
+}

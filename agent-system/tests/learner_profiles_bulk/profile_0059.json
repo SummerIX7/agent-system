@@ -1,0 +1,26 @@
+{
+  "profile_name": "调机工-相关专业-本科-intermediate-#059",
+  "career_track": "setup_tech",
+  "career_track_name": "调机工",
+  "education_background": "本科",
+  "education_label": "bachelor",
+  "major": "智能制造工程",
+  "major_related": true,
+  "work_experience_years": 5,
+  "learning_style": "visual",
+  "self_assessment": {
+    "对刀操作": "了解基础",
+    "刀具偏置设置": "了解基础",
+    "夹具安装与调试": "熟练",
+    "切削参数调整": "熟练",
+    "首件试切与检测": "精通",
+    "程序试运行": "不了解",
+    "加工精度调整": "了解基础",
+    "设备故障排查": "熟练"
+  },
+  "goals": [
+    "系统学习调机工核心内容"
+  ],
+  "expected_difficulty": "intermediate",
+  "profile_id": 59
+}

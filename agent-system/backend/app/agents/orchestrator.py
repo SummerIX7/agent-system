@@ -36,7 +36,7 @@ class DecisionOrchestrator(BaseAgent):
         return "retry"
 
     async def adjust_learning_path(self, path: dict, feedback_history: list) -> dict:
-        """根据答题历史调整学习路径"""
+        """根据答题历史调整学习路径（返回新对象，不修改原对象）"""
         if not feedback_history:
             return path
 
@@ -44,24 +44,32 @@ class DecisionOrchestrator(BaseAgent):
         recent = feedback_history[-5:]
         avg_correctness = sum(f.get("correctness", 0) for f in recent) / len(recent)
 
+        # 工作在新的副本上，避免 in-place 修改导致调用方的比较总是相等
+        import copy
+        adjusted = copy.deepcopy(path)
+        changed = False
+
         if avg_correctness < 0.6:
             # 插入基础补充阶段
-            current = path.get("current_stage", 1)
-            for stage in path.get("path", []):
+            current = adjusted.get("current_stage", 1)
+            for stage in adjusted.get("path", []):
                 if stage.get("stage") == current:
                     stage["difficulty"] = "beginner"
                     stage["title"] = f"{stage['title']}（基础巩固）"
+                    changed = True
                     break
         elif avg_correctness > 0.9:
             # 标记当前阶段完成，推进到下一阶段
-            current = path.get("current_stage", 1)
-            for stage in path.get("path", []):
+            current = adjusted.get("current_stage", 1)
+            for stage in adjusted.get("path", []):
                 if stage.get("stage") == current:
                     stage["completed"] = True
+                    changed = True
                     break
-            path["current_stage"] = current + 1
+            adjusted["current_stage"] = current + 1
+            changed = True
 
-        return path
+        return adjusted if changed else path
 
     def _downgrade_difficulty(self, current: str) -> str:
         levels = ["beginner", "intermediate", "advanced", "expert"]

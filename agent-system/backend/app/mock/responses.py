@@ -37,7 +37,8 @@ def _mock_build_profile() -> str:
         "overall_level": "beginner",
         "learning_style_analysis": "该学习者有机械制图基础，但 CNC 编程经验为零。建议从 G 代码基础入手，结合机械制图优势快速建立坐标系概念，通过大量实操练习巩固编程技能。",
         "recommended_difficulty": "beginner",
-        "domain": "cnc",
+        "career_track": "operator",
+    "career_track_name": "操机工",
     })
 
 
@@ -558,7 +559,8 @@ def _mock_questions() -> str:
     return _j({
         "topic": "G 代码基础",
         "difficulty": "beginner",
-        "domain": "cnc",
+        "career_track": "operator",
+    "career_track_name": "操机工",
         "questions": [
             {
                 "question": "G00 指令的作用是什么？",

@@ -1,0 +1,27 @@
+{
+  "profile_name": "编程师-相关专业-硕士-expert-#060",
+  "career_track": "programmer",
+  "career_track_name": "编程师",
+  "education_background": "硕士",
+  "education_label": "master",
+  "major": "数控技术",
+  "major_related": true,
+  "work_experience_years": 1,
+  "learning_style": "theory",
+  "self_assessment": {
+    "手工G代码编程": "精通",
+    "CAM软件编程(UG/Mastercam)": "熟练",
+    "工艺路线设计": "精通",
+    "刀具路径优化": "熟练",
+    "宏程序编写": "熟练",
+    "多轴编程": "精通",
+    "加工仿真验证": "熟练",
+    "工艺文件编制": "精通"
+  },
+  "goals": [
+    "研究编程师前沿技术",
+    "掌握编程师系统级优化"
+  ],
+  "expected_difficulty": "expert",
+  "profile_id": 60
+}
