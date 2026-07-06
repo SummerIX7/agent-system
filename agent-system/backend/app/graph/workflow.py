@@ -510,6 +510,8 @@ async def finalize_node(state: AgentState) -> dict:
             "topic": topic, "difficulty": difficulty,
         })
 
+    _broadcast(session_id, "知识生成 Agent", "completed", "全部节点资源与试题生成完成", 96)
+    _broadcast(session_id, "审核纠偏 Agent", "completed", "全部节点内容已审核", 96)
     _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成：5个节点资源+节点练习已全部就绪", 100)
 
     return {
@@ -792,6 +794,9 @@ async def finalize_node_no_debate(state: AgentState) -> dict:
             "content": learning_path,
             "topic": topic, "difficulty": difficulty,
         })
+
+    _broadcast(session_id, "知识生成 Agent", "completed", "全部节点资源与试题生成完成", 96)
+    _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成（无辩论，5个节点资源+节点练习已就绪）", 100)
 
     return {
         "final_resources": final_resources,

@@ -40,12 +40,19 @@
           <span class="badge badge--mute">{{ knowledgePoints.length }} 维度</span>
         </div>
         <div style="display: flex; align-items: center; justify-content: center; padding: 8px 0 4px">
-          <DashboardKnowledgeRadar
-            v-if="knowledgePoints.length > 0"
-            :key="radarKey"
-            :knowledge-points="knowledgePoints"
-          />
-          <p v-else class="text-text-3 text-center py-12">暂无诊断数据</p>
+          <ClientOnly>
+            <DashboardKnowledgeRadar
+              v-if="knowledgePoints.length > 0"
+              :key="radarKey"
+              :knowledge-points="knowledgePoints"
+            />
+            <template #fallback>
+              <div class="flex items-center justify-center" style="width: 420px; height: 380px">
+                <p class="text-text-3">加载图表中...</p>
+              </div>
+            </template>
+          </ClientOnly>
+          <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-12">暂无诊断数据</p>
         </div>
       </div>
 

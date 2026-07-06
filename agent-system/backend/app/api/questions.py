@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, validate_session_ownership
 from app.core.store import (
     get_session,
     save_practice_state,
@@ -224,6 +224,7 @@ async def get_questions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     regenerate: bool = False,
+    _validated: str = Depends(validate_session_ownership),
 ):
     """根据学习者画像动态生成试题（需登录）。默认优先返回缓存，传 regenerate=true 重新生成。"""
     # ── 0. 先查缓存（非主动重新生成时） ──
@@ -323,7 +324,12 @@ class PracticeStateRequest(BaseModel):
 
 
 @router.post("/practice/state/{session_id}")
-async def save_state(session_id: str, state: PracticeStateRequest, db: AsyncSession = Depends(get_db)):
+async def save_state(
+    session_id: str,
+    state: PracticeStateRequest,
+    db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
+):
     """保存答题进度到 session，并按账号持久化到数据库。"""
     state_data = state.model_dump()
     if state_data.get("level"):
@@ -343,6 +349,7 @@ async def get_state(
     level: str | None = None,
     stage: int | None = None,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """恢复答题进度。优先 session，缺失时从数据库按账号回填。"""
     if level:
@@ -367,6 +374,7 @@ async def regenerate_questions(
     session_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """清除缓存并重新生成试题"""
     clear_cached_questions(session_id)
@@ -389,6 +397,7 @@ async def generate_tiered_questions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     stage: int = 1,
+    _validated: str = Depends(validate_session_ownership),
 ):
     """
     为指定学习节点生成一套节点练习并按 stage 缓存。
@@ -430,6 +439,7 @@ async def generate_tiered_questions(
 async def get_tiered_question_set(
     session_id: str, level: str, stage: int = 1,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """
     获取指定节点练习或综合练习的缓存试题。
@@ -552,6 +562,7 @@ async def save_practice_result(
     session_id: str,
     result: PracticeResultRequest,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """保存一轮练习结果。练习结果只用于报告和知识图谱掌握度，不推进学习节点。"""
     from app.core.store import resolve_learner_context
@@ -589,6 +600,9 @@ async def save_practice_result(
 
 
 @router.get("/practice/results/{session_id}")
-async def list_practice_results(session_id: str):
+async def list_practice_results(
+    session_id: str,
+    _validated: str = Depends(validate_session_ownership),
+):
     """获取练习结果列表，供分析报告展示。"""
     return {"results": get_practice_results(session_id)}

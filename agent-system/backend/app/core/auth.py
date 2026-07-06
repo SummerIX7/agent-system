@@ -92,3 +92,23 @@ async def require_admin(
             detail="需要管理员权限",
         )
     return current_user
+
+
+async def validate_session_ownership(
+    session_id: str,
+    current_user = Depends(get_current_user),
+):
+    """
+    FastAPI 依赖：校验 session_id 属于当前登录用户。
+    session_id 格式为 user-{userId}，必须与当前用户的 ID 匹配。
+    管理员可以访问任意 session。
+    """
+    if current_user.role == "admin":
+        return session_id
+    expected = f"user-{current_user.id}"
+    if session_id != expected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"无权访问会话 {session_id}，该会话不属于当前用户",
+        )
+    return session_id

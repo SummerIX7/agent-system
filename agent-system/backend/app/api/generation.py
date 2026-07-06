@@ -8,6 +8,8 @@ from app.models.resource import Resource
 from app.graph.workflow import run_workflow
 from app.core.store import add_resource, get_session, clear_cached_questions, save_practice_state, update_session
 from app.core.question_persistence import clear_persisted_practice_cache, persist_session_question_cache
+from app.core.auth import get_current_user, validate_session_ownership
+from app.models.user import User
 
 router = APIRouter(prefix="/api", tags=["资源生成"])
 
@@ -16,8 +18,13 @@ router = APIRouter(prefix="/api", tags=["资源生成"])
 async def generate_resources(
     request: GenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """触发资源生成（讲义/指南/试题）— 运行完整 Agent 工作流"""
+    # 校验 session 归属
+    expected_session = f"user-{current_user.id}"
+    if request.session_id != expected_session and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="无权操作其他用户的会话")
 
     # 获取学习者画像：优先用请求传入的，其次从 store 查找
     profile = request.profile or {}
@@ -218,6 +225,7 @@ async def get_resources(
     session_id: str,
     db: AsyncSession = Depends(get_db),
     stage: int = None,
+    _validated: str = Depends(validate_session_ownership),
 ):
     """获取指定会话的生成资源。传 stage 参数可按学习节点过滤。"""
     # 先从 MySQL 查询
@@ -258,7 +266,10 @@ async def get_resources(
 
 
 @router.get("/trace/{session_id}")
-async def get_trace(session_id: str):
+async def get_trace(
+    session_id: str,
+    _validated: str = Depends(validate_session_ownership),
+):
     """返回完整工作流追踪数据——每个节点的输入输出和 LLM 调用明细"""
     from app.core.store import get_trace_entries
     session = get_session(session_id)

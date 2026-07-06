@@ -544,6 +544,15 @@ const submitPracticeResult = async () => {
       })),
     })
     resultSaved.value = true
+
+    // 节点练习完成后自动标记当前节点为已完成，推进到下一节点
+    if (testLevel.value === 'node') {
+      try {
+        await api.completeCurrentNode(sessionId.value)
+      } catch {
+        // 节点推进失败不阻塞结果展示
+      }
+    }
   } catch (err) {
     console.warn('保存练习结果失败:', err)
     resultSaveError.value = '练习结果保存失败，报告可能暂时无法显示本次成绩'

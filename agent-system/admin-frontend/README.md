@@ -17,7 +17,7 @@
 pnpm install
 
 # 开发模式
-pnpm dev          # http://localhost:5173
+pnpm dev          # http://localhost:3001
 
 # 生产构建
 pnpm build        # 输出到 dist/

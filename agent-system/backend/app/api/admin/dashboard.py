@@ -36,12 +36,14 @@ async def get_overview(
     )
     active_today = active_result.scalar() or 0
 
-    # 平均通过率（从 report_cache 计算）
+    # 平均通过率（从 report_cache 计算。hallucination_rate 存储为百分比 0-100，需转为小数）
     all_learners = await db.execute(select(Learner.report_cache))
     rates = []
     for row in all_learners.scalars():
-        if row and isinstance(row, dict) and "hallucination_rate" in row:
-            rates.append(1.0 - row.get("hallucination_rate", 0))
+        if row and isinstance(row, dict):
+            rate = row.get("hallucination_rate")
+            if rate is not None:
+                rates.append(1.0 - rate / 100)
     avg_pass_rate = sum(rates) / len(rates) if rates else 0.0
 
     # 知识点分布（从所有学员 knowledge_points 聚合）

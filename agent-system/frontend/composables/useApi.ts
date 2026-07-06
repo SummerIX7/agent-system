@@ -113,8 +113,8 @@ export function useApi() {
       request<VisualizationData>(`/api/visualization/${sessionId}`),
 
     // 历史
-    getHistory: (learnerId: number | string) =>
-      request<any[]>(`/api/history/${learnerId}`),
+    getHistory: (learnerId: number | string, page: number = 1, pageSize: number = 20) =>
+      request<{ items: any[]; total: number; page: number; page_size: number; total_pages: number }>(`/api/history/${learnerId}?page=${page}&page_size=${pageSize}`),
 
     // 试题
     getQuestions: (sessionId: string) =>

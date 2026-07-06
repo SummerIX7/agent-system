@@ -100,10 +100,11 @@ def main():
     print()
     print("    uvicorn main:app --host 0.0.0.0 --port 8000")
     print()
-    print("   B 端管理后台:   http://localhost:5173")
+    print("   B 端管理后台:   http://localhost:3001")
     print("   C 端学习平台:   http://localhost:3000")
     print("   API 文档:       http://localhost:8000/docs")
     print("=" * 60)
+
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@
           <div class="history-content">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <p style="font-weight: 600;">{{ record.title }}</p>
-              <span class="text-text-3 text-xs">{{ record.date }}</span>
+              <span class="text-text-3 text-xs">{{ formatDate(record.date) }}</span>
             </div>
             <p class="text-text-2 text-sm mt-1">{{ record.description }}</p>
             <div style="display: flex; gap: 8px; margin-top: 8px;">
@@ -38,6 +38,24 @@
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 分页导航 -->
+      <div v-if="totalPages > 1" class="pagination-bar">
+        <span class="pagination-info">{{ totalRecords }} 条记录，第 {{ currentPage }}/{{ totalPages }} 页</span>
+        <div class="pagination-btns">
+          <button class="btn btn--ghost btn--sm" :disabled="currentPage <= 1" @click="goPage(currentPage - 1)">上一页</button>
+          <button
+            v-for="p in displayPages"
+            :key="p"
+            class="btn btn--sm"
+            :class="p === currentPage ? 'btn--primary' : 'btn--ghost'"
+            @click="goPage(p)"
+          >
+            {{ p }}
+          </button>
+          <button class="btn btn--ghost btn--sm" :disabled="currentPage >= totalPages" @click="goPage(currentPage + 1)">下一页</button>
         </div>
       </div>
     </div>
@@ -50,31 +68,49 @@ const { learnerId } = useSession()
 
 const loading = ref(true)
 const historyRecords = ref<any[]>([])
+const currentPage = ref(1)
+const totalPages = ref(1)
+const totalRecords = ref(0)
+const PAGE_SIZE = 20
 
-onMounted(async () => {
-  if (learnerId.value) {
-    try {
-      const data = await api.getHistory(learnerId.value)
-      historyRecords.value = data
-    } catch (err) {
-      console.warn('获取历史失败:', err)
-    }
+const fetchHistory = async (page: number = 1) => {
+  if (!learnerId.value) return
+  loading.value = true
+  try {
+    const data = await api.getHistory(learnerId.value, page, PAGE_SIZE)
+    historyRecords.value = data.items
+    currentPage.value = data.page
+    totalPages.value = data.total_pages
+    totalRecords.value = data.total
+  } catch (err) {
+    console.warn('获取历史失败:', err)
+  } finally {
+    loading.value = false
   }
+}
 
-  // 如果没有数据，显示默认记录
-  if (!historyRecords.value.length) {
-    historyRecords.value = [
-      {
-        title: '完成学情诊断',
-        date: new Date().toLocaleString(),
-        description: '系统构建了初始学习者画像',
-        tags: ['画像构建', '学情诊断'],
-      },
-    ]
-  }
+const goPage = (page: number) => {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) return
+  fetchHistory(page)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
-  loading.value = false
+const formatDate = (value: string) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+const displayPages = computed(() => {
+  const pages: number[] = []
+  const start = Math.max(1, currentPage.value - 2)
+  const end = Math.min(totalPages.value, currentPage.value + 2)
+  for (let i = start; i <= end; i++) pages.push(i)
+  return pages
 })
+
+onMounted(() => fetchHistory(1))
 </script>
 
 <style scoped>
@@ -120,6 +156,23 @@ onMounted(async () => {
 .history-item:last-child .history-content {
   border-bottom: none;
   padding-bottom: 0;
+}
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .animate-spin {
   animation: spin 1s linear infinite;

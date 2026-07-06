@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import validate_session_ownership
 from app.models.database import get_db
 from app.models.schemas import VisualizationData, KnowledgePoint as SchemaKnowledgePoint, BlindSpot as SchemaBlindSpot
 from app.core.store import get_session
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api", tags=["可视化数据"])
 async def get_visualization(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """获取可视化数据。优先从 learner.report_cache 读取快照。"""
     from app.core.store import resolve_learner_context
@@ -139,8 +141,10 @@ async def get_visualization(
 async def get_history(
     learner_id: int,
     db: AsyncSession = Depends(get_db),
+    page: int = 1,
+    page_size: int = 20,
 ):
-    """获取学习历史记录（从数据库读取）"""
+    """获取学习历史记录（从数据库读取），支持分页"""
     history = []
 
     stmt = select(Learner).where(Learner.id == learner_id)
@@ -178,5 +182,17 @@ async def get_history(
         })
 
     history.sort(key=lambda x: x.get("date", ""), reverse=True)
-    return history
+
+    total = len(history)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size
+    items = history[start:start + page_size]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 

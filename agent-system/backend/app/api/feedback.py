@@ -9,6 +9,7 @@ from app.models.schemas import FeedbackInput, FeedbackResponse, PracticalFeedbac
 from app.models.agent_state import FeedbackRecord
 from app.models.learner import Learner
 from app.models.user import User
+from app.core.auth import get_current_user
 from app.core.llm import get_llm
 from app.core.store import add_feedback, get_session
 from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
@@ -67,8 +68,13 @@ async def generate_heuristic_question(
 async def submit_feedback(
     feedback: FeedbackInput,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """提交答题反馈，支持多轮苏格拉底式追问"""
+    # 校验 session 归属
+    expected_session = f"user-{current_user.id}"
+    if feedback.session_id != expected_session and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="无权操作其他用户的会话")
     MAX_ROUNDS = 3
     is_correct = feedback.user_answer.strip().lower() == feedback.correct_answer.strip().lower()
     correctness = 1.0 if is_correct else 0.0
@@ -261,8 +267,14 @@ async def grade_practical_answer(
 async def submit_practical_feedback(
     feedback: PracticalFeedbackInput,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """提交实操题答案，由 LLM Agent 批改"""
+    # 校验 session 归属
+    expected_session = f"user-{current_user.id}"
+    if feedback.session_id != expected_session and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="无权操作其他用户的会话")
+
     # 0. 获取当前领域配置
     session = get_session(feedback.session_id)
     profile = session.get("profile", {})

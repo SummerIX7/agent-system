@@ -95,7 +95,7 @@
 <script setup lang="ts">
 const router = useRouter()
 const { user, isLoggedIn, restoreToken, logout } = useAuth()
-const { setSession, setProfile } = useSession()
+const { setSession, setProfile, clearSession } = useSession()
 const api = useApi()
 
 const mobileMenuOpen = ref(false)
@@ -130,7 +130,8 @@ onMounted(async () => {
         setProfile(profile)
       }
     } catch {
-      // 404 = 用户尚未创建画像，正常情况
+      // 用户尚未创建画像，清除可能残留的旧 session（防止继承上一个用户的 session）
+      clearSession()
     }
   }
 })

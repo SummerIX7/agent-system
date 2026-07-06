@@ -55,8 +55,10 @@ export function useAuth() {
     user.value = null
     if (import.meta.client) {
       localStorage.removeItem('auth_token')
+      // 清除 session，防止下一个登录用户继承当前用户的 session 数据
+      localStorage.removeItem('agent_session_id')
+      localStorage.removeItem('agent_learner_id')
     }
-    // 不清除 session——用户下次登录应继续之前的进度
   }
 
   return {

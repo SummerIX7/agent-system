@@ -133,9 +133,12 @@ watch(authLoading, async (val) => {
   }
 }, { immediate: true })
 
-// 登录后自动加载已有画像 + 职业方向列表
-onMounted(async () => {
-  if (!isLoggedIn.value) return
+const dataLoaded = ref(false)
+
+// 监听登录状态：一旦登录态确认，立即加载数据（覆盖正常导航和页面刷新两种场景）
+watch(isLoggedIn, async (loggedIn) => {
+  if (!loggedIn || dataLoaded.value) return
+  dataLoaded.value = true
 
   // 加载可用职业方向
   try {
@@ -164,7 +167,7 @@ onMounted(async () => {
   } catch {
     // 404 = 没有画像，正常情况
   }
-})
+}, { immediate: true })
 
 // 当前职业方向的技能自评项
 const skillOptions = computed(() => {
@@ -176,7 +179,25 @@ const skillOptions = computed(() => {
 function onCareerChange(code: string) {
   formState.career_track = code
   formState.self_assessment = {}
+  initDefaultAssessment()
 }
+
+// 技能自评默认值：所有技能默认为"了解基础"
+function initDefaultAssessment() {
+  const skills = skillOptions.value
+  if (!skills.length) return
+  for (const skill of skills) {
+    if (!formState.self_assessment[skill]) {
+      formState.self_assessment[skill] = '了解基础'
+    }
+  }
+}
+
+// 技能列表加载后自动填入默认值
+watch(skillOptions, (skills) => {
+  if (!skills.length) return
+  initDefaultAssessment()
+})
 
 const formState = reactive({
   education_background: '本科',

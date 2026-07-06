@@ -55,7 +55,7 @@ const chartOption = computed(() => ({
   },
   yAxis: {
     type: 'value',
-    min: 1,
+    min: 0,
     max: 5,
     interval: 1,
     axisLabel: {

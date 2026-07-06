@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, validate_session_ownership
 from app.core.store import get_session, update_session
 from app.core.domains import get_domain_from_input, build_domain_prompt
 from app.models.database import get_db
@@ -162,6 +162,7 @@ async def _get_learning_path_from_any_source(session_id: str, db: AsyncSession =
 async def get_learning_path(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """获取完整学习路径及各节点状态"""
     learning_path, current_stage = await _get_learning_path_from_any_source(session_id, db)
@@ -187,6 +188,7 @@ async def get_learning_path(
 async def get_current_node(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """获取当前应学习的节点信息"""
     learning_path, current_stage = await _get_learning_path_from_any_source(session_id, db)
@@ -210,6 +212,7 @@ async def advance_node(
     session_id: str,
     req: AdvanceRequest,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """
     节点推进：评估考核结果，决定是否推进到下一节点
@@ -327,6 +330,7 @@ async def mark_basic_passed(
     session_id: str,
     req: MarkBasicPassedRequest,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """
     标记当前节点基础考核已通过。
@@ -373,6 +377,7 @@ async def mark_basic_passed(
 async def complete_current_node(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """
     学习资源页完成当前节点。
@@ -482,6 +487,7 @@ async def generate_node_content(
     session_id: str,
     req: GenerateNodeRequest,
     db: AsyncSession = Depends(get_db),
+    _validated: str = Depends(validate_session_ownership),
 ):
     """
     为指定节点按需生成资源+试题。
