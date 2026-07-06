@@ -104,11 +104,11 @@ const navItems = [
   { path: '/', label: '首页' },
   { path: '/profile', label: '学习者画像' },
   { path: '/dashboard', label: '学情诊断' },
-  { path: '/knowledge-graph', label: '知识图谱' },
   { path: '/workflow', label: 'Agent 协同' },
-  { path: '/practice', label: '答题考核' },
+  { path: '/resources', label: '学习资源' },
+  { path: '/practice', label: '答题练习' },
   { path: '/report', label: '分析报告' },
-  { path: '/resources', label: '资源展示' },
+  { path: '/knowledge-graph', label: '知识图谱' },
   { path: '/history', label: '历史记录' },
 ]
 

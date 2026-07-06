@@ -121,14 +121,19 @@ export function useApi() {
       request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
 
     // 答题进度持久化
-    savePracticeState: (sessionId: string, data: { current_index: number; questions: any[] }) =>
+    savePracticeState: (sessionId: string, data: { current_index: number; questions: any[]; level?: string | null; stage?: number | null }) =>
       request<{ ok: boolean }>(`/api/questions/practice/state/${sessionId}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
-    getPracticeState: (sessionId: string) =>
-      request<{ current_index: number; questions: any[] }>(`/api/questions/practice/state/${sessionId}`),
+    getPracticeState: (sessionId: string, level?: string | null, stage?: number | null) => {
+      const query = new URLSearchParams()
+      if (level) query.set('level', level)
+      if (stage !== undefined && stage !== null) query.set('stage', String(stage))
+      const suffix = query.toString() ? `?${query.toString()}` : ''
+      return request<{ current_index: number; questions: any[]; level?: string | null; stage?: number | null }>(`/api/questions/practice/state/${sessionId}${suffix}`)
+    },
 
     // 重新生成试题（清除缓存后重新调用 LLM 生成）
     regenerateQuestions: (sessionId: string) =>
@@ -136,14 +141,23 @@ export function useApi() {
         method: 'POST',
       }),
 
-    // 分阶试题
+    // 节点练习
     generateTieredQuestions: (sessionId: string) =>
-      request<{ node_title: string; basic: any; advanced: any }>(`/api/questions/generate/${sessionId}`, {
+      request<{ node_title: string; node: any }>(`/api/questions/generate/${sessionId}`, {
         method: 'POST',
       }),
 
-    getTieredQuestions: (sessionId: string, level: 'basic' | 'advanced', stage?: number) =>
-      request<{ level: string; label: string; topic: string; difficulty: string; questions: any[] }>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
+    getTieredQuestions: (sessionId: string, level: 'node' | 'comprehensive', stage?: number) =>
+      request<{ level: string; label: string; topic: string; difficulty: string; format_version?: string; scenario?: Record<string, any>; questions: any[] }>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
+
+    savePracticeResult: (sessionId: string, data: { level: string; stage?: number | null; score: number; correct_count: number; wrong_count: number; question_count: number; questions: any[] }) =>
+      request<{ ok: boolean; total: number }>(`/api/questions/practice/result/${sessionId}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getPracticeResults: (sessionId: string) =>
+      request<{ results: any[] }>(`/api/questions/practice/results/${sessionId}`),
 
     // 学习路径管理
     getLearningPath: (sessionId: string) =>
@@ -164,6 +178,11 @@ export function useApi() {
         body: JSON.stringify({ basic_score: basicScore }),
       }),
 
+    completeCurrentNode: (sessionId: string) =>
+      request<{ ok: boolean; stage?: number; new_stage: number | null; all_completed: boolean; message: string }>(`/api/learning-path/${sessionId}/complete-current`, {
+        method: 'POST',
+      }),
+
     generateNodeContent: (sessionId: string, stage: number) =>
       request<{ ok: boolean; stage: number; resource_count: number }>(`/api/learning-path/${sessionId}/generate-node-content`, {
         method: 'POST',
@@ -181,16 +200,19 @@ export function useApi() {
     getKnowledgeGraph: () =>
       request<any>('/api/knowledge-graph'),
 
+    getKnowledgeGraphGraph: (withProgress: boolean = true) =>
+      request<any>(withProgress ? '/api/knowledge-graph/progress/graph' : '/api/knowledge-graph/graph'),
+
     getKnowledgeGraphProgress: () =>
-      request<{ username: string; completed_nodes: string[]; total: number; percentage: number }>('/api/knowledge-graph/progress'),
+      request<{ username: string; completed_nodes: string[]; node_scores?: Record<string, any>; total: number; percentage: number; stats?: any }>('/api/knowledge-graph/progress'),
 
     getKnowledgeGraphTreeWithProgress: () =>
       request<any>('/api/knowledge-graph/progress/tree'),
 
-    markKnowledgeNode: (nodeId: string, completed: boolean) =>
-      request<{ username: string; completed_nodes: string[]; total: number; percentage: number }>('/api/knowledge-graph/progress', {
+    markKnowledgeNode: (nodeId: string, completed: boolean, score?: number) =>
+      request<{ username: string; completed_nodes: string[]; node_scores?: Record<string, any>; total: number; percentage: number; stats?: any }>('/api/knowledge-graph/progress', {
         method: 'POST',
-        body: JSON.stringify({ node_id: nodeId, completed }),
+        body: JSON.stringify({ node_id: nodeId, completed, score }),
       }),
 
     // 机台使用申请

@@ -125,6 +125,10 @@ async def generate_node(state: AgentState) -> dict:
     generation_agent._trace_calls = []
 
     topic = state.get("topic", "")
+    learning_path = state.get("learning_path", {})
+    stage_one = next((s for s in learning_path.get("path", []) if s.get("stage") == 1), None)
+    if stage_one:
+        topic = _stage_learning_topic(stage_one)
     profile = state.get("profile", {})
     career_code = state.get("career_track", "operator")
     track = get_career_track_from_input({"career_track": career_code, **profile})
@@ -186,6 +190,10 @@ async def review_correct_node(state: AgentState) -> dict:
     review_agent._trace_calls = []
 
     topic = state.get("topic", "")
+    learning_path = state.get("learning_path", {})
+    stage_one = next((s for s in learning_path.get("path", []) if s.get("stage") == 1), None)
+    if stage_one:
+        topic = _stage_learning_topic(stage_one)
     generated = state.get("generated_content", {})
     retry_count = state.get("retry_count", 0)
     review_results = {}
@@ -405,6 +413,26 @@ async def decide_node(state: AgentState) -> str:
 # ──────────────────────────────────────────────
 # 最终输出（保存已审核资源 + 生成试题 + 标记节点）
 # ──────────────────────────────────────────────
+def _stage_learning_topic(stage_data: dict) -> str:
+    """把一个学习节点压缩成资源/试题生成使用的主题。"""
+    title = stage_data.get("title") or f"节点{stage_data.get('stage', '')}"
+    topics = [str(t) for t in stage_data.get("topics", []) if t]
+    if topics:
+        return f"{title}（{ '、'.join(topics) }）"
+    return title
+
+
+def _prepare_stage_states(learning_path: dict) -> list[dict]:
+    """初始化学习节点状态；资源在协同阶段一次性生成，因此全部标记 has_resources。"""
+    path_stages = learning_path.get("path", [])
+    for stage_data in path_stages:
+        stage_data.setdefault("completed", False)
+        stage_data.setdefault("basic_test_passed", False)
+        stage_data.setdefault("advanced_test_passed", False)
+        stage_data["has_resources"] = True
+    return path_stages
+
+
 async def finalize_node(state: AgentState) -> dict:
     final_resources = []
     topic = state.get("topic", "")
@@ -414,9 +442,14 @@ async def finalize_node(state: AgentState) -> dict:
     profile = state.get("profile", {})
     learning_path = state.get("learning_path", {})
 
-    # ── Step 1: 保存节点 1 的已审核资源 ──
+    path_stages = _prepare_stage_states(learning_path)
     has_degraded = any(r.get("degraded", False) for r in review_results.values())
+    stage_one = next((s for s in path_stages if s.get("stage") == 1), {}) if path_stages else {}
+    stage_one_topic = _stage_learning_topic(stage_one) if stage_one else topic
+    stage_one_difficulty = stage_one.get("difficulty", difficulty) if stage_one else difficulty
+    stage_one_saved = False
 
+    # ── Step 1: 保存节点 1 的已审核资源 ──
     if has_degraded:
         degraded_warning = (
             "\n\n---\n"
@@ -428,29 +461,48 @@ async def finalize_node(state: AgentState) -> dict:
             final_resources.append({
                 "type": content_type, "stage": 1,
                 "content": content + degraded_warning if content else degraded_warning.strip(),
-                "topic": topic, "difficulty": difficulty,
+                "topic": stage_one_topic, "difficulty": stage_one_difficulty,
+                "review_score": review.get("score"),
+                "review_passed": review.get("passed", False),
             })
+            stage_one_saved = True
     else:
         for content_type, review in review_results.items():
             final_resources.append({
                 "type": content_type, "stage": 1,
                 "content": review.get("final_content", ""),
-                "topic": topic, "difficulty": difficulty,
+                "topic": stage_one_topic, "difficulty": stage_one_difficulty,
+                "review_score": review.get("score"),
+                "review_passed": review.get("passed", True),
             })
+            stage_one_saved = True
 
-    # ── Step 2: 初始化 node_states（节点 1 标记 has_resources，其他节点待 advance 时生成）──
-    path_stages = learning_path.get("path", [])
-    for stage_data in path_stages:
-        stage_num = stage_data.get("stage", 0)
-        stage_data.setdefault("completed", False)
-        stage_data.setdefault("basic_test_passed", False)
-        stage_data.setdefault("advanced_test_passed", False)
-        stage_data.setdefault("has_resources", stage_num == 1)
+    # ── Step 2: 遍历 5 个节点，补齐全部资源与节点练习 ──
+    if path_stages:
+        total = len(path_stages)
+        for idx, stage_data in enumerate(path_stages, start=1):
+            stage_num = int(stage_data.get("stage", idx))
+            node_topic = _stage_learning_topic(stage_data)
+            node_difficulty = stage_data.get("difficulty", difficulty)
 
-    # ── Step 3: 生成并缓存节点 1 的分阶试题 ──
-    await _generate_and_cache_questions(session_id, 1, topic, difficulty, profile, learning_path)
+            if stage_num == 1 and stage_one_saved:
+                _broadcast(session_id, "知识生成 Agent", "running",
+                           "节点1资源已完成审核，继续生成全路径试题...", 84)
+            else:
+                progress = min(96, 84 + idx * 2)
+                _broadcast(session_id, "知识生成 Agent", "running",
+                           f"正在批量生成节点 {stage_num}/{total} 资源：{stage_data.get('title', node_topic)}", progress)
+                final_resources.extend(
+                    await generate_resources_for_stage(session_id, stage_num, profile, learning_path)
+                )
 
-    # ── Step 4: 添加学习路径 ──
+            await _generate_and_cache_questions(
+                session_id, stage_num, node_topic, node_difficulty, profile, learning_path
+            )
+    else:
+        await _generate_and_cache_questions(session_id, 1, topic, difficulty, profile, learning_path)
+
+    # ── Step 3: 添加学习路径 ──
     if path_stages:
         final_resources.append({
             "type": "learning_path",
@@ -458,13 +510,13 @@ async def finalize_node(state: AgentState) -> dict:
             "topic": topic, "difficulty": difficulty,
         })
 
-    _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成：全部资源+试题已就绪", 100)
+    _broadcast(session_id, "决策调度 Agent", "completed", "工作流完成：5个节点资源+节点练习已全部就绪", 100)
 
     return {
         "final_resources": final_resources,
         "learning_path": learning_path,
         "review_results": review_results,
-        "decision_log": ["⑥ 工作流完成 — 节点1资源+试题已就绪"],
+        "decision_log": ["⑥ 工作流完成 — 5个节点资源+节点练习已全部就绪"],
     }
 
 
@@ -481,7 +533,7 @@ async def generate_resources_for_stage(
     """
     from app.agents.generation import GenerationAgent
     from app.agents.review import ReviewAgent
-    from app.core.domains import get_domain_from_input
+    from app.core.career_tracks import get_career_track_from_input
 
     path_stages = learning_path.get("path", [])
     stage_data = next((s for s in path_stages if s.get("stage") == stage), None)
@@ -489,14 +541,14 @@ async def generate_resources_for_stage(
         print(f"[警告] 未找到节点 {stage}")
         return []
 
-    node_topics = stage_data.get("topics", [])
-    node_topic = node_topics[0] if node_topics else stage_data.get("title", "")
+    node_title = stage_data.get("title", f"节点{stage}")
+    node_topic = _stage_learning_topic(stage_data)
     node_difficulty = stage_data.get("difficulty", "beginner")
-    domain = get_domain_from_input({
-        "domain": profile.get("domain", ""),
-        "goals": profile.get("goals", []),
+    track = get_career_track_from_input({
+        "career_track": profile.get("career_track", learning_path.get("career_track", "")),
+        **(profile or {}),
     })
-    full_topic = f"{domain.name} - {node_topic}"
+    full_topic = f"{track.name} - {node_topic}"
 
     gen_agent = GenerationAgent()
     review_agent = ReviewAgent()
@@ -505,27 +557,30 @@ async def generate_resources_for_stage(
     for ct in ("lecture", "guide", "project"):
         try:
             if ct == "lecture":
-                content = await gen_agent.generate_lecture_notes(full_topic, profile, domain)
+                content = await gen_agent.generate_lecture_notes(full_topic, profile, track)
             elif ct == "guide":
-                content = await gen_agent.generate_practical_guide(full_topic, profile, domain)
+                content = await gen_agent.generate_practical_guide(full_topic, profile, track)
             else:
-                content = await gen_agent.generate_project_case(full_topic, profile, domain)
+                content = await gen_agent.generate_project_case(full_topic, profile, track)
 
             try:
                 review = await review_agent.corrective_review(content, full_topic)
                 final_content = review.get("final_content", content)
             except Exception:
+                review = {"score": None, "passed": True}
                 final_content = content
 
             resources.append({
                 "type": ct, "stage": stage,
                 "content": final_content,
-                "topic": node_topic, "difficulty": node_difficulty,
+                "topic": node_title, "difficulty": node_difficulty,
+                "review_score": review.get("score"),
+                "review_passed": review.get("passed", True),
             })
         except Exception as e:
             print(f"[警告] 节点{stage} {ct} 生成失败: {e}")
 
-    print(f"[节点生成] stage={stage} ({node_topic}): 已生成 {len(resources)} 种资源")
+    print(f"[节点生成] stage={stage} ({node_title}): 已生成 {len(resources)} 种资源")
     return resources
 
 
@@ -533,51 +588,59 @@ async def _generate_and_cache_questions(
     session_id: str, stage: int, topic: str, difficulty: str,
     profile: dict, learning_path: dict = None,
 ) -> dict:
-    """为指定节点生成分阶试题并按 stage 缓存"""
+    """为指定节点生成节点练习并按 stage 缓存"""
     from app.agents.question_generator import QuestionGeneratorAgent
-    from app.core.store import save_tiered_questions_for_stage
+    from app.core.store import get_session, save_tiered_questions_for_stage
+
+    def collect_avoid_questions() -> list[str]:
+        session = get_session(session_id)
+        tq_map = session.get("tiered_questions_map", {}) or {}
+        questions: list[str] = []
+        if isinstance(tq_map, dict):
+            for tiered in tq_map.values():
+                if not isinstance(tiered, dict):
+                    continue
+                for qset in tiered.values():
+                    for q in (qset or {}).get("questions", []) or []:
+                        if q.get("question"):
+                            questions.append(q["question"])
+        return list(dict.fromkeys(questions))
 
     q_agent = QuestionGeneratorAgent()
-    difficulty_levels = ["beginner", "intermediate", "advanced", "expert"]
-    try:
-        basic_difficulty = difficulty
-        advanced_idx = min(difficulty_levels.index(difficulty) + 1, len(difficulty_levels) - 1) \
-            if difficulty in difficulty_levels else 1
-    except ValueError:
-        advanced_idx = 1
-    advanced_difficulty = difficulty_levels[advanced_idx]
-
-    _broadcast(session_id, "试题生成 Agent", "running", f"正在生成节点{stage}试题...", 86)
+    _broadcast(session_id, "试题生成 Agent", "running", f"正在生成节点{stage}练习题...", 86)
 
     tiered = {}
     try:
-        basic_result = await q_agent.generate_questions(topic, basic_difficulty, profile)
-        tiered["basic"] = {
-            "level": "basic", "label": "基础考核", "stage": stage,
-            "topic": basic_result.get("topic", topic),
-            "difficulty": basic_result.get("difficulty", basic_difficulty),
-            "questions": basic_result.get("questions", []),
+        stage_data = {}
+        for item in (learning_path or {}).get("path", []):
+            if int(item.get("stage", 0) or 0) == int(stage):
+                stage_data = item
+                break
+        node_title = stage_data.get("title") or topic
+        node_topics = [str(t) for t in stage_data.get("topics", []) if t]
+        node_result = await q_agent.generate_node_practice_questions(
+            topic=topic,
+            difficulty=difficulty,
+            profile=profile,
+            count=9,
+            avoid_questions=collect_avoid_questions(),
+            node_title=node_title,
+            node_topics=node_topics,
+        )
+        tiered["node"] = {
+            "level": "node", "label": "节点练习", "stage": stage,
+            "topic": node_result.get("topic", topic),
+            "difficulty": node_result.get("difficulty", difficulty),
+            "questions": node_result.get("questions", []),
         }
     except Exception as e:
-        print(f"[警告] 节点{stage}基础试题生成失败: {e}")
-        tiered["basic"] = {"level": "basic", "stage": stage, "questions": [], "topic": topic, "difficulty": basic_difficulty}
-
-    try:
-        advanced_result = await q_agent.generate_questions(topic, advanced_difficulty, profile)
-        tiered["advanced"] = {
-            "level": "advanced", "label": "提升考核", "stage": stage,
-            "topic": advanced_result.get("topic", topic),
-            "difficulty": advanced_result.get("difficulty", advanced_difficulty),
-            "questions": advanced_result.get("questions", []),
-        }
-    except Exception as e:
-        print(f"[警告] 节点{stage}提升试题生成失败: {e}")
-        tiered["advanced"] = {"level": "advanced", "stage": stage, "questions": [], "topic": topic, "difficulty": advanced_difficulty}
+        print(f"[警告] 节点{stage}练习题生成失败: {e}")
+        tiered["node"] = {"level": "node", "label": "节点练习", "stage": stage, "questions": [], "topic": topic, "difficulty": difficulty}
 
     save_tiered_questions_for_stage(session_id, stage, tiered)
     _broadcast(session_id, "试题生成 Agent", "completed",
-               f"试题生成完成: 基础{len(tiered['basic']['questions'])}题 + 提升{len(tiered['advanced']['questions'])}题", 94)
-    print(f"[分阶试题] 节点{stage}: 基础{len(tiered['basic']['questions'])}题 + 提升{len(tiered['advanced']['questions'])}题")
+               f"节点练习生成完成: {len(tiered['node']['questions'])}题", 94)
+    print(f"[节点练习] 节点{stage}: {len(tiered['node']['questions'])}题")
     return tiered
 
 
@@ -687,25 +750,40 @@ async def finalize_node_no_debate(state: AgentState) -> dict:
     session_id = state.get("session_id", "")
     profile = state.get("profile", {})
     learning_path = state.get("learning_path", {})
+    path_stages = _prepare_stage_states(learning_path)
+    stage_one = next((s for s in path_stages if s.get("stage") == 1), {}) if path_stages else {}
+    stage_one_topic = _stage_learning_topic(stage_one) if stage_one else topic
+    stage_one_difficulty = stage_one.get("difficulty", difficulty) if stage_one else difficulty
+    stage_one_saved = False
 
     # 直接使用生成的内容，不经过辩论验证
     for content_type, content in generated.items():
         final_resources.append({
             "type": content_type, "stage": 1,
-            "content": content, "topic": topic, "difficulty": difficulty,
+            "content": content, "topic": stage_one_topic, "difficulty": stage_one_difficulty,
+            "review_score": None, "review_passed": True,
         })
+        stage_one_saved = True
 
-    # 初始化 node_states
-    path_stages = learning_path.get("path", [])
-    for stage_data in path_stages:
-        stage_num = stage_data.get("stage", 0)
-        stage_data.setdefault("completed", False)
-        stage_data.setdefault("basic_test_passed", False)
-        stage_data.setdefault("advanced_test_passed", False)
-        stage_data.setdefault("has_resources", stage_num == 1)
-
-    # 生成试题
-    await _generate_and_cache_questions(session_id, 1, topic, difficulty, profile, learning_path)
+    # 生成全路径资源与试题
+    if path_stages:
+        total = len(path_stages)
+        for idx, stage_data in enumerate(path_stages, start=1):
+            stage_num = int(stage_data.get("stage", idx))
+            node_topic = _stage_learning_topic(stage_data)
+            node_difficulty = stage_data.get("difficulty", difficulty)
+            if not (stage_num == 1 and stage_one_saved):
+                _broadcast(session_id, "知识生成 Agent", "running",
+                           f"正在批量生成节点 {stage_num}/{total} 资源：{stage_data.get('title', node_topic)}",
+                           min(96, 84 + idx * 2))
+                final_resources.extend(
+                    await generate_resources_for_stage(session_id, stage_num, profile, learning_path)
+                )
+            await _generate_and_cache_questions(
+                session_id, stage_num, node_topic, node_difficulty, profile, learning_path
+            )
+    else:
+        await _generate_and_cache_questions(session_id, 1, topic, difficulty, profile, learning_path)
 
     # 添加学习路径
     if path_stages:
@@ -718,7 +796,7 @@ async def finalize_node_no_debate(state: AgentState) -> dict:
     return {
         "final_resources": final_resources,
         "learning_path": learning_path,
-        "decision_log": ["⑥ 工作流完成（无辩论）"],
+        "decision_log": ["⑥ 工作流完成（无辩论，5个节点资源+节点练习已就绪）"],
     }
 
 

@@ -3,185 +3,152 @@
     <div class="page-head">
       <p class="page-head__eyebrow">步骤 6</p>
       <h1 class="page-head__title">学习分析报告</h1>
-      <p class="page-head__desc">查看完整学习路径及各节点进度，根据需要进入学习或考核环节。</p>
+      <p class="page-head__desc">汇总学习完成情况、练习表现、资源匹配质量和后续改进建议。</p>
     </div>
 
-    <!-- 加载中 -->
     <div v-if="loading" class="flex flex-col items-center justify-center py-20">
       <div class="spinner"></div>
-      <p class="mt-4 text-text-2">加载学习路径...</p>
+      <p class="mt-4 text-text-2">正在生成分析报告...</p>
     </div>
 
-    <!-- 学习路径（主视图） -->
-    <div v-else-if="nodes.length > 0" class="path-section">
-      <!-- 总览卡片 -->
-      <div class="path-overview">
-        <div class="path-overview__left">
-          <div class="path-overview__title">学习路径</div>
-          <div class="path-overview__sub">{{ nodes.length }} 个节点 · 预估 {{ pathMeta.total_estimated_hours || '--' }} 小时</div>
+    <template v-else>
+      <div v-if="nodes.length === 0" class="card empty-card">
+        <p class="text-text-2 mb-4">暂未生成学习数据，请先完成 Agent 协同生成。</p>
+        <NuxtLink to="/workflow" class="btn btn--primary">前往 Agent 协同</NuxtLink>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-card__label">学习节点完成度</div>
+          <div class="summary-card__value">{{ completedCount }}/{{ nodes.length || 0 }}</div>
+          <div class="bar"><div class="bar__fill ok" :style="{ width: progressPercent + '%' }"></div></div>
+          <div class="summary-card__hint">{{ progressPercent }}% · {{ allCompleted ? '已完成全部节点' : `当前第 ${currentStage} 节` }}</div>
         </div>
-        <div class="path-overview__right">
-          <div class="path-progress-ring">
-            <svg viewBox="0 0 64 64" class="path-progress-ring__svg">
-              <circle cx="32" cy="32" r="28" fill="none" stroke="var(--line)" stroke-width="5" />
-              <circle
-                cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="5"
-                stroke-linecap="round"
-                :stroke-dasharray="2 * Math.PI * 28"
-                :stroke-dashoffset="2 * Math.PI * 28 * (1 - (nodes.length ? completedCount / nodes.length : 0))"
-                transform="rotate(-90 32 32)"
-              />
-            </svg>
-            <div class="path-progress-ring__text">
-              <span>{{ nodes.length ? Math.round(completedCount / nodes.length * 100) : 0 }}%</span>
+        <div class="summary-card">
+          <div class="summary-card__label">练习轮次</div>
+          <div class="summary-card__value">{{ practiceResults.length }}</div>
+          <div class="summary-card__hint">节点练习和综合练习累计次数</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card__label">平均正确率</div>
+          <div class="summary-card__value">{{ averagePracticeScore }}%</div>
+          <div class="summary-card__hint">{{ averagePracticeScore >= 70 ? '整体达标' : '建议继续巩固' }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card__label">综合练习</div>
+          <div class="summary-card__value">{{ comprehensiveResult ? `${comprehensiveResult.score}%` : '--' }}</div>
+          <div class="summary-card__hint">{{ comprehensiveHint }}</div>
+        </div>
+      </div>
+
+      <div class="report-grid" style="margin-top: 24px">
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">练习表现分析</h2>
+            <span class="badge badge--mute">{{ latestResults.length }} 条近期记录</span>
+          </div>
+          <div v-if="latestResults.length" class="practice-list">
+            <div v-for="item in latestResults" :key="item.created_at" class="practice-item">
+              <div>
+                <div class="practice-item__title">{{ levelName(item.level) }}</div>
+                <div class="practice-item__meta">
+                  {{ item.stage ? `节点 ${item.stage}` : '最终综合' }} · {{ formatDate(item.created_at) }}
+                </div>
+              </div>
+              <div class="practice-item__score" :class="{ ok: item.score >= 70, warn: item.score < 70 }">{{ item.score }}%</div>
+            </div>
+          </div>
+          <div v-else class="muted-box">暂无练习记录，完成一轮答题后这里会展示得分趋势。</div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">综合练习结果</h2>
+          </div>
+          <template v-if="comprehensiveResult">
+            <div class="final-score" :class="{ ok: comprehensiveResult.score >= 70 }">{{ comprehensiveResult.score }}%</div>
+            <p class="text-text-2" style="line-height: 1.8">
+              综合练习覆盖真实业务场景，包含图纸/工艺理解、装夹找正、程序识读、首件检测和异常处理。
+              本次答对 {{ comprehensiveResult.correct_count }}/{{ comprehensiveResult.question_count }} 题。
+            </p>
+          </template>
+          <template v-else>
+            <div class="muted-box">
+              {{ allCompleted ? '全部节点已完成，建议进入综合练习验证真实场景处理能力。' : '完成全部学习节点后解锁最终综合练习。' }}
+            </div>
+            <NuxtLink v-if="allCompleted" to="/practice?level=comprehensive" class="btn btn--primary mt-4">进入综合练习</NuxtLink>
+          </template>
+        </div>
+      </div>
+
+      <div class="report-grid" style="margin-top: 24px">
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">薄弱项与复习建议</h2>
+          </div>
+          <div v-if="weakItems.length" class="weak-list">
+            <div v-for="item in weakItems" :key="item.question" class="weak-item">
+              <span class="weak-item__count">{{ item.count }}次</span>
+              <span>{{ item.question }}</span>
+            </div>
+          </div>
+          <div v-else class="muted-box">暂无明显薄弱项。后续练习错误会在这里聚合。</div>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">后续建议</h2>
+          </div>
+          <div class="advice-list">
+            <div v-if="!allCompleted">继续学习第 {{ currentStage }} 节资源，完成后在学习资源页解锁下一节点。</div>
+            <div v-else-if="!comprehensiveResult">进入综合练习，验证完整业务场景处理能力。</div>
+            <div v-else-if="comprehensiveResult.score < 70">复盘综合练习错题，重点回看测量、报警和程序识读相关资源。</div>
+            <div v-else>综合练习已达标，可准备提交机台使用申请或进入实操训练。</div>
+          </div>
+          <div v-if="allCompleted" class="machine-block">
+            <button
+              v-if="machineStatus === 'none' || machineStatus === 'rejected'"
+              class="btn btn--primary"
+              :disabled="applyingMachine"
+              @click="handleApplyMachine"
+            >
+              {{ applyingMachine ? '提交中...' : '申请机台使用' }}
+            </button>
+            <div v-else class="machine-status" :class="machineStatus === 'approved' ? 'machine-status--approved' : 'machine-status--pending'">
+              {{ machineStatus === 'approved' ? '机台使用权限已批准' : '机台使用申请审批中' }}
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 节点列表 -->
-      <div class="path-steps">
-        <div
-          v-for="(node, idx) in nodes"
-          :key="node.stage"
-          class="path-step"
-          :class="{
-            'is-done': node.advanced_test_passed,
-            'is-current': node.stage === currentStage && !node.advanced_test_passed,
-          }"
-        >
-          <!-- 连接线 -->
-          <div v-if="idx < nodes.length - 1" class="path-step__line" :class="{ done: node.advanced_test_passed }" />
+      <hr class="section-divider" />
 
-          <!-- 步骤头 -->
-          <div class="path-step__head">
-            <div class="path-step__index" :class="{ done: node.advanced_test_passed, current: node.stage === currentStage && !node.advanced_test_passed }">
-              <span v-if="node.advanced_test_passed" class="path-step__check">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
-              </span>
-              <span v-else>{{ node.stage }}</span>
-            </div>
-            <div class="path-step__info">
-              <span class="path-step__title">{{ node.title }}</span>
-              <span :class="['path-step__tag', node.advanced_test_passed ? 'done' : node.basic_test_passed ? 'active' : node.has_resources ? 'ready' : 'pending']">
-                {{ node.advanced_test_passed ? '已通过' : node.basic_test_passed ? '基础已过' : node.has_resources ? '待考核' : '待生成' }}
-              </span>
-            </div>
+      <div class="section-head">
+        <h2 class="section-head__title">资源质量与匹配评估</h2>
+        <p class="section-head__desc">系统对本轮学习闭环的关键指标进行量化评估</p>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-cell">
+          <div class="metric-cell__label">知识谬误率</div>
+          <div class="metric-cell__value" :style="{ color: metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? 'var(--ok)' : 'var(--err)' }">
+            {{ metrics.hallucination_rate !== null ? metrics.hallucination_rate : '--' }}<span>%</span>
           </div>
-
-          <!-- 步骤体 -->
-          <div class="path-step__body">
-            <div v-if="node.topics?.length" class="path-step__topics">
-              {{ node.topics.join('  ·  ') }}
-            </div>
-            <div class="path-step__meta">
-              <span v-if="node.estimated_hours">{{ node.estimated_hours }}h</span>
-              <span v-if="node.difficulty">{{ difficultyLabel(node.difficulty) }}</span>
-              <span v-if="node.prerequisites?.length">前置: {{ node.prerequisites.join(', ') }}</span>
-            </div>
-
-            <!-- 操作按钮 -->
-            <div v-if="node.stage === currentStage && !node.advanced_test_passed && !allCompleted" class="path-step__actions">
-              <button
-                v-if="!node.has_resources"
-                class="btn btn--primary"
-                :disabled="generatingNode === node.stage"
-                @click="handleGenerateNode(node)"
-              >
-                {{ generatingNode === node.stage ? '生成中...' : '生成节点学习资源' }}
-              </button>
-              <template v-else>
-                <button class="btn btn--primary" @click="goToResources(node)">查看学习资源</button>
-                <button v-if="!node.basic_test_passed" class="btn btn--outline" @click="goToPractice('basic')">基础考核</button>
-                <button v-if="node.basic_test_passed && !node.advanced_test_passed" class="btn btn--outline" @click="goToPractice('advanced')">提升考核</button>
-              </template>
-            </div>
-          </div>
+          <div class="metric-cell__hint">目标 &lt; 5% · {{ metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? '已达标' : '待优化' }}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-cell__label">难度匹配准确率</div>
+          <div class="metric-cell__value accent">{{ metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate : '--' }}<span>%</span></div>
+          <div class="metric-cell__hint">目标 ≥ 85% · {{ metrics.difficulty_match_rate !== null && metrics.difficulty_match_rate >= 85 ? '已达标' : '待优化' }}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-cell__label">知识点覆盖率</div>
+          <div class="metric-cell__value accent">{{ metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate : '--' }}<span>%</span></div>
+          <div class="metric-cell__hint">目标 ≥ 90% · {{ metrics.knowledge_coverage_rate !== null && metrics.knowledge_coverage_rate >= 90 ? '已达标' : '待优化' }}</div>
         </div>
       </div>
 
-      <!-- 全部完成 -->
-      <div v-if="allCompleted" class="card" style="margin-top: 32px; text-align: center; padding: 40px">
-        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 8px">学习路径全部完成</h2>
-        <p class="text-text-2 mb-6">你已通过所有节点的考核，可以选择申请机台使用权限。</p>
-
-        <!-- 机台申请区域 -->
-        <div v-if="machineStatus === 'none' || machineStatus === 'rejected'" style="margin-bottom: 20px">
-          <button
-            class="btn btn--primary btn--lg"
-            :disabled="applyingMachine"
-            @click="handleApplyMachine"
-          >
-            {{ applyingMachine ? '提交中...' : '申请机台使用' }}
-          </button>
-          <p v-if="machineStatus === 'rejected'" style="margin-top: 12px; font-size: 13px; color: var(--err)">
-            上次申请未通过，可以重新提交申请
-          </p>
-        </div>
-        <div v-else-if="machineStatus === 'pending'" class="machine-status machine-status--pending">
-          <span class="machine-status__dot"></span>
-          审批中，请耐心等待管理员审核
-        </div>
-        <div v-else-if="machineStatus === 'approved'" class="machine-status machine-status--approved">
-          <span class="machine-status__dot"></span>
-          机台使用权限已批准，可以上机操作
-        </div>
-
-        <NuxtLink to="/" class="btn btn--text" style="margin-top: 16px">返回首页</NuxtLink>
-      </div>
-    </div>
-
-    <!-- 无学习路径时的降级显示 -->
-    <div v-else-if="!loading" class="card" style="text-align: center; padding: 40px">
-      <p class="text-text-2 mb-4">暂未生成学习路径，请先完成 Agent 协同生成。</p>
-      <NuxtLink to="/workflow" class="btn btn--primary">前往 Agent 协同</NuxtLink>
-    </div>
-
-    <!-- 分隔 -->
-    <hr class="section-divider" />
-
-    <!-- 核心指标（保留原有） -->
-    <div class="section-head">
-      <h2 class="section-head__title">核心指标评估</h2>
-      <p class="section-head__desc">系统对本轮学习闭环的关键指标进行量化评估</p>
-    </div>
-
-    <div class="metric-grid">
-      <div class="metric-cell">
-        <div style="font-size: 12px; color: var(--text-3)">知识谬误率</div>
-        <div style="font-size: 38px; font-weight: 600; letter-spacing: -.035em; margin-top: 8px; line-height: 1.1;" :style="{ color: metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? 'var(--ok)' : 'var(--err)' }">
-          {{ metrics.hallucination_rate !== null ? metrics.hallucination_rate : '--' }}<span style="font-size: 20px">%</span>
-        </div>
-        <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">目标 &lt; 5% · {{ metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? '已达标' : '待优化' }}</div>
-        <div class="bar" style="margin-top: 14px">
-          <div class="bar__fill" :class="metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? 'ok' : ''" :style="{ width: metrics.hallucination_rate !== null ? (metrics.hallucination_rate * 20) + '%' : '0%' }"></div>
-        </div>
-      </div>
-      <div class="metric-cell">
-        <div style="font-size: 12px; color: var(--text-3)">难度匹配准确率</div>
-        <div style="font-size: 38px; font-weight: 600; letter-spacing: -.035em; margin-top: 8px; line-height: 1.1; color: var(--accent)">
-          {{ metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate : '--' }}<span style="font-size: 20px">%</span>
-        </div>
-        <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">目标 ≥ 85% · {{ metrics.difficulty_match_rate !== null && metrics.difficulty_match_rate >= 85 ? '已达标' : '待优化' }}</div>
-        <div class="bar" style="margin-top: 14px">
-          <div class="bar__fill" :style="{ width: metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate + '%' : '0%' }"></div>
-        </div>
-      </div>
-      <div class="metric-cell">
-        <div style="font-size: 12px; color: var(--text-3)">知识点覆盖率</div>
-        <div style="font-size: 38px; font-weight: 600; letter-spacing: -.035em; margin-top: 8px; line-height: 1.1; color: var(--accent)">
-          {{ metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate : '--' }}<span style="font-size: 20px">%</span>
-        </div>
-        <div style="font-size: 12px; color: var(--text-3); margin-top: 6px">目标 ≥ 90% · {{ metrics.knowledge_coverage_rate !== null && metrics.knowledge_coverage_rate >= 90 ? '已达标' : '待优化' }}</div>
-        <div class="bar" style="margin-top: 14px">
-          <div class="bar__fill" :style="{ width: metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate + '%' : '0%' }"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 匹配曲线 -->
-    <div class="report-grid" style="margin-top: 24px">
-      <div class="card">
+      <div class="card" style="margin-top: 24px">
         <div class="card__head">
           <h2 class="card__title">学习者水平与资源难度匹配曲线</h2>
         </div>
@@ -192,44 +159,23 @@
         <ClientOnly>
           <ReportDifficultyMatchCurve :data="matchCurveData" />
           <template #fallback>
-            <div style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: 14px">加载图表中...</div>
+            <div class="chart-fallback">加载图表中...</div>
           </template>
         </ClientOnly>
       </div>
-
-      <!-- 匹配曲线说明 -->
-      <div class="card">
-        <div class="card__head">
-          <h2 class="card__title">学习统计</h2>
-        </div>
-        <div style="font-size: 13px; color: var(--text-2); line-height: 2">
-          <div> 学习路径节点：<strong>{{ nodes.length }}</strong> 个</div>
-          <div> 已完成节点：<strong>{{ completedCount }}</strong> 个</div>
-          <div> 当前节点：<strong>{{ currentNodeTitle }}</strong></div>
-          <div> 预估总时长：<strong>{{ pathMeta.total_estimated_hours || '--' }}</strong> 小时</div>
-          <div> 整体进度：<strong>{{ nodes.length ? Math.round(completedCount / nodes.length * 100) : 0 }}%</strong></div>
-        </div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-const router = useRouter()
 const api = useApi()
-const { sessionId, profile } = useSession()
-const { nodes, currentStage, allCompleted, fetchLearningPath } = useLearningPath()
+const { sessionId } = useSession()
+const { nodes, currentStage, allCompleted } = useLearningPath()
 
 const loading = ref(true)
-
-// 机台申请状态
+const practiceResults = ref<any[]>([])
 const machineStatus = ref<string>('none')
 const applyingMachine = ref(false)
-
-const pathMeta = ref({
-  total_estimated_hours: 0,
-  recommended_order: '',
-})
 
 const matchCurveData = ref({
   learnerLevel: 2.5,
@@ -242,48 +188,48 @@ const metrics = ref({
   knowledge_coverage_rate: null as number | null,
 })
 
-// 计算属性
 const completedCount = computed(() =>
-  nodes.value.filter(n => n.advanced_test_passed || n.completed).length
+  nodes.value.filter(n => n.completed || n.advanced_test_passed).length
 )
-
-const currentNodeTitle = computed(() => {
-  const node = nodes.value.find(n => n.stage === currentStage.value)
-  return node?.title || '暂无'
+const progressPercent = computed(() => nodes.value.length ? Math.round(completedCount.value / nodes.value.length * 100) : 0)
+const averagePracticeScore = computed(() => {
+  if (!practiceResults.value.length) return 0
+  const total = practiceResults.value.reduce((sum, item) => sum + Number(item.score || 0), 0)
+  return Math.round(total / practiceResults.value.length)
+})
+const latestResults = computed(() => [...practiceResults.value].reverse().slice(0, 6))
+const comprehensiveResult = computed(() =>
+  [...practiceResults.value].reverse().find(item => item.level === 'comprehensive')
+)
+const comprehensiveHint = computed(() => {
+  if (comprehensiveResult.value) return comprehensiveResult.value.score >= 70 ? '最终场景练习已达标' : '最终场景练习需复盘'
+  return allCompleted.value ? '已解锁，待完成' : '完成全部节点后解锁'
+})
+const weakItems = computed(() => {
+  const counter = new Map<string, number>()
+  practiceResults.value.forEach(item => {
+    ;(item.questions || []).forEach((q: any) => {
+      if (q.is_correct === false && q.question) {
+        counter.set(q.question, (counter.get(q.question) || 0) + 1)
+      }
+    })
+  })
+  return Array.from(counter.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([question, count]) => ({ question, count }))
 })
 
-// 难度标签
-const difficultyLabel = (d: string) => {
-  const map: Record<string, string> = { beginner: '初级', intermediate: '中级', advanced: '高级', expert: '专家' }
-  return map[d] || d
-}
-const difficultyBadgeClass = (d: string) => {
-  const map: Record<string, string> = { beginner: 'badge--mute', intermediate: 'badge--accent', advanced: 'badge--warn', expert: 'badge--err' }
-  return map[d] || 'badge--mute'
+const levelName = (level: string) => {
+  const map: Record<string, string> = { node: '节点练习', basic: '节点练习', advanced: '节点练习', comprehensive: '综合练习' }
+  return map[level] || level
 }
 
-// 按需生成节点内容
-const generatingNode = ref(0)
-
-const handleGenerateNode = async (node: any) => {
-  if (!sessionId.value || generatingNode.value) return
-  generatingNode.value = node.stage
-  try {
-    await api.generateNodeContent(sessionId.value, node.stage)
-    node.has_resources = true
-  } catch (err) {
-    console.warn('节点内容生成失败:', err)
-  } finally {
-    generatingNode.value = 0
-  }
-}
-
-// 导航
-const goToResources = (node: any) => {
-  router.push({
-    path: '/resources',
-    query: { stage: String(node.stage) },
-  })
+const formatDate = (value: string) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 const handleApplyMachine = async () => {
@@ -298,37 +244,22 @@ const handleApplyMachine = async () => {
   }
 }
 
-const goToPractice = (level: string) => {
-  router.push({
-    path: '/practice',
-    query: { level },
-  })
-}
-
-// 初始化
 onMounted(async () => {
   loading.value = true
-
-  // 并行加载学习路径和可视化数据
   if (sessionId.value) {
     try {
-      const [pathData, vizData] = await Promise.allSettled([
+      const [pathData, vizData, practiceData] = await Promise.allSettled([
         api.getLearningPath(sessionId.value),
         api.getVisualization(sessionId.value).catch(() => null),
+        api.getPracticeResults(sessionId.value).catch(() => ({ results: [] })),
       ])
 
-      // 学习路径
       if (pathData.status === 'fulfilled' && pathData.value) {
         nodes.value = pathData.value.nodes || []
         currentStage.value = pathData.value.current_stage || 1
         allCompleted.value = pathData.value.all_completed || false
-        pathMeta.value = {
-          total_estimated_hours: pathData.value.total_estimated_hours || 0,
-          recommended_order: pathData.value.recommended_order || '',
-        }
       }
 
-      // 可视化数据（指标 + 匹配曲线）
       const viz = vizData.status === 'fulfilled' ? vizData.value : null
       if (viz) {
         if (viz.match_curve) {
@@ -338,326 +269,78 @@ onMounted(async () => {
             resources: viz.match_curve.resources || [],
           }
         }
-        if (viz.metrics) {
-          metrics.value = viz.metrics
-        }
+        if (viz.metrics) metrics.value = viz.metrics
+      }
+
+      if (practiceData.status === 'fulfilled') {
+        practiceResults.value = practiceData.value.results || []
       }
     } catch (err) {
       console.warn('获取报告数据失败:', err)
     }
 
-    // 获取机台审批状态
     try {
       const profile = await api.getMyProfile()
       machineStatus.value = (profile as any).machine_approval_status || 'none'
     } catch {
-      // 忽略
+      // 用户尚未建档时忽略
     }
   }
-
   loading.value = false
 })
 </script>
 
 <style scoped>
-/* ── 学习路径步骤条 ── */
-.path-section {
-  margin-bottom: 8px;
-}
-.path-overview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius) var(--radius) 0 0;
-  margin-bottom: 0;
-}
-.path-overview__left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.path-overview__title {
-  font-size: 16px;
-  font-weight: 600;
-}
-.path-overview__sub {
-  font-size: 13px;
-  color: var(--text-2);
-}
-.path-progress-ring {
-  position: relative;
-  width: 56px;
-  height: 56px;
-}
-.path-progress-ring__svg {
-  width: 100%;
-  height: 100%;
-  transition: stroke-dashoffset .5s ease;
-}
-.path-progress-ring__text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: var(--mono);
-  color: var(--accent);
-}
-
-.path-steps {
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  border-radius: 0 0 var(--radius) var(--radius);
-  overflow: hidden;
-}
-.path-step {
-  padding: 22px 24px;
-  position: relative;
-  border-bottom: 1px solid var(--line);
-}
-.path-step:last-child {
-  border-bottom: none;
-}
-.path-step.is-done {
-  background: var(--bg-muted);
-}
-.path-step.is-current {
-  background: linear-gradient(135deg, rgba(99,102,241,.04) 0%, transparent 50%);
-  border-left: 3px solid var(--accent);
-  margin-left: -1px;
-}
-
-.path-step__line {
-  display: none;
-}
-.path-step__head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.path-step__check {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.path-step__index {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: var(--mono);
-  background: var(--bg-muted);
-  color: var(--text-3);
-  border: 2px solid var(--line);
-}
-.path-step__index.done {
-  background: var(--ok);
-  color: #fff;
-  border-color: var(--ok);
-}
-.path-step__index.current {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 5px rgba(99,102,241,.12);
-}
-.path-step__info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-.path-step__title {
-  font-size: 15px;
-  font-weight: 600;
-}
-.path-step__tag {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 10px;
-  border-radius: 99px;
-  flex-shrink: 0;
-}
-.path-step__tag.done {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
-.path-step__tag.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.path-step__tag.ready {
-  background: #FEF3C7;
-  color: #D97706;
-}
-.path-step__tag.pending {
-  background: var(--bg-muted);
-  color: var(--text-3);
-}
-.path-step__body {
-  margin-top: 12px;
-  padding-left: 48px;
-}
-.path-step__topics {
-  font-size: 13px;
-  color: var(--text-2);
-  line-height: 1.6;
-}
-.path-step__meta {
-  font-size: 12px;
-  color: var(--text-3);
-  margin-top: 6px;
-  display: flex;
-  gap: 14px;
-}
-.path-step__actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-  flex-wrap: wrap;
-}
-
-.btn--outline {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius-sm);
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all .15s;
-}
-.btn--outline:hover {
-  border-color: var(--text-3);
-  background: var(--bg-soft);
-}
-
-/* ── 分隔线 ── */
-.section-divider {
-  border: none;
-  border-top: 1px solid var(--line);
-  margin: 32px 0;
-}
-.section-head {
-  margin-bottom: 20px;
-}
-.section-head__title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.section-head__desc {
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-/* ── 指标卡片 ── */
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.metric-cell {
-  background: var(--bg);
-  padding: 26px 24px;
-  text-align: center;
-}
-.report-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-.legend-bar {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  font-size: 12px;
-  color: var(--text-2);
-  margin-bottom: 16px;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.legend-line {
-  width: 20px;
-  height: 2px;
-  display: inline-block;
-}
-
-/* ── spinner ── */
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--line);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ── 机台申请状态 ── */
-.machine-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-.machine-status--pending {
-  background: #FFFBEB;
-  color: #D97706;
-  border: 1px solid #FDE68A;
-}
-.machine-status--approved {
-  background: #ECFDF5;
-  color: #059669;
-  border: 1px solid #A7F3D0;
-}
-.machine-status__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.machine-status--pending .machine-status__dot {
-  background: #D97706;
-  animation: pulse-dot 1.5s ease-in-out infinite;
-}
-.machine-status--approved .machine-status__dot {
-  background: #059669;
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .4; }
-}
-
-@media (max-width: 760px) {
-  .metric-grid { grid-template-columns: 1fr; }
+.empty-card { text-align: center; padding: 40px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.summary-card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 20px; }
+.summary-card__label { font-size: 12px; color: var(--text-3); margin-bottom: 10px; }
+.summary-card__value { font-size: 34px; font-weight: 700; letter-spacing: -.04em; color: var(--text); line-height: 1.1; }
+.summary-card__hint { font-size: 12px; color: var(--text-2); margin-top: 10px; }
+.report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.practice-list { display: flex; flex-direction: column; gap: 10px; }
+.practice-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.practice-item__title { font-size: 14px; font-weight: 600; }
+.practice-item__meta { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+.practice-item__score { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+.practice-item__score.ok { color: var(--ok); }
+.practice-item__score.warn { color: var(--warn); }
+.final-score { font-family: var(--mono); font-size: 52px; font-weight: 800; letter-spacing: -.05em; color: var(--warn); margin-bottom: 12px; }
+.final-score.ok { color: var(--ok); }
+.muted-box { color: var(--text-2); background: var(--bg-muted); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px; line-height: 1.7; font-size: 13px; }
+.weak-list { display: flex; flex-direction: column; gap: 10px; }
+.weak-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px; line-height: 1.6; }
+.weak-item__count { flex-shrink: 0; font-family: var(--mono); color: var(--err); background: var(--err-soft); border-radius: 99px; padding: 2px 8px; font-size: 12px; }
+.advice-list { color: var(--text-2); line-height: 1.8; font-size: 14px; }
+.machine-block { margin-top: 18px; }
+.machine-status { display: inline-flex; align-items: center; padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; }
+.machine-status--pending { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+.machine-status--approved { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+.section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+.section-head { margin-bottom: 20px; }
+.section-head__title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.section-head__desc { font-size: 13px; color: var(--text-2); }
+.metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.metric-cell { background: var(--bg); padding: 26px 24px; text-align: center; }
+.metric-cell__label { font-size: 12px; color: var(--text-3); }
+.metric-cell__value { font-size: 38px; font-weight: 700; letter-spacing: -.04em; margin-top: 8px; line-height: 1.1; }
+.metric-cell__value span { font-size: 20px; }
+.metric-cell__value.accent { color: var(--accent); }
+.metric-cell__hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+.legend-bar { display: flex; align-items: center; gap: 20px; font-size: 12px; color: var(--text-2); margin-bottom: 16px; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-line { width: 20px; height: 2px; display: inline-block; }
+.chart-fallback { height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: 14px; }
+.spinner { width: 48px; height: 48px; border: 4px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 12px; }
+.bar__fill { height: 100%; border-radius: 3px; transition: width .4s ease; background: var(--accent); }
+.bar__fill.ok { background: var(--ok); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (max-width: 960px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
   .report-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .summary-grid, .metric-grid { grid-template-columns: 1fr; }
 }
 </style>

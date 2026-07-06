@@ -47,6 +47,9 @@ const columns: DataTableColumns<LearnerItem> = [
     width: 90,
     sorter: true,
     render(row) {
+      if (!row.profile_created) {
+        return h('span', { style: 'font-size:12px; color:#9CA3AF' }, '未建档')
+      }
       return h('span', { style: 'font-size:13px; color:#4B5563' }, LEVEL_MAP[row.overall_level] || row.overall_level || '-')
     },
   },
@@ -81,6 +84,9 @@ const columns: DataTableColumns<LearnerItem> = [
     width: 100,
     fixed: 'right',
     render(row) {
+      if (!row.profile_created || !row.id) {
+        return h('span', { style: 'color:#9CA3AF; font-size:13px' }, '未建档')
+      }
       return h('a', {
         style: 'color:#4F46E5; cursor:pointer; font-size:13px',
         onClick: () => router.push({ name: 'UserDetail', params: { id: row.id } }),

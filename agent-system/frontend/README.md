@@ -1,6 +1,6 @@
 # C 端学习平台
 
-面向学员的个性化学习前端，基于 Nuxt 3 构建，覆盖「画像填写 → 学情诊断 → Agent 协同 → 资源学习 → 答题考核 → 学习报告」完整闭环。
+面向学员的个性化学习前端，基于 Nuxt 3 构建，覆盖「画像填写 → 学情诊断 → Agent 协同 → 资源学习 → 答题练习 → 学习报告」完整闭环。
 
 ## 技术栈
 
@@ -46,7 +46,7 @@ frontend/
 │   ├── dashboard.vue         # 学情诊断仪表盘 (Step 2) — 雷达图 + 盲区定位
 │   ├── workflow.vue          # Agent 协同 (Step 3) — 实时状态监控
 │   ├── resources.vue         # 学习资源 (Step 4) — 讲义/实验指导/项目案例
-│   ├── practice.vue          # 答题考核 (Step 5) — 分阶试题 + 苏格拉底追问
+│   ├── practice.vue          # 答题练习 (Step 5) — 分阶练习 + 苏格拉底追问
 │   ├── report.vue            # 学习报告 (Step 6) — 学习路径 + 核心指标
 │   ├── history.vue           # 学习历程
 │   └── trace.vue             # 工作流追踪 (调试)
@@ -86,7 +86,7 @@ frontend/
     → 学情诊断仪表盘 (Step 2) — 雷达图 + 盲区
     → Agent 协同生成 (Step 3) — 6 Agent 实时状态
     → 查看生成资源 (Step 4) — 讲义/指导/案例
-    → 答题考核 (Step 5) — 基础考核 → 提升考核
+    → 答题练习 (Step 5) — 节点练习 / 综合练习
     → 学习报告 (Step 6) — 路径进度 + 机台申请
     → 推进到下一节点 → 回到 Step 4 ...
 ```
@@ -101,7 +101,7 @@ frontend/
 | 学情诊断 | `/dashboard` | 知识雷达图 + 盲区定位 + 推荐难度 |
 | Agent 协同 | `/workflow` | 6 Agent 实时状态 + 资源生成进度 |
 | 学习资源 | `/resources?stage=N` | 讲义/实验指导/项目案例 + 参考来源 |
-| 答题考核 | `/practice?level=basic\|advanced` | 分阶试题 + 苏格拉底追问 + 实操题 |
+| 答题练习 | `/practice?level=node\|comprehensive` | 节点练习 + 综合练习 + 苏格拉底追问 + 简答批改 |
 | 学习报告 | `/report` | 学习路径进度 + 核心指标 + 机台申请 |
 | 学习历程 | `/history` | 画像演变历史 |
 | 工作流追踪 | `/trace` | Agent LLM 调用明细 (调试) |

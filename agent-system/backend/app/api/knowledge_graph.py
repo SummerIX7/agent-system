@@ -9,7 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, require_admin
+from app.core.config import get_settings
 from app.models.database import get_db
 from app.models.learner import Learner
 from app.models.user import User
@@ -26,8 +27,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["知识图谱"])
 
 # ── 路径配置 ──
-_KNOWLEDGE_BASE_DIR = Path(r"D:\agent-system\agent-system\knowledge-base\cnc_domain")
-_PROGRESS_DIR = Path(r"D:\agent-system\agent-system\data\progress")
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+_PROJECT_ROOT = _BACKEND_DIR.parent
+
+
+def _resolve_kb_dir() -> Path:
+    """从 .env 的 KNOWLEDGE_BASE_DIRS 解析知识库目录，避免硬编码本机路径。"""
+    first_dir = get_settings().KNOWLEDGE_BASE_DIRS.split(",")[0].strip()
+    path = Path(first_dir)
+    if not path.is_absolute():
+        path = _BACKEND_DIR / path
+    return path.resolve()
+
+
+_KNOWLEDGE_BASE_DIR = _resolve_kb_dir()
+_PROGRESS_DIR = (_PROJECT_ROOT / "data" / "progress").resolve()
 
 # ── 分类中文标签映射 ──
 _CATEGORY_LABELS: dict[str, str] = {}
@@ -164,6 +178,305 @@ def _collect_leaf_index() -> dict[str, str]:
     return leaf_nodes
 
 
+def _clamp_score(score: Any, default: int = 0) -> int:
+    """标准化掌握度分数，兼容 0-1 和 0-100 两种输入。"""
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        value = float(default)
+    if 0 < value <= 1:
+        value *= 100
+    return max(0, min(100, int(round(value))))
+
+
+def _status_from_score(score: int) -> str:
+    """掌握度状态：mastered / learning / weak / recommended。"""
+    if score >= 80:
+        return "mastered"
+    if score >= 60:
+        return "learning"
+    if score > 0:
+        return "weak"
+    return "recommended"
+
+
+def _status_label(status: str) -> str:
+    labels = {
+        "mastered": "掌握度 >= 80%",
+        "learning": "掌握度 60-79%",
+        "weak": "掌握度 < 60%",
+        "recommended": "建议重点学习",
+    }
+    return labels.get(status, status)
+
+
+def _normalize_node_scores(raw_scores: Any) -> dict[str, dict]:
+    """兼容旧/新 node_scores 结构，统一为 {node_id: {score, status, ...}}。"""
+    node_scores: dict[str, dict] = {}
+    if not isinstance(raw_scores, dict):
+        return node_scores
+
+    for node_id, value in raw_scores.items():
+        if not node_id:
+            continue
+        if isinstance(value, dict):
+            entry = dict(value)
+            score = _clamp_score(entry.get("score", 0))
+        else:
+            entry = {}
+            score = _clamp_score(value)
+        entry["score"] = score
+        entry["status"] = _status_from_score(score)
+        node_scores[str(node_id)] = entry
+    return node_scores
+
+
+def _normalize_progress(data: Any) -> dict:
+    """
+    统一学习进度结构。
+    兼容旧版 {completed_nodes, history}，新版额外包含 node_scores。
+    """
+    if not isinstance(data, dict):
+        data = {}
+
+    history = data.get("history", [])
+    if not isinstance(history, list):
+        history = []
+
+    completed = data.get("completed_nodes", [])
+    if not isinstance(completed, list):
+        completed = []
+
+    # 旧文件可能只有 history，没有 completed_nodes，先从历史重建。
+    if not completed and history:
+        completed_set = set()
+        for entry in history:
+            if not isinstance(entry, dict):
+                continue
+            nid = entry.get("node_id", "")
+            action = entry.get("action", "")
+            if not nid:
+                continue
+            if action in ("completed", "auto_completed", "score_update"):
+                score = _clamp_score(entry.get("score", 100 if action != "score_update" else 0))
+                if score >= 80:
+                    completed_set.add(nid)
+            elif action == "uncompleted":
+                completed_set.discard(nid)
+        completed = sorted(completed_set)
+
+    node_scores = _normalize_node_scores(data.get("node_scores", {}))
+
+    # 旧版 completed_nodes 视为已掌握，补齐 node_scores。
+    for node_id in completed:
+        current = node_scores.get(node_id, {})
+        if _clamp_score(current.get("score", 0)) < 80:
+            current.update({
+                "score": 100,
+                "status": "mastered",
+                "source": current.get("source", "legacy_completed"),
+            })
+            node_scores[node_id] = current
+
+    completed_nodes = sorted(
+        node_id
+        for node_id, entry in node_scores.items()
+        if _clamp_score(entry.get("score", 0)) >= 80
+    )
+
+    return {
+        "completed_nodes": completed_nodes,
+        "node_scores": node_scores,
+        "history": history,
+    }
+
+
+def _leaf_ids_from_tree(tree: dict) -> set[str]:
+    ids: set[str] = set()
+
+    def _walk(node: dict) -> None:
+        if node.get("is_leaf") and node.get("id"):
+            ids.add(node["id"])
+        for child in node.get("children", []):
+            _walk(child)
+
+    _walk(tree)
+    return ids
+
+
+def _progress_stats(progress: dict, total_leaves: int, leaf_ids: set[str] | None = None) -> dict:
+    """按叶子知识点统计掌握度分布。"""
+    progress = _normalize_progress(progress)
+    node_scores = progress.get("node_scores", {})
+    target_ids = leaf_ids or set(node_scores.keys())
+    scores = [
+        _clamp_score(node_scores.get(node_id, {}).get("score", 0))
+        for node_id in target_ids
+    ]
+    total = total_leaves if total_leaves else len(scores)
+    mastered = sum(1 for score in scores if score >= 80)
+    learning = sum(1 for score in scores if 60 <= score < 80)
+    weak = sum(1 for score in scores if 0 < score < 60)
+    recommended = max(0, total - mastered - learning - weak)
+    average_score = round(sum(scores) / total, 1) if total > 0 else 0
+    percentage = round(mastered / total * 100, 1) if total > 0 else 0
+    return {
+        "total": total,
+        "mastered": mastered,
+        "learning": learning,
+        "weak": weak,
+        "recommended": recommended,
+        "to_improve": max(0, total - mastered),
+        "average_score": average_score,
+        "percentage": percentage,
+    }
+
+
+def _apply_score_update(
+    progress: dict,
+    node_id: str,
+    score: Any,
+    source: str = "manual",
+    action: str = "score_update",
+    extra: dict | None = None,
+) -> dict:
+    """更新单个节点掌握度，并同步 completed_nodes。"""
+    progress = _normalize_progress(progress)
+    score_value = _clamp_score(score)
+    status = _status_from_score(score_value)
+
+    import datetime
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    previous = progress["node_scores"].get(node_id, {})
+    previous_score = _clamp_score(previous.get("score", 0))
+    entry = dict(previous)
+    entry.update({
+        "score": score_value,
+        "status": status,
+        "source": source,
+        "updated_at": now,
+    })
+    progress["node_scores"][node_id] = entry
+
+    history_entry = {
+        "node_id": node_id,
+        "action": action,
+        "timestamp": now,
+        "source": source,
+        "score": score_value,
+        "status": status,
+        "previous_score": previous_score,
+    }
+    if extra:
+        history_entry.update(extra)
+    progress["history"].append(history_entry)
+
+    progress["completed_nodes"] = sorted(
+        nid
+        for nid, node_score in progress["node_scores"].items()
+        if _clamp_score(node_score.get("score", 0)) >= 80
+    )
+    return progress
+
+
+def _match_leaf_id(item_name: str, leaf_nodes: dict[str, str]) -> str | None:
+    """将学习路径主题/知识点名称匹配到知识库叶子节点 ID。"""
+    if not item_name:
+        return None
+
+    def _normalize(s: str) -> str:
+        return s.replace(" ", "").replace("　", "").strip()
+
+    norm_item = _normalize(item_name)
+    matched_id = leaf_nodes.get(item_name)
+    if matched_id:
+        return matched_id
+
+    for leaf_name, leaf_id in leaf_nodes.items():
+        if _normalize(leaf_name) == norm_item:
+            return leaf_id
+
+    for leaf_name, leaf_id in leaf_nodes.items():
+        norm_leaf = _normalize(leaf_name)
+        if norm_item in norm_leaf or norm_leaf in norm_item:
+            return leaf_id
+
+    if len(item_name) >= 2:
+        keywords = item_name.replace("（", " ").replace("）", " ")
+        keywords = keywords.replace("(", " ").replace(")", " ")
+        keywords = keywords.replace("/", " ").replace("、", " ").replace("，", " ")
+        keywords = keywords.replace("与", " ").replace("及", " ").replace("的", " ")
+        for kw in keywords.split():
+            if len(kw) < 2:
+                continue
+            norm_kw = _normalize(kw)
+            for leaf_name, leaf_id in leaf_nodes.items():
+                if norm_kw in _normalize(leaf_name):
+                    return leaf_id
+
+    return None
+
+
+async def mark_learning_event_by_learner_id(
+    db: AsyncSession,
+    learner_id: str | int,
+    knowledge_items: list[str],
+    score: Any,
+    source: str,
+) -> dict:
+    """
+    根据学习路径/考核事件更新知识图谱掌握度。
+    用于“学生学习了会点亮”的自动触发，不改变原有业务表结构。
+    """
+    try:
+        lid = int(learner_id)
+    except (ValueError, TypeError):
+        return {"marked_count": 0, "matched": []}
+
+    stmt = select(Learner, User.username).join(User, Learner.user_id == User.id).where(Learner.id == lid)
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+    if not row:
+        return {"marked_count": 0, "matched": []}
+
+    learner, username = row
+    progress = _load_progress(username)
+    leaf_nodes = _collect_leaf_index()
+    matched: list[dict] = []
+
+    for item in knowledge_items:
+        leaf_id = _match_leaf_id(str(item), leaf_nodes)
+        if not leaf_id:
+            continue
+        current_score = _clamp_score(progress.get("node_scores", {}).get(leaf_id, {}).get("score", 0))
+        target_score = max(current_score, _clamp_score(score))
+        progress = _apply_score_update(
+            progress,
+            leaf_id,
+            target_score,
+            source=source,
+            action="score_update",
+            extra={"matched_name": item},
+        )
+        matched.append({
+            "node_id": leaf_id,
+            "matched_name": item,
+            "score": target_score,
+        })
+
+    if matched:
+        _save_progress(username, progress)
+        await _sync_progress_to_db(username, progress, db)
+    elif learner.kg_progress is None:
+        learner.kg_progress = build_kg_progress_for_learner(username)
+
+    return {
+        "marked_count": len(matched),
+        "matched": matched,
+    }
+
+
 def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
     """
     根据分析报告涉及的知识点，自动标记对应知识图谱节点为已学习。
@@ -250,6 +563,7 @@ def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
             marked_count += 1
 
     progress["completed_nodes"] = sorted(completed)
+    progress = _normalize_progress(progress)
     _save_progress(username, progress)
 
     total_leaves = tree.get("total_leaves", 0)
@@ -265,7 +579,7 @@ def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
         "username": username,
         "marked_count": marked_count,
         "total_provided": len(knowledge_items),
-        "completed_nodes": sorted(completed),
+        "completed_nodes": progress.get("completed_nodes", []),
         "total": total_leaves,
         "percentage": percentage,
     }
@@ -284,33 +598,16 @@ def _progress_file_path(username: str) -> Path:
 
 
 def _load_progress(username: str) -> dict:
-    """加载用户学习进度，返回 {completed_nodes: [...], history: [...]}"""
+    """加载用户学习进度，返回 {completed_nodes, node_scores, history}"""
     file_path = _progress_file_path(username)
     if file_path.exists():
         try:
             data = json.loads(file_path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                completed = data.get("completed_nodes", [])
-                history = data.get("history", [])
-                # 如果 completed_nodes 为空但 history 有记录，从 history 重建
-                if not completed and history:
-                    completed_set = set()
-                    for entry in history:
-                        nid = entry.get("node_id", "")
-                        action = entry.get("action", "")
-                        if nid:
-                            if action in ("completed", "auto_completed"):
-                                completed_set.add(nid)
-                            elif action == "uncompleted":
-                                completed_set.discard(nid)
-                    completed = sorted(completed_set)
-                return {
-                    "completed_nodes": completed,
-                    "history": history,
-                }
+                return _normalize_progress(data)
         except Exception:
             logger.warning(f"进度文件损坏，重新创建: {file_path}")
-    return {"completed_nodes": [], "history": []}
+    return _normalize_progress({})
 
 
 def _save_progress(username: str, progress: dict) -> None:
@@ -326,14 +623,19 @@ async def _sync_progress_to_db(username: str, progress: dict, db: AsyncSession) 
     """将知识图谱进度同步到数据库 learners.kg_progress"""
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
+    leaf_ids = _leaf_ids_from_tree(tree)
+    leaf_ids = _leaf_ids_from_tree(tree)
+    progress = _normalize_progress(progress)
     completed = progress.get("completed_nodes", [])
-    percentage = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
+    stats = _progress_stats(progress, total_leaves, leaf_ids)
 
     kg_data = {
         "completed_nodes": completed,
+        "node_scores": progress.get("node_scores", {}),
         "history": progress.get("history", []),
-        "percentage": percentage,
+        "percentage": stats["percentage"],
         "total": total_leaves,
+        "stats": stats,
     }
 
     try:
@@ -344,7 +646,7 @@ async def _sync_progress_to_db(username: str, progress: dict, db: AsyncSession) 
         if learner:
             learner.kg_progress = kg_data
             await db.flush()
-            logger.info(f"[KG进度同步到DB] 用户={username}, 进度={percentage}%")
+            logger.info(f"[KG进度同步到DB] 用户={username}, 进度={stats['percentage']}%")
     except Exception as e:
         logger.warning(f"[KG进度同步到DB失败] 用户={username}: {e}")
 
@@ -357,10 +659,11 @@ async def _load_progress_from_db(username: str, db: AsyncSession) -> dict | None
         learner = result.scalar_one_or_none()
         if learner and learner.kg_progress and isinstance(learner.kg_progress, dict):
             kg = learner.kg_progress
-            return {
+            return _normalize_progress({
                 "completed_nodes": kg.get("completed_nodes", []),
+                "node_scores": kg.get("node_scores", {}),
                 "history": kg.get("history", []),
-            }
+            })
     except Exception as e:
         logger.warning(f"[KG进度从DB加载失败] 用户={username}: {e}")
     return None
@@ -373,14 +676,16 @@ def build_kg_progress_for_learner(username: str) -> dict:
     """
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
+    leaf_ids = _leaf_ids_from_tree(tree)
     progress = _load_progress(username)
-    completed = progress.get("completed_nodes", [])
-    pct = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
+    stats = _progress_stats(progress, total_leaves, leaf_ids)
     return {
-        "completed_nodes": completed,
+        "completed_nodes": progress.get("completed_nodes", []),
+        "node_scores": progress.get("node_scores", {}),
         "history": progress.get("history", []),
-        "percentage": pct,
+        "percentage": stats["percentage"],
         "total": total_leaves,
+        "stats": stats,
     }
 
 
@@ -389,16 +694,155 @@ def _get_or_init_progress(username: str, db: AsyncSession | None = None) -> dict
     return _load_progress(username)
 
 
+def _build_graph(progress: dict | None = None) -> dict:
+    """
+    构建力导向图数据。
+    nodes / links 适配 ECharts graph；叶子节点附带 score/status。
+    """
+    if not _CATEGORY_LABELS:
+        _init_category_labels()
+
+    tree = _build_tree()
+    progress = _normalize_progress(progress or {})
+    node_scores = progress.get("node_scores", {})
+
+    nodes: list[dict] = []
+    links: list[dict] = []
+    category_stats: list[dict] = []
+    leaf_ids: set[str] = set()
+    leaf_scores: list[int] = []
+
+    def _node_score(node_id: str) -> int:
+        return _clamp_score(node_scores.get(node_id, {}).get("score", 0))
+
+    root_id = tree.get("id", "root")
+    nodes.append({
+        "id": root_id,
+        "name": tree.get("name", "数控加工知识体系"),
+        "type": "root",
+        "category": "root",
+        "category_label": "知识体系",
+        "score": 0,
+        "status": "recommended",
+        "status_label": _status_label("recommended"),
+        "is_leaf": False,
+    })
+
+    for cat_node in tree.get("children", []):
+        cat_id = cat_node.get("id")
+        cat_key = cat_node.get("category", "")
+        cat_label = cat_node.get("name", _category_label(cat_key))
+        cat_leaf_scores: list[int] = []
+
+        nodes.append({
+            "id": cat_id,
+            "name": cat_label,
+            "type": "category",
+            "category": cat_key,
+            "category_label": cat_label,
+            "score": 0,
+            "status": "recommended",
+            "status_label": _status_label("recommended"),
+            "is_leaf": False,
+        })
+        links.append({
+            "source": root_id,
+            "target": cat_id,
+            "relation": "contains",
+        })
+
+        for leaf in cat_node.get("children", []):
+            if not leaf.get("is_leaf"):
+                continue
+            leaf_id = leaf.get("id")
+            score = _node_score(leaf_id)
+            status = _status_from_score(score)
+            leaf_ids.add(leaf_id)
+            leaf_scores.append(score)
+            cat_leaf_scores.append(score)
+
+            nodes.append({
+                "id": leaf_id,
+                "name": leaf.get("name", ""),
+                "type": "knowledge",
+                "category": cat_key,
+                "category_label": cat_label,
+                "score": score,
+                "status": status,
+                "status_label": _status_label(status),
+                "is_leaf": True,
+                "file": leaf.get("file", ""),
+                "source_type": leaf.get("source_type", ""),
+                "source_name": leaf.get("source_name", ""),
+                "author": leaf.get("author", ""),
+                "year": leaf.get("year", ""),
+                "chapter": leaf.get("chapter", ""),
+                "completed": score >= 80,
+            })
+            links.append({
+                "source": cat_id,
+                "target": leaf_id,
+                "relation": "contains",
+            })
+
+        cat_total = len(cat_leaf_scores)
+        cat_mastered = sum(1 for score in cat_leaf_scores if score >= 80)
+        cat_average = round(sum(cat_leaf_scores) / cat_total, 1) if cat_total else 0
+        cat_status = _status_from_score(int(cat_average))
+        category_stats.append({
+            "key": cat_key,
+            "name": cat_label,
+            "total": cat_total,
+            "mastered": cat_mastered,
+            "to_improve": max(0, cat_total - cat_mastered),
+            "average_score": cat_average,
+            "percentage": round(cat_mastered / cat_total * 100, 1) if cat_total else 0,
+        })
+        for node in nodes:
+            if node.get("id") == cat_id:
+                node["score"] = cat_average
+                node["status"] = cat_status
+                node["status_label"] = _status_label(cat_status)
+                break
+
+    root_average = round(sum(leaf_scores) / len(leaf_scores), 1) if leaf_scores else 0
+    root_status = _status_from_score(int(root_average))
+    nodes[0]["score"] = root_average
+    nodes[0]["status"] = root_status
+    nodes[0]["status_label"] = _status_label(root_status)
+
+    total_leaves = tree.get("total_leaves", len(leaf_ids))
+    stats = _progress_stats(progress, total_leaves, leaf_ids)
+
+    return {
+        "domain": "cnc",
+        "domain_name": "数控加工领域",
+        "nodes": nodes,
+        "links": links,
+        "stats": stats,
+        "categories": category_stats,
+        "legend": [
+            {"status": "mastered", "label": "掌握度 >= 80%", "color": "#22C55E"},
+            {"status": "learning", "label": "掌握度 60-79%", "color": "#A3E635"},
+            {"status": "weak", "label": "掌握度 < 60%", "color": "#FACC15"},
+            {"status": "recommended", "label": "建议重点学习", "color": "#D1D5DB"},
+        ],
+    }
+
+
 # ── 请求模型 ──
 
 class ProgressRequest(BaseModel):
     node_id: str
     completed: bool
+    score: Optional[float] = None
+    source: Optional[str] = "manual"
 
 
 class ProgressResponse(BaseModel):
     username: str
     completed_nodes: list[str]
+    node_scores: dict[str, dict] = {}
     total: int
     percentage: float
 
@@ -415,6 +859,15 @@ async def get_knowledge_graph():
         _init_category_labels()
     tree = _build_tree()
     return tree
+
+
+@router.get("/knowledge-graph/graph")
+async def get_knowledge_graph_as_graph():
+    """
+    获取无个人进度的力导向图数据。
+    返回适配 ECharts Graph 的 nodes / links。
+    """
+    return _build_graph(_normalize_progress({}))
 
 
 @router.get("/knowledge-graph/files")
@@ -470,29 +923,17 @@ async def mark_progress(
     """
     username = current_user.username
     progress = _load_progress(username)
-    completed = progress["completed_nodes"]
-
-    import datetime
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    if req.completed:
-        if req.node_id not in completed:
-            completed.append(req.node_id)
-            progress["history"].append({
-                "node_id": req.node_id,
-                "action": "completed",
-                "timestamp": now,
-            })
-    else:
-        if req.node_id in completed:
-            completed.remove(req.node_id)
-            progress["history"].append({
-                "node_id": req.node_id,
-                "action": "uncompleted",
-                "timestamp": now,
-            })
-
-    progress["completed_nodes"] = sorted(completed)
+    target_score = req.score
+    if target_score is None:
+        target_score = 100 if req.completed else 0
+    action = "completed" if req.completed else "uncompleted"
+    progress = _apply_score_update(
+        progress,
+        req.node_id,
+        target_score,
+        source=req.source or "manual",
+        action=action,
+    )
     _save_progress(username, progress)
 
     # 同步到数据库
@@ -501,37 +942,63 @@ async def mark_progress(
     # 计算进度百分比
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
-    percentage = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
+    leaf_ids = _leaf_ids_from_tree(tree)
+    stats = _progress_stats(progress, total_leaves, leaf_ids)
 
     return {
         "username": username,
-        "completed_nodes": completed,
+        "completed_nodes": progress.get("completed_nodes", []),
+        "node_scores": progress.get("node_scores", {}),
         "total": total_leaves,
-        "percentage": percentage,
+        "percentage": stats["percentage"],
+        "stats": stats,
     }
 
 
 @router.get("/knowledge-graph/progress")
 async def get_progress(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取当前用户的学习进度。
     """
     username = current_user.username
     progress = _load_progress(username)
+    if not progress.get("completed_nodes") and not progress.get("node_scores"):
+        db_progress = await _load_progress_from_db(username, db)
+        if db_progress:
+            progress = db_progress
 
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
-    completed = progress["completed_nodes"]
-    percentage = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
+    leaf_ids = _leaf_ids_from_tree(tree)
+    stats = _progress_stats(progress, total_leaves, leaf_ids)
 
     return {
         "username": username,
-        "completed_nodes": completed,
+        "completed_nodes": progress.get("completed_nodes", []),
+        "node_scores": progress.get("node_scores", {}),
         "total": total_leaves,
-        "percentage": percentage,
+        "percentage": stats["percentage"],
+        "stats": stats,
     }
+
+
+@router.get("/knowledge-graph/progress/graph")
+async def get_graph_with_progress(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取带当前用户掌握度的力导向图数据。
+    """
+    progress = _load_progress(current_user.username)
+    if not progress.get("completed_nodes") and not progress.get("node_scores"):
+        db_progress = await _load_progress_from_db(current_user.username, db)
+        if db_progress:
+            progress = db_progress
+    return _build_graph(progress)
 
 
 @router.get("/knowledge-graph/progress/all")
@@ -545,59 +1012,40 @@ async def get_all_progress(
     """
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
+    leaf_ids = _leaf_ids_from_tree(tree)
 
     all_progress = []
 
-    # 从数据库查询所有学员
-    stmt = select(Learner, User.username).join(User, Learner.user_id == User.id).where(User.role == "learner")
+    # 从数据库查询所有 learner 账号；未建档账号没有 Learner 记录，按 0 进度展示。
+    stmt = (
+        select(User.username, Learner.kg_progress)
+        .select_from(User)
+        .outerjoin(Learner, Learner.user_id == User.id)
+        .where(User.role == "learner")
+    )
     result = await db.execute(stmt)
     rows = result.all()
 
-    processed_usernames = set()
-
-    for learner, username in rows:
-        processed_usernames.add(username)
-
+    for username, kg_progress in rows:
         # 优先从 DB 的 kg_progress 读取
-        if learner.kg_progress and isinstance(learner.kg_progress, dict):
-            kg = learner.kg_progress
-            completed = kg.get("completed_nodes", [])
-            pct = kg.get("percentage", 0)
-            if not pct and total_leaves > 0:
-                pct = round(len(completed) / total_leaves * 100, 1)
+        if kg_progress and isinstance(kg_progress, dict):
+            kg = _normalize_progress(kg_progress)
         else:
             # 降级到文件
-            file_progress = _load_progress(username)
-            completed = file_progress.get("completed_nodes", [])
-            pct = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
+            kg = _load_progress(username)
+
+        completed = kg.get("completed_nodes", [])
+        stats = _progress_stats(kg, total_leaves, leaf_ids)
 
         all_progress.append({
             "username": username,
             "completed_nodes": completed,
+            "node_scores": kg.get("node_scores", {}),
             "completed_count": len(completed),
             "total": total_leaves,
-            "percentage": pct,
+            "percentage": stats["percentage"],
+            "stats": stats,
         })
-
-    # 补充：文件中有但数据库中可能已删除的用户
-    if _PROGRESS_DIR.exists():
-        for f in sorted(_PROGRESS_DIR.glob("*.json")):
-            f_username = f.stem
-            if f_username in processed_usernames:
-                continue
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-                completed = data.get("completed_nodes", []) if isinstance(data, dict) else []
-                pct = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
-                all_progress.append({
-                    "username": f_username,
-                    "completed_nodes": completed,
-                    "completed_count": len(completed),
-                    "total": total_leaves,
-                    "percentage": pct,
-                })
-            except Exception as e:
-                logger.warning(f"读取进度文件失败 {f}: {e}")
 
     return {
         "total_learners": len(all_progress),
@@ -609,6 +1057,7 @@ async def get_all_progress(
 @router.get("/knowledge-graph/progress/tree")
 async def get_tree_with_progress(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取带当前用户学习进度标记的树状图数据。
@@ -619,10 +1068,20 @@ async def get_tree_with_progress(
 
     tree = _build_tree()
     progress = _load_progress(current_user.username)
-    completed = set(progress["completed_nodes"])
+    if not progress.get("completed_nodes") and not progress.get("node_scores"):
+        db_progress = await _load_progress_from_db(current_user.username, db)
+        if db_progress:
+            progress = db_progress
+    completed = set(progress.get("completed_nodes", []))
+    node_scores = progress.get("node_scores", {})
 
     def _attach_progress(node: dict) -> None:
         if node.get("is_leaf"):
+            score = _clamp_score(node_scores.get(node.get("id"), {}).get("score", 0))
+            status = _status_from_score(score)
+            node["score"] = score
+            node["status"] = status
+            node["status_label"] = _status_label(status)
             node["completed"] = node.get("id") in completed
         for child in node.get("children", []):
             _attach_progress(child)
@@ -646,6 +1105,7 @@ async def sync_all_progress_to_db(
     """
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
+    leaf_ids = _leaf_ids_from_tree(tree)
     synced = 0
     failed = 0
 
@@ -655,27 +1115,17 @@ async def sync_all_progress_to_db(
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
-                    completed = data.get("completed_nodes", [])
-                    history = data.get("history", [])
-                    # 如果 completed_nodes 为空但 history 有记录，从 history 重建
-                    if not completed and history:
-                        completed_set = set()
-                        for entry in history:
-                            nid = entry.get("node_id", "")
-                            action = entry.get("action", "")
-                            if nid:
-                                if action in ("completed", "auto_completed"):
-                                    completed_set.add(nid)
-                                elif action == "uncompleted":
-                                    completed_set.discard(nid)
-                        completed = sorted(completed_set)
-                    pct = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
+                    progress = _normalize_progress(data)
+                    completed = progress.get("completed_nodes", [])
+                    stats = _progress_stats(progress, total_leaves, leaf_ids)
 
                     kg_data = {
                         "completed_nodes": completed,
-                        "history": history,
-                        "percentage": pct,
+                        "node_scores": progress.get("node_scores", {}),
+                        "history": progress.get("history", []),
+                        "percentage": stats["percentage"],
                         "total": total_leaves,
+                        "stats": stats,
                     }
 
                     stmt = select(Learner).join(User, Learner.user_id == User.id).where(User.username == username)

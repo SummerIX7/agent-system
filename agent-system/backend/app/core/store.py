@@ -85,6 +85,7 @@ def _new_session(session_id: str) -> dict:
         "profile": {},
         "resources": [],
         "feedback": [],
+        "practice_results": [],
         "agent_logs": [],
         "trace_entries": [],
         "created_at": datetime.now().isoformat(),
@@ -95,7 +96,8 @@ def _serialize(data: dict) -> dict:
     """将 Python dict 序列化为 Redis Hash 兼容格式（全字符串）"""
     json_fields = {"profile", "resources", "feedback", "agent_logs", "trace_entries",
                    "cached_questions", "practice_state", "node_states", "node_resources",
-                   "tiered_questions", "tiered_questions_map", "test_results"}
+                   "tiered_questions", "tiered_questions_map", "comprehensive_questions",
+                   "test_results", "practice_results"}
     result = {}
     for k, v in data.items():
         if k in json_fields and v is not None:
@@ -115,6 +117,7 @@ def _deserialize(raw: dict) -> dict:
         "profile": {},
         "resources": [],
         "feedback": [],
+        "practice_results": [],
         "agent_logs": [],
         "trace_entries": [],
         "cached_questions": None,
@@ -123,6 +126,7 @@ def _deserialize(raw: dict) -> dict:
         "node_resources": {},
         "tiered_questions": None,
         "tiered_questions_map": {},
+        "comprehensive_questions": None,
         "test_results": {},
     }
     for field, default in json_fields.items():
@@ -248,30 +252,31 @@ def clear_cached_questions(session_id: str) -> None:
         session = _fallback_sessions.get(session_id, {})
         session.pop("cached_questions", None)
         session.pop("tiered_questions", None)
+        session.pop("comprehensive_questions", None)
         return
 
     key = f"{KEY_SESSION}:{session_id}"
     if r.exists(key):
-        r.hdel(key, "cached_questions", "tiered_questions")
+        r.hdel(key, "cached_questions", "tiered_questions", "comprehensive_questions")
 
 
 # ═══════════════════════════════════════════
-# 分阶试题缓存（基础 / 提升）
+# 节点练习缓存
 # ═══════════════════════════════════════════
 
 def save_tiered_questions(session_id: str, tiered: dict) -> None:
-    """缓存分阶试题 {basic: QuestionSet, advanced: QuestionSet}"""
+    """缓存节点练习 {node: QuestionSet}；保留函数名兼容旧调用。"""
     _update_field(session_id, "tiered_questions", tiered)
 
 
 def get_tiered_questions(session_id: str) -> dict | None:
-    """获取缓存的分阶试题，没有则返回 None"""
+    """获取缓存的节点练习，没有则返回 None。"""
     data = get_session(session_id).get("tiered_questions")
     return data if data else None
 
 
 def get_tier_questions(session_id: str, level: str) -> dict | None:
-    """获取指定等级的缓存试题（basic 或 advanced）"""
+    """获取指定类型的缓存试题（node 或 comprehensive 以外的旧类型）。"""
     tiered = get_tiered_questions(session_id)
     if tiered and isinstance(tiered, dict):
         return tiered.get(level)
@@ -279,12 +284,12 @@ def get_tier_questions(session_id: str, level: str) -> dict | None:
 
 
 # ═══════════════════════════════════════════
-# 按阶段索引的分阶试题缓存
+# 按阶段索引的节点练习缓存
 # ═══════════════════════════════════════════
 
 def save_tiered_questions_for_stage(session_id: str, stage: int, tiered: dict) -> None:
     """
-    缓存指定节点的分阶试题。
+    缓存指定节点的节点练习。
     存储在 session 的 tiered_questions_map 字段中，以 stage 为 key。
     """
     session = get_session(session_id)
@@ -300,7 +305,7 @@ def save_tiered_questions_for_stage(session_id: str, stage: int, tiered: dict) -
 
 
 def get_tiered_questions_for_stage(session_id: str, stage: int) -> dict | None:
-    """获取指定节点的分阶试题缓存"""
+    """获取指定节点的节点练习缓存"""
     session = get_session(session_id)
     tq_map = session.get("tiered_questions_map", {})
     if isinstance(tq_map, str):
@@ -315,11 +320,22 @@ def get_tiered_questions_for_stage(session_id: str, stage: int) -> dict | None:
 
 
 def get_tier_questions_for_stage(session_id: str, stage: int, level: str) -> dict | None:
-    """获取指定节点+等级的缓存试题"""
+    """获取指定节点+类型的缓存试题"""
     tiered = get_tiered_questions_for_stage(session_id, stage)
     if tiered and isinstance(tiered, dict):
         return tiered.get(level)
     return None
+
+
+def save_comprehensive_questions(session_id: str, question_set: dict) -> None:
+    """缓存最终综合练习题，不绑定具体 stage。"""
+    _update_field(session_id, "comprehensive_questions", question_set)
+
+
+def get_comprehensive_questions(session_id: str) -> dict | None:
+    """获取最终综合练习题缓存。"""
+    data = get_session(session_id).get("comprehensive_questions")
+    return data if data else None
 
 
 # ═══════════════════════════════════════════
@@ -345,6 +361,30 @@ def get_test_result(session_id: str, level: str) -> dict | None:
         except Exception:
             results = {}
     return results.get(level) if results else None
+
+
+def append_practice_result(session_id: str, result: dict) -> list[dict]:
+    """追加一轮练习结果，供报告页分析。"""
+    results = get_session(session_id).get("practice_results", [])
+    if isinstance(results, str):
+        try:
+            results = json.loads(results)
+        except Exception:
+            results = []
+    results.append({**result, "created_at": datetime.now().isoformat()})
+    _update_field(session_id, "practice_results", results)
+    return results
+
+
+def get_practice_results(session_id: str) -> list[dict]:
+    """获取所有练习结果。"""
+    results = get_session(session_id).get("practice_results", [])
+    if isinstance(results, str):
+        try:
+            return json.loads(results)
+        except Exception:
+            return []
+    return results if isinstance(results, list) else []
 
 
 def clear_test_results(session_id: str) -> None:

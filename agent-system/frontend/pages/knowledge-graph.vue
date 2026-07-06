@@ -3,131 +3,194 @@
     <div class="page-head">
       <p class="page-head__eyebrow">知识库</p>
       <h1 class="page-head__title">知识图谱</h1>
-      <p class="page-head__desc">数控加工知识体系树状图。完成分析报告或考核后系统自动标记已学习知识点，实时追踪学习进度。</p>
+      <p class="page-head__desc">
+        以掌握度驱动知识点点亮：深绿代表已掌握，浅绿代表基本掌握，黄色代表待巩固，灰色代表建议重点学习。
+      </p>
     </div>
 
-    <!-- Loading 状态 -->
     <div v-if="loading" class="card" style="margin-top: 24px">
       <div class="text-center py-12 text-text-3">正在加载知识图谱数据...</div>
     </div>
 
-    <!-- 错误状态 -->
     <div v-else-if="errorMsg" class="card" style="margin-top: 24px">
       <div class="text-center py-12 text-err">{{ errorMsg }}</div>
     </div>
 
     <template v-else>
-      <!-- 学习进度面板 -->
-      <div class="stats-row" style="margin-top: 24px">
-        <div class="stat-cell">
-          <div class="stat-cell__label">知识节点总数</div>
-          <div class="stat-cell__value">{{ totalLeaves }}</div>
-          <div class="stat-cell__sub">个知识点</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-cell__label">已学习</div>
-          <div class="stat-cell__value" style="color: var(--ok)">{{ completedCount }}</div>
-          <div class="stat-cell__sub">个知识点</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-cell__label">学习进度</div>
-          <div class="stat-cell__value" :style="{ color: progressColor }">{{ progressPercentage }}%</div>
-          <div class="stat-cell__sub">
-            <div class="progress-bar-mini">
-              <div class="progress-bar-mini__fill" :style="{ width: progressPercentage + '%', background: progressColor }"></div>
+      <div class="knowledge-card">
+        <div class="knowledge-card__head">
+          <div>
+            <div class="section-title">知识图谱</div>
+            <div class="section-subtitle">
+              {{ isLoggedIn ? '当前账号学习进度' : '未登录，仅展示知识体系结构' }}
             </div>
           </div>
+          <span class="badge badge--mute">平均掌握度 {{ stats.average_score }}%</span>
         </div>
-        <div class="stat-cell">
-          <div class="stat-cell__label">知识分类</div>
-          <div class="stat-cell__value">{{ categoryCount }}</div>
-          <div class="stat-cell__sub">个分类维度</div>
+
+        <div class="graph-panel">
+          <ClientOnly v-if="graphData">
+            <VChart
+              :option="graphChartOption"
+              autoresize
+              class="graph-chart"
+              @click="handleChartClick"
+            />
+            <template #fallback>
+              <div class="text-center py-12 text-text-3">正在加载图表...</div>
+            </template>
+          </ClientOnly>
+          <p v-else class="text-text-3 text-center py-12">暂无知识图谱数据</p>
+        </div>
+
+        <div class="legend-row">
+          <span
+            v-for="item in legendItems"
+            :key="item.status"
+            class="legend-item"
+          >
+            <span class="legend-dot" :style="{ background: item.color }"></span>
+            {{ item.label }}
+          </span>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-card summary-card--blue">
+            <div class="summary-card__label">知识点总数</div>
+            <div class="summary-card__value">{{ stats.total }}</div>
+          </div>
+          <div class="summary-card summary-card--green">
+            <div class="summary-card__label">已掌握知识点</div>
+            <div class="summary-card__value">{{ stats.mastered }}</div>
+          </div>
+          <div class="summary-card summary-card--yellow">
+            <div class="summary-card__label">待提升知识点</div>
+            <div class="summary-card__value">{{ stats.to_improve }}</div>
+          </div>
         </div>
       </div>
 
-      <!-- 树状图 -->
-      <div class="dashboard-grid" style="margin-top: 24px">
-        <!-- ECharts 树状图 -->
-        <div class="card" style="grid-column: 1 / -1">
+      <div class="detail-grid">
+        <div class="card">
           <div class="card__head">
-            <h2 class="card__title">知识体系树状图</h2>
-            <span class="badge badge--mute">{{ totalLeaves }} 个知识点</span>
+            <h2 class="card__title">节点详情</h2>
+            <span v-if="selectedNode" class="status-pill" :style="{ color: getNodeColor(selectedNode.score) }">
+              {{ selectedNode.status_label }}
+            </span>
           </div>
-          <div style="min-height: 520px">
-            <ClientOnly v-if="treeData">
-              <VChart :option="treeChartOption" autoresize style="width: 100%; height: 500px" />
-              <template #fallback>
-                <div class="text-center py-12 text-text-3">正在加载图表...</div>
-              </template>
-            </ClientOnly>
-            <p v-else class="text-text-3 text-center py-12">暂无知识图谱数据</p>
+
+          <div v-if="selectedNode" class="node-detail">
+            <div class="node-detail__title">{{ selectedNode.name }}</div>
+            <div class="node-detail__meta">
+              <span>{{ selectedNode.category_label }}</span>
+              <span v-if="selectedNode.file">{{ selectedNode.file }}</span>
+            </div>
+
+            <div class="mastery-line">
+              <div class="mastery-line__top">
+                <span>掌握度</span>
+                <strong>{{ selectedNode.score }}%</strong>
+              </div>
+              <div class="mastery-bar">
+                <div
+                  class="mastery-bar__fill"
+                  :style="{ width: selectedNode.score + '%', background: getNodeColor(selectedNode.score) }"
+                ></div>
+              </div>
+            </div>
+
+            <div class="source-list">
+              <div v-if="selectedNode.source_type">来源类型：{{ selectedNode.source_type }}</div>
+              <div v-if="selectedNode.source_name">来源名称：{{ selectedNode.source_name }}</div>
+              <div v-if="selectedNode.author">作者：{{ selectedNode.author }}</div>
+              <div v-if="selectedNode.year">年份：{{ selectedNode.year }}</div>
+              <div v-if="selectedNode.chapter">章节：{{ selectedNode.chapter }}</div>
+            </div>
+
+            <button
+              v-if="selectedNode.is_leaf"
+              class="primary-mark-btn"
+              :class="{ 'primary-mark-btn--reset': selectedNode.score >= 80 }"
+              :disabled="markingNodes.has(selectedNode.id)"
+              @click="toggleMark(selectedNode)"
+            >
+              {{ markingNodes.has(selectedNode.id) ? '处理中...' : (selectedNode.score >= 80 ? '重置掌握度' : '标记为已掌握') }}
+            </button>
           </div>
-          <div class="legend-row">
-            <span class="legend-item"><span class="legend-dot legend-dot--normal"></span> 未学习</span>
-            <span class="legend-item"><span class="legend-dot legend-dot--completed"></span> 已学习</span>
-            <span class="legend-item"><span class="legend-dot legend-dot--category"></span> 知识分类</span>
+
+          <div v-else class="empty-hint">
+            点击图谱中的知识点查看详情。
           </div>
         </div>
 
-        <!-- 分类详情卡片 -->
         <div class="card">
           <div class="card__head">
-            <h2 class="card__title">分类详情</h2>
-            <span class="badge badge--mute">{{ categoryDetails.length }} 类</span>
+            <h2 class="card__title">分类掌握情况</h2>
+            <div class="category-toolbar">
+              <button type="button" class="category-toolbar__btn" @click="collapseAllCategories">
+                全部收起
+              </button>
+              <button type="button" class="category-toolbar__btn" @click="expandAllCategories">
+                全部展开
+              </button>
+              <span class="badge badge--mute">{{ categoryDetails.length }} 类</span>
+            </div>
           </div>
+
           <div
             v-for="cat in categoryDetails"
-            :key="cat.name"
-            style="margin-bottom: 16px"
+            :key="cat.key"
+            class="category-block"
           >
-            <div class="category-header">
-              <div style="font-size: 14px; font-weight: 600">{{ cat.name }}</div>
-              <span class="badge badge--mute">{{ cat.completed }} / {{ cat.total }}</span>
-            </div>
-            <div class="bar" style="margin: 8px 0 12px">
-              <div
-                class="bar__fill ok"
-                :style="{ width: (cat.total / maxCategoryCount * 100) + '%' }"
-              ></div>
-            </div>
-            <div class="doc-list">
-              <div
-                v-for="item in cat.items"
-                :key="item.name"
-                class="doc-item"
-                :class="{ 'doc-item--completed': completedSet.has(item.id) }"
-              >
-                <div class="doc-item__row">
-                  <div class="doc-item__info">
-                    <div class="doc-item__title">
-                      <span class="doc-item__dot" :class="'dot--' + cat.key"></span>
-                      {{ item.name }}
-                      <span v-if="completedSet.has(item.id)" class="check-mark">&#10003;</span>
-                    </div>
-                    <div class="doc-item__meta">
-                      <template v-if="item.source_type">
-                        <span class="doc-item__tag">{{ item.source_type }}</span>
-                      </template>
-                      <template v-if="item.author">
-                        <span>{{ item.author }}</span>
-                      </template>
-                    </div>
-                  </div>
-                  <button
-                    class="mark-btn"
-                    :class="{ 'mark-btn--learned': completedSet.has(item.id) }"
-                    :disabled="markingNodes.has(item.id)"
-                    @click.stop="toggleMark(item.id)"
-                  >
-                    {{ markingNodes.has(item.id) ? '...' : (completedSet.has(item.id) ? '取消标记' : '标记已学') }}
-                  </button>
+            <button
+              type="button"
+              class="category-block__head"
+              :aria-expanded="isCategoryExpanded(cat.key)"
+              @click="toggleCategory(cat.key)"
+            >
+              <div>
+                <div class="category-block__title">{{ cat.name }}</div>
+                <div class="category-block__sub">
+                  已掌握 {{ cat.mastered }} / {{ cat.total }}，平均 {{ cat.average_score }}%
                 </div>
+              </div>
+              <div class="category-block__right">
+                <span class="badge badge--mute">{{ cat.percentage }}%</span>
+                <span
+                  class="category-block__chevron"
+                  :class="{ 'category-block__chevron--open': isCategoryExpanded(cat.key) }"
+                >
+                  >
+                </span>
+              </div>
+            </button>
+
+            <div v-show="isCategoryExpanded(cat.key)" class="category-block__body">
+              <div class="mastery-bar mastery-bar--thin">
+                <div
+                  class="mastery-bar__fill"
+                  :style="{ width: cat.percentage + '%', background: '#22C55E' }"
+                ></div>
+              </div>
+
+              <div class="knowledge-list">
+                <button
+                  v-for="item in cat.items"
+                  :key="item.id"
+                  type="button"
+                  class="knowledge-item"
+                  :class="{ 'knowledge-item--active': selectedNode?.id === item.id }"
+                  @click="selectedNodeId = item.id"
+                >
+                  <span class="knowledge-item__dot" :style="{ background: getNodeColor(item.score) }"></span>
+                  <span class="knowledge-item__name">{{ item.name }}</span>
+                  <span class="knowledge-item__score">{{ item.score }}%</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-
     </template>
   </div>
 </template>
@@ -137,271 +200,306 @@ definePageMeta({ ssr: false })
 
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
-import { TreeChart } from 'echarts/charts'
+import { GraphChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
-import { TooltipComponent, TitleComponent } from 'echarts/components'
+import { TooltipComponent } from 'echarts/components'
 
-use([TreeChart, CanvasRenderer, TooltipComponent, TitleComponent])
+use([GraphChart, CanvasRenderer, TooltipComponent])
 
-interface TreeNode {
-  name: string
+interface GraphNode {
   id: string
-  children?: TreeNode[]
-  is_leaf?: boolean
-  completed?: boolean
-  category?: string
+  name: string
+  type: 'root' | 'category' | 'knowledge'
+  category: string
+  category_label: string
+  score: number
+  status: string
+  status_label: string
+  is_leaf: boolean
   file?: string
   source_type?: string
+  source_name?: string
   author?: string
   year?: string
   chapter?: string
-  source_name?: string
-  total_leaves?: number
 }
 
-interface CategoryDetail {
-  name: string
-  key: string
+interface GraphLink {
+  source: string
+  target: string
+  relation?: string
+}
+
+interface GraphStats {
   total: number
-  completed: number
-  items: TreeNode[]
+  mastered: number
+  learning: number
+  weak: number
+  recommended: number
+  to_improve: number
+  average_score: number
+  percentage: number
+}
+
+interface CategoryStat {
+  key: string
+  name: string
+  total: number
+  mastered: number
+  to_improve: number
+  average_score: number
+  percentage: number
+  items?: GraphNode[]
+}
+
+interface LegendItem {
+  status: string
+  label: string
+  color: string
+}
+
+interface GraphPayload {
+  domain: string
+  domain_name: string
+  nodes: GraphNode[]
+  links: GraphLink[]
+  stats: GraphStats
+  categories: CategoryStat[]
+  legend: LegendItem[]
+}
+
+const emptyStats: GraphStats = {
+  total: 0,
+  mastered: 0,
+  learning: 0,
+  weak: 0,
+  recommended: 0,
+  to_improve: 0,
+  average_score: 0,
+  percentage: 0,
 }
 
 const { isLoggedIn, token } = useAuth()
 const api = useApi()
+const router = useRouter()
 
 const loading = ref(true)
 const errorMsg = ref('')
-const treeData = ref<TreeNode | null>(null)
-const completedSet = ref<Set<string>>(new Set())
-const progressPercentage = ref(0)
+const graphData = ref<GraphPayload | null>(null)
+const selectedNodeId = ref('')
 const markingNodes = ref<Set<string>>(new Set())
+const expandedCategories = ref<Set<string>>(new Set())
 
-const totalLeaves = computed(() => treeData.value?.total_leaves || 0)
-const completedCount = computed(() => completedSet.value.size)
-const categoryCount = computed(() => treeData.value?.children?.length || 0)
-const progressColor = computed(() => {
-  const p = progressPercentage.value
-  if (p >= 80) return 'var(--ok)'
-  if (p >= 40) return 'var(--warn)'
-  return 'var(--text-1)'
+const stats = computed(() => graphData.value?.stats || emptyStats)
+const legendItems = computed<LegendItem[]>(() => graphData.value?.legend || [
+  { status: 'mastered', label: '掌握度 >= 80%', color: '#22C55E' },
+  { status: 'learning', label: '掌握度 60-79%', color: '#A3E635' },
+  { status: 'weak', label: '掌握度 < 60%', color: '#FACC15' },
+  { status: 'recommended', label: '建议重点学习', color: '#D1D5DB' },
+])
+
+const nodesById = computed(() => {
+  const map = new Map<string, GraphNode>()
+  for (const node of graphData.value?.nodes || []) {
+    map.set(node.id, node)
+  }
+  return map
 })
 
-const categoryDetails = computed<CategoryDetail[]>(() => {
-  if (!treeData.value?.children) return []
-  return treeData.value.children.map(cat => {
-    const items = (cat.children || []).filter(c => c.is_leaf).map(c => ({
-      ...c,
-      name: c.name,
-      id: c.id,
-      is_leaf: true,
-      source_type: c.source_type,
-      author: c.author,
-    }))
-    const completed = items.filter(c => completedSet.value.has(c.id)).length
-    return {
-      name: cat.name,
-      key: cat.category || cat.name,
-      total: items.length,
-      completed,
-      items: items as TreeNode[],
-    }
-  })
+const selectedNode = computed(() => {
+  if (!selectedNodeId.value) return null
+  return nodesById.value.get(selectedNodeId.value) || null
 })
 
-const maxCategoryCount = computed(() => {
-  if (categoryDetails.value.length === 0) return 1
-  return Math.max(...categoryDetails.value.map(d => d.total))
+const leafNodes = computed(() => (graphData.value?.nodes || []).filter(node => node.is_leaf))
+
+const categoryDetails = computed<CategoryStat[]>(() => {
+  const categories = graphData.value?.categories || []
+  return categories.map(cat => ({
+    ...cat,
+    items: leafNodes.value
+      .filter(node => node.category === cat.key)
+      .sort((a, b) => a.score - b.score || a.name.localeCompare(b.name, 'zh-Hans-CN')),
+  }))
 })
 
-// ECharts Tree 配置
-const treeChartOption = computed(() => {
-  if (!treeData.value) return {}
+function isCategoryExpanded(key: string) {
+  return expandedCategories.value.has(key)
+}
 
-  const data = JSON.parse(JSON.stringify(treeData.value))
+function toggleCategory(key: string) {
+  const next = new Set(expandedCategories.value)
+  if (next.has(key)) {
+    next.delete(key)
+  } else {
+    next.add(key)
+  }
+  expandedCategories.value = next
+}
 
-  // 递归处理节点样式
-  function processNode(node: any) {
-    if (node.is_leaf) {
-      const isCompleted = completedSet.value.has(node.id)
-      node.itemStyle = {
-        color: isCompleted ? '#10B981' : '#4F46E5',
-        borderColor: isCompleted ? '#059669' : '#4338CA',
-        borderWidth: 2,
-        borderRadius: 5,
-      }
-      if (isCompleted) {
-        node.label = {
-          ...(node.label || {}),
-          color: '#059669',
-          fontWeight: 'bold',
-        }
-      }
-      node.symbol = isCompleted ? 'roundRect' : 'circle'
-      node.symbolSize = isCompleted ? 14 : 10
-    } else {
-      // 分类节点样式
-      node.itemStyle = {
-        color: '#F59E0B',
-        borderColor: '#D97706',
-        borderWidth: 2,
-        borderRadius: 5,
-      }
-      node.label = {
-        ...(node.label || {}),
-        color: '#92400E',
-        fontWeight: 'bold',
-        fontSize: 13,
-      }
-      node.symbol = 'roundRect'
-      node.symbolSize = 16
-    }
-    if (node.children) {
-      node.children.forEach(processNode)
-    }
-  }
+function expandAllCategories() {
+  expandedCategories.value = new Set(categoryDetails.value.map(cat => cat.key))
+}
 
-  // 根节点样式
-  data.itemStyle = {
-    color: '#1E40AF',
-    borderColor: '#1E3A8A',
-    borderWidth: 3,
-    borderRadius: 8,
-  }
-  data.label = {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-  }
-  data.symbol = 'roundRect'
-  data.symbolSize = 20
+function collapseAllCategories() {
+  expandedCategories.value = new Set()
+}
 
-  if (data.children) {
-    data.children.forEach(processNode)
-  }
+function getNodeColor(score: number) {
+  if (score >= 80) return '#22C55E'
+  if (score >= 60) return '#A3E635'
+  if (score > 0) return '#FACC15'
+  return '#D1D5DB'
+}
 
-  // 初始展开到第2层
-  data.collapsed = false
-  if (data.children) {
-    data.children.forEach((cat: any) => {
-      cat.collapsed = false
-    })
-  }
+function getNodeBorderColor(score: number) {
+  if (score >= 80) return '#15803D'
+  if (score >= 60) return '#65A30D'
+  if (score > 0) return '#CA8A04'
+  return '#9CA3AF'
+}
+
+function getNodeSize(node: GraphNode) {
+  if (node.type === 'root') return 58
+  if (node.type === 'category') return 42
+  if (node.score >= 80) return 32
+  if (node.score >= 60) return 28
+  return 26
+}
+
+function shortName(name: string, maxLength = 12) {
+  return name.length > maxLength ? `${name.slice(0, maxLength)}...` : name
+}
+
+const graphChartOption = computed(() => {
+  if (!graphData.value) return {}
+
+  const nodes = graphData.value.nodes.map(node => ({
+    id: node.id,
+    name: node.name,
+    value: node.score,
+    raw: node,
+    symbolSize: getNodeSize(node),
+    draggable: true,
+    itemStyle: {
+      color: getNodeColor(node.score),
+      borderColor: getNodeBorderColor(node.score),
+      borderWidth: node.type === 'knowledge' ? 2 : 3,
+      shadowBlur: node.score >= 80 ? 10 : 0,
+      shadowColor: 'rgba(34, 197, 94, 0.28)',
+    },
+    label: {
+      show: true,
+      position: 'bottom',
+      formatter: node.type === 'knowledge' ? shortName(node.name, 11) : node.name,
+      color: '#334155',
+      fontSize: node.type === 'knowledge' ? 10 : 12,
+      fontWeight: node.type === 'knowledge' ? 400 : 600,
+    },
+  }))
+
+  const links = graphData.value.links.map(link => ({
+    ...link,
+    lineStyle: {
+      color: '#CBD5E1',
+      width: 1.2,
+      opacity: 0.9,
+      curveness: 0.08,
+    },
+  }))
 
   return {
     tooltip: {
       trigger: 'item',
-      triggerOn: 'mousemove',
+      borderWidth: 0,
+      padding: 12,
       formatter: (params: any) => {
-        if (params.data.is_leaf) {
-          const completed = completedSet.value.has(params.data.id)
-          let html = `<b>${params.data.name}</b><br/>`
-          if (params.data.source_type) html += `类型: ${params.data.source_type}<br/>`
-          if (params.data.author) html += `作者: ${params.data.author}<br/>`
-          if (params.data.year) html += `年份: ${params.data.year}<br/>`
-          html += `状态: <b style="color:${completed ? '#10B981' : '#9CA3AF'}">${completed ? '已学习 ✓' : '未学习'}</b>`
-          return html
-        }
-        return `<b>${params.data.name}</b>`
+        const node = params.data?.raw as GraphNode | undefined
+        if (!node) return ''
+        const file = node.file ? `<br/>文件：${node.file}` : ''
+        return `
+          <div style="font-weight:600;margin-bottom:6px">${node.name}</div>
+          <div>分类：${node.category_label}</div>
+          <div>掌握度：${node.score}%</div>
+          <div>状态：${node.status_label}</div>
+          ${file}
+        `
       },
     },
     series: [
       {
-        type: 'tree',
-        data: [data],
-        top: '2%',
-        left: '8%',
-        bottom: '2%',
-        right: '10%',
-        symbolSize: 10,
-        orient: 'LR',
-        expandAndCollapse: true,
-        initialTreeDepth: 2,
-        label: {
-          position: 'right',
-          verticalAlign: 'middle',
-          align: 'left',
-          fontSize: 12,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
-        },
-        leaves: {
-          label: {
-            position: 'right',
-            verticalAlign: 'middle',
-            align: 'left',
-            fontSize: 11,
-          },
+        type: 'graph',
+        layout: 'force',
+        roam: true,
+        draggable: true,
+        data: nodes,
+        links,
+        force: {
+          repulsion: 210,
+          gravity: 0.055,
+          edgeLength: [72, 150],
+          friction: 0.28,
+          layoutAnimation: true,
         },
         emphasis: {
-          focus: 'descendant',
-        },
-        lineStyle: {
-          color: '#CBD5E1',
-          width: 1.5,
-          curveness: 0.5,
+          focus: 'adjacency',
+          lineStyle: {
+            width: 2.2,
+          },
         },
       },
     ],
   }
 })
 
-// 手动标记/取消标记知识点
-async function toggleMark(nodeId: string) {
-  if (!isLoggedIn.value || markingNodes.value.has(nodeId)) return
+function handleChartClick(params: any) {
+  const node = params?.data?.raw as GraphNode | undefined
+  if (node) {
+    selectedNodeId.value = node.id
+  }
+}
 
-  const newCompleted = !completedSet.value.has(nodeId)
-  markingNodes.value = new Set([...markingNodes.value, nodeId])
-
-  // 乐观更新 UI
-  const prevSet = new Set(completedSet.value)
-  if (newCompleted) {
-    completedSet.value = new Set([...completedSet.value, nodeId])
-  } else {
-    const next = new Set(completedSet.value)
-    next.delete(nodeId)
-    completedSet.value = next
+async function toggleMark(node: GraphNode) {
+  if (!node?.is_leaf || markingNodes.value.has(node.id)) return
+  if (!isLoggedIn.value || !token.value) {
+    router.push('/login')
+    return
   }
 
+  const markAsMastered = node.score < 80
+  markingNodes.value = new Set([...markingNodes.value, node.id])
+
   try {
-    const result = await api.markKnowledgeNode(nodeId, newCompleted)
-    // 用 API 返回的数据同步确认
-    completedSet.value = new Set(result.completed_nodes || [])
-    progressPercentage.value = result.percentage || 0
+    await api.markKnowledgeNode(node.id, markAsMastered, markAsMastered ? 100 : 0)
+    const keepSelected = selectedNodeId.value
+    await loadData(false)
+    selectedNodeId.value = keepSelected
   } catch (err: any) {
-    // 失败时回滚
-    completedSet.value = prevSet
-    console.error('标记知识点失败:', err)
+    console.error('更新知识点掌握度失败:', err)
+    errorMsg.value = `更新失败: ${err.message || '未知错误'}`
   } finally {
     const next = new Set(markingNodes.value)
-    next.delete(nodeId)
+    next.delete(node.id)
     markingNodes.value = next
   }
 }
 
-// 加载数据
-async function loadData() {
-  loading.value = true
+async function loadData(showLoading = true) {
+  if (showLoading) loading.value = true
   errorMsg.value = ''
 
   try {
-    // 并行加载树数据和进度数据
-    const requests: Promise<any>[] = [
-      api.getKnowledgeGraph(),
-    ]
+    const withProgress = Boolean(isLoggedIn.value && token.value)
+    const data = await api.getKnowledgeGraphGraph(withProgress)
+    graphData.value = data
 
-    if (isLoggedIn.value && token.value) {
-      requests.push(
-        api.getKnowledgeGraphProgress()
-      )
+    if (expandedCategories.value.size === 0 && data.categories?.length) {
+      expandedCategories.value = new Set([data.categories[0].key])
     }
 
-    const responses = await Promise.all(requests)
-    treeData.value = responses[0]
-
-    if (responses.length > 1 && responses[1]) {
-      const progressData = responses[1]
-      completedSet.value = new Set(progressData.completed_nodes || [])
-      progressPercentage.value = progressData.percentage || 0
+    if (!selectedNodeId.value) {
+      const firstWeakNode = leafNodes.value.find(node => node.score < 80)
+      selectedNodeId.value = firstWeakNode?.id || leafNodes.value[0]?.id || ''
     }
   } catch (err: any) {
     console.error('加载知识图谱数据失败:', err)
@@ -415,196 +513,401 @@ onMounted(() => {
   loadData()
 })
 
-// 监听登录状态变化，登录后自动加载进度
-watch(isLoggedIn, (val) => {
-  if (val && treeData.value) {
-    // 已加载树数据，只需补充加载进度
-    api.getKnowledgeGraphProgress()
-      .then(data => {
-        if (data) {
-          completedSet.value = new Set(data.completed_nodes || [])
-          progressPercentage.value = data.percentage || 0
-        }
-      }).catch(() => {})
-  }
+watch(isLoggedIn, () => {
+  loadData(false)
 })
 </script>
 
 <style scoped>
-/* ── 统计面板 ── */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--line);
+.knowledge-card {
+  margin-top: 24px;
+  padding: 20px 24px 24px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  overflow: hidden;
-}
-.stat-cell {
   background: var(--bg);
-  padding: 22px 24px;
-}
-.stat-cell__label { font-size: 12px; color: var(--text-3); }
-.stat-cell__value {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -.03em;
-  margin-top: 8px;
-}
-.stat-cell__sub {
-  font-size: 12px;
-  color: var(--text-3);
-  margin-top: 4px;
 }
 
-/* 迷你进度条 */
-.progress-bar-mini {
-  width: 100%;
-  height: 6px;
-  background: var(--bg-muted);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-top: 4px;
-}
-.progress-bar-mini__fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  transition: width 0.4s ease;
-}
-
-/* ── 图例 ── */
-.legend-row {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-  margin-top: 8px;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-2);
-}
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-.legend-dot--normal { background: #4F46E5; }
-.legend-dot--completed { background: #10B981; }
-.legend-dot--category { background: #F59E0B; }
-
-/* ── 分类详情 ── */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-.category-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.doc-list {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.doc-item {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  transition: background 0.2s;
-}
-.doc-item:last-child { border-bottom: none; }
-.doc-item--completed { background: rgba(16, 185, 129, 0.04); }
-.doc-item__row {
+.knowledge-card__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
-.doc-item__info {
-  flex: 1;
-  min-width: 0;
+
+.section-title {
+  position: relative;
+  padding-left: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-1);
 }
-.doc-item__title {
-  font-size: 13px;
-  font-weight: 500;
+
+.section-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.section-subtitle {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.graph-panel {
+  min-height: 540px;
+  border-radius: 4px;
+  background: #F8FAFC;
+  overflow: hidden;
+}
+
+.graph-chart {
+  width: 100%;
+  height: 540px;
+}
+
+.legend-row {
   display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  margin-top: 16px;
+  color: var(--text-2);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.legend-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.summary-card {
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.summary-card__label {
+  font-size: 14px;
+  color: #475569;
+}
+
+.summary-card__value {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.summary-card--blue {
+  background: #EFF6FF;
+}
+
+.summary-card--blue .summary-card__value {
+  color: #2563EB;
+}
+
+.summary-card--green {
+  background: #ECFDF5;
+}
+
+.summary-card--green .summary-card__value {
+  color: #22C55E;
+}
+
+.summary-card--yellow {
+  background: #FEFCE8;
+}
+
+.summary-card--yellow .summary-card__value {
+  color: #F59E0B;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.status-pill {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.node-detail__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.node-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.mastery-line {
+  margin-top: 20px;
+}
+
+.mastery-line__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.mastery-bar {
+  width: 100%;
+  height: 10px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #E5E7EB;
+}
+
+.mastery-bar--thin {
+  height: 6px;
+  margin-top: 10px;
+}
+
+.mastery-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.source-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.primary-mark-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 10px 14px;
+  border: 1px solid #22C55E;
+  border-radius: 8px;
+  background: #22C55E;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.primary-mark-btn:hover {
+  background: #16A34A;
+}
+
+.primary-mark-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primary-mark-btn--reset {
+  border-color: #CBD5E1;
+  background: #fff;
+  color: #475569;
+}
+
+.primary-mark-btn--reset:hover {
+  background: #F8FAFC;
+}
+
+.empty-hint {
+  padding: 44px 0;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.category-block {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.category-block:last-child {
+  border-bottom: 0;
+}
+
+.category-toolbar {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.doc-item__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dot--theory { background: var(--accent); }
-.dot--practice { background: var(--ok); }
-.dot--standards { background: var(--warn); }
-.check-mark {
-  color: var(--ok);
-  font-weight: bold;
-  font-size: 14px;
-}
-.doc-item__meta {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-3);
-}
-.doc-item__tag {
-  display: inline-block;
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--bg-muted);
-  color: var(--text-3);
-  font-weight: 500;
-}
 
-/* ── 标记按钮 ── */
-.mark-btn {
-  flex-shrink: 0;
-  padding: 4px 12px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--accent);
+.category-toolbar__btn {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-3);
   font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+.category-toolbar__btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(79, 70, 229, 0.04);
+}
+
+.category-block__head {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-block__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.category-block__sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.category-block__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.category-block__chevron {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 12px;
+  transform: rotate(0deg);
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.category-block__head:hover .category-block__chevron {
+  background: var(--bg-muted);
+  color: var(--accent);
+}
+
+.category-block__chevron--open {
+  transform: rotate(90deg);
+}
+
+.category-block__body {
+  padding-top: 10px;
+}
+
+.knowledge-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.knowledge-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.knowledge-item:hover,
+.knowledge-item--active {
+  border-color: var(--accent);
+  background: rgba(79, 70, 229, 0.04);
+}
+
+.knowledge-item__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.knowledge-item__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mark-btn:hover {
-  background: var(--accent);
-  color: #fff;
+
+.knowledge-item__score {
+  color: var(--text-3);
 }
-.mark-btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-.mark-btn--learned {
-  border-color: var(--ok);
-  color: var(--ok);
-}
-.mark-btn--learned:hover {
-  background: var(--ok);
-  color: #fff;
+
+@media (max-width: 960px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
-  .stats-row { grid-template-columns: 1fr 1fr; }
-  .dashboard-grid { grid-template-columns: 1fr; }
+  .knowledge-card__head,
+  .category-block__head {
+    flex-direction: column;
+  }
+
+  .summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-panel,
+  .graph-chart {
+    height: 460px;
+    min-height: 460px;
+  }
 }
 </style>

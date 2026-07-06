@@ -55,3 +55,6 @@ origin/
 
 # Docs (文档暂不提交，后续再加)
 docs/
+
+# Data (运行时生成的进度/数据文件)
+data/

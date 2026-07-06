@@ -22,6 +22,8 @@ export interface DashboardOverview {
 /** 学员列表项 */
 export interface LearnerItem {
   id: number
+  user_id?: number
+  profile_created?: boolean
   username: string
   email: string
   education_background: string

@@ -29,6 +29,7 @@ declare module 'vue' {
     NLayoutSider: typeof import('naive-ui')['NLayoutSider']
     NMenu: typeof import('naive-ui')['NMenu']
     NModal: typeof import('naive-ui')['NModal']
+    NProgress: typeof import('naive-ui')['NProgress']
     NSelect: typeof import('naive-ui')['NSelect']
     NSpace: typeof import('naive-ui')['NSpace']
     NSpin: typeof import('naive-ui')['NSpin']

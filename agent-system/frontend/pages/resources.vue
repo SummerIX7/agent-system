@@ -6,10 +6,28 @@
       <p class="page-head__desc">系统已为你生成多类资源，每条知识点均标注来源出处，难度适配你的当前水平。</p>
     </div>
 
-    <!-- 当前节点信息条 -->
+    <!-- 5 个节点均可直接切换查看，不再做顺序解锁 -->
+    <div v-if="!loading && nodes.length > 0" class="node-selector">
+      <button
+        v-for="node in nodes"
+        :key="node.stage"
+        class="node-selector__card"
+        :class="{ active: Number(node.stage) === selectedStage }"
+        @click="switchStage(Number(node.stage))"
+      >
+        <span class="node-selector__stage">节点 {{ node.stage }}</span>
+        <strong>{{ node.title }}</strong>
+        <span class="node-selector__meta">
+          {{ difficultyLabel(node.difficulty || 'beginner') }}
+          <template v-if="node.estimated_hours"> · {{ node.estimated_hours }} 小时</template>
+        </span>
+      </button>
+    </div>
+
+    <!-- 当前查看节点信息条 -->
     <div v-if="currentNode" class="node-info-bar">
       <div class="node-info-left">
-        <span class="node-info-stage">节点 {{ currentNode.stage }}</span>
+        <span class="node-info-stage">正在查看节点 {{ currentNode.stage }}</span>
         <span class="node-info-divider">|</span>
         <span class="node-info-title">{{ currentNode.title }}</span>
         <span v-if="currentNode.difficulty" class="badge" :class="difficultyBadge(currentNode.difficulty)">
@@ -77,10 +95,12 @@
 
       <!-- 底部操作按钮 -->
       <div class="actions-bar">
-        <NuxtLink to="/report" class="btn btn--ghost">← 返回学习路径</NuxtLink>
-        <button class="btn btn--primary" @click="goToPractice">
-          学完了，去答题 →
-        </button>
+        <NuxtLink to="/report" class="btn btn--ghost">← 返回分析报告</NuxtLink>
+        <div class="actions-group">
+          <button class="btn btn--ghost" @click="goToPractice">
+            练习本节点 →
+          </button>
+        </div>
       </div>
 
       <!-- 参考来源汇总 -->
@@ -114,10 +134,10 @@
       </div>
     </div>
 
-    <!-- 底部导航：进入答题练习 -->
+    <!-- 底部导航 -->
     <div v-if="!loading && resources.length > 0" style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
       <NuxtLink to="/workflow" class="btn btn--ghost btn--lg">← 重新生成资源</NuxtLink>
-      <NuxtLink to="/practice" class="btn btn--primary btn--lg">进入答题练习 →</NuxtLink>
+      <NuxtLink :to="`/practice?stage=${selectedStage}&level=node`" class="btn btn--primary btn--lg">进入答题练习 →</NuxtLink>
     </div>
   </div>
 </template>
@@ -127,10 +147,12 @@ const router = useRouter()
 const route = useRoute()
 const api = useApi()
 const { sessionId } = useSession()
+const { nodes, fetchLearningPath } = useLearningPath()
 
 const loading = ref(true)
 const resources = ref<any[]>([])
 const activeTab = ref('lecture')
+const selectedStage = ref(Number(route.query.stage) || 1)
 
 const lectureContent = ref('')
 const guideContent = ref('')
@@ -161,7 +183,15 @@ const difficultyBadge = (d: string) => {
 }
 
 const goToPractice = () => {
-  router.push({ path: '/practice', query: { level: 'basic' } })
+  router.push({
+    path: '/practice',
+    query: { stage: String(selectedStage.value), level: 'node' },
+  })
+}
+
+const switchStage = (stage: number) => {
+  if (!stage || stage === selectedStage.value) return
+  router.push({ path: '/resources', query: { stage: String(stage) } })
 }
 
 /** 从生成内容中解析所有来源标注 */
@@ -189,23 +219,28 @@ const parseSources = (content: string): SourceInfo[] => {
   return sources
 }
 
-onMounted(async () => {
+const loadResources = async () => {
   if (!sessionId.value) { loading.value = false; return }
+  loading.value = true
+  resources.value = []
+  lectureContent.value = ''
+  guideContent.value = ''
+  projectContent.value = ''
+  allSources.value = []
+  currentNode.value = null
 
-  // 获取当前节点信息
-  const stage = Number(route.query.stage) || 0
   try {
-    if (stage) {
-      const lp = await api.getLearningPath(sessionId.value)
-      currentNode.value = (lp.nodes || []).find((n: any) => n.stage === stage) || null
+    await fetchLearningPath()
+    let stage = Number(route.query.stage) || selectedStage.value || 1
+    if (nodes.value.length > 0 && !nodes.value.some((n: any) => Number(n.stage) === stage)) {
+      stage = Number(nodes.value[0].stage) || 1
     }
-    if (!currentNode.value) {
-      const nodeData = await api.getCurrentNode(sessionId.value)
-      currentNode.value = nodeData.current_node || null
-    }
+    selectedStage.value = stage
+    currentNode.value = (nodes.value || []).find((n: any) => Number(n.stage) === stage) || null
+    if (!currentNode.value && nodes.value.length > 0) currentNode.value = nodes.value[0]
   } catch { /* 降级：无节点信息也可正常使用 */ }
 
-  const loadStage = Number(route.query.stage) || undefined
+  const loadStage = selectedStage.value || Number(route.query.stage) || undefined
   try {
     const data = await api.getResources(sessionId.value, loadStage)
     resources.value = data
@@ -224,10 +259,64 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+onMounted(loadResources)
+
+watch(() => route.query.stage, () => {
+  loadResources()
 })
 </script>
 
 <style scoped>
+.node-selector {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.node-selector__card {
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all .15s;
+  min-height: 116px;
+}
+.node-selector__card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.node-selector__card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, .12);
+}
+.node-selector__stage {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(99, 102, 241, .1);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.node-selector__card strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.node-selector__meta {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
 .node-info-bar {
   display: flex;
   align-items: center;
@@ -274,6 +363,34 @@ onMounted(async () => {
   margin-top: 28px;
   padding-top: 20px;
   border-top: 1px solid var(--line);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.actions-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.complete-hint {
+  font-size: 13px;
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-radius: 99px;
+  padding: 6px 12px;
+}
+.complete-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid #A7F3D0;
+  border-radius: var(--radius-sm);
+  background: var(--ok-soft);
+  color: var(--text);
+  flex-wrap: wrap;
 }
 .tabs-bar {
   display: flex;
@@ -336,6 +453,7 @@ onMounted(async () => {
   to { transform: rotate(360deg); }
 }
 @media (max-width: 760px) {
+  .node-selector { grid-template-columns: 1fr; }
   .sources-grid { grid-template-columns: 1fr; }
 }
 </style>

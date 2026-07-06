@@ -26,9 +26,11 @@ async def list_users(
     _admin = Depends(require_admin),
 ):
     """学员列表（分页 + 搜索 + 筛选）"""
-    # 基础查询：关联 User 表
+    # 基础查询：以 User 为主表，左关联 Learner。
+    # 注册后尚未提交画像的 learner 账号没有 learners 记录，也要在管理端显示为“未建档”。
     base_query = select(
-        Learner.id,
+        User.id.label("user_id"),
+        Learner.id.label("learner_id"),
         User.username,
         User.email,
         Learner.education_background,
@@ -37,7 +39,8 @@ async def list_users(
         Learner.machine_approval_status,
         Learner.updated_at,
         Learner.learning_path,
-    ).join(User, Learner.user_id == User.id).where(User.role == "learner")
+        User.created_at.label("user_created_at"),
+    ).select_from(User).outerjoin(Learner, Learner.user_id == User.id).where(User.role == "learner")
 
     # 关键词搜索
     if keyword:
@@ -50,7 +53,7 @@ async def list_users(
 
     # 审批状态筛选
     if approval_status:
-        base_query = base_query.where(Learner.machine_approval_status == approval_status)
+        base_query = base_query.where(func.coalesce(Learner.machine_approval_status, "none") == approval_status)
 
     # 等级筛选
     if level:
@@ -67,7 +70,12 @@ async def list_users(
 
     # 分页
     offset = (page - 1) * page_size
-    rows_result = await db.execute(base_query.order_by(Learner.updated_at.desc()).offset(offset).limit(page_size))
+    rows_result = await db.execute(
+        base_query
+        .order_by(func.coalesce(Learner.updated_at, User.created_at).desc())
+        .offset(offset)
+        .limit(page_size)
+    )
     rows = rows_result.all()
 
     items = []
@@ -82,15 +90,17 @@ async def list_users(
                 progress = round(completed / len(path_nodes), 4)
 
         items.append({
-            "id": row.id,
+            "id": row.learner_id or 0,
+            "user_id": row.user_id,
+            "profile_created": row.learner_id is not None,
             "username": row.username,
             "email": row.email,
-            "education_background": row.education_background,
-            "major": row.major,
+            "education_background": row.education_background or "未建档",
+            "major": row.major or "未建档",
             "overall_level": row.overall_level,
             "learning_progress": progress,
-            "machine_approval_status": row.machine_approval_status,
-            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "machine_approval_status": row.machine_approval_status or "none",
+            "updated_at": (row.updated_at or row.user_created_at).isoformat() if (row.updated_at or row.user_created_at) else None,
         })
 
     return {

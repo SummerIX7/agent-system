@@ -205,7 +205,7 @@ const getAgentDescription = (agentId: string): string => {
     planner: '生成学习路径序列',
     generator: 'RAG 生成 · 标注来源',
     reviewer: '双视角审查 · 自动修正',
-    quiz: '分阶试题 · 动态调整',
+    quiz: '节点练习 · 答题反馈',
   }
 
   if (status === 'running' && agent?.progress) return `执行中... ${agent.progress}%`

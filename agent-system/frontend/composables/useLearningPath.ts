@@ -47,13 +47,26 @@ export function useLearningPath() {
     }
   }
 
+  const completeCurrentNode = async () => {
+    if (!sessionId.value) return null
+    try {
+      const result = await api.completeCurrentNode(sessionId.value)
+      if (result.new_stage) currentStage.value = result.new_stage
+      allCompleted.value = result.all_completed || false
+      await fetchLearningPath()
+      return result
+    } catch (err) {
+      console.warn('完成当前节点失败:', err)
+      return null
+    }
+  }
+
   // 当前节点的完成状态
   const currentNodeStatus = computed(() => {
     const node = currentNode.value
     if (!node) return { label: '就绪', color: 'var(--text-3)', action: 'start' }
-    if (node.advanced_test_passed) return { label: '已通过', color: 'var(--ok)', action: 'done' }
-    if (node.basic_test_passed) return { label: '基础已过·待提升', color: 'var(--accent)', action: 'advanced' }
-    if (node.has_resources) return { label: '已学习·待考核', color: 'var(--warn)', action: 'basic' }
+    if (node.completed || node.advanced_test_passed) return { label: '已完成', color: 'var(--ok)', action: 'done' }
+    if (node.has_resources) return { label: '待学习', color: 'var(--warn)', action: 'learn' }
     return { label: '待学习', color: 'var(--text-3)', action: 'learn' }
   })
 
@@ -65,5 +78,6 @@ export function useLearningPath() {
     currentNodeStatus,
     fetchLearningPath,
     advanceNode,
+    completeCurrentNode,
   }
 }

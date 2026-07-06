@@ -6,16 +6,56 @@
       <p class="page-head__desc">{{ testDescription }}</p>
     </div>
 
-    <!-- 未指定考核等级 -->
-    <div v-if="!testLevel" class="text-center py-12">
-      <p class="text-text-3 mb-4">请从学习路径报告中选择考核等级</p>
-      <NuxtLink to="/report" class="btn btn--primary">前往学习报告</NuxtLink>
+    <div v-if="nodes.length > 0" class="practice-path">
+      <div class="node-selector">
+        <button
+          v-for="node in nodes"
+          :key="node.stage"
+          class="node-selector__card"
+          :class="{ active: testLevel === 'node' && Number(node.stage) === selectedStage }"
+          @click="switchStage(Number(node.stage))"
+        >
+          <span class="node-selector__stage">节点 {{ node.stage }}</span>
+          <strong>{{ node.title }}</strong>
+          <span class="node-selector__meta">
+            {{ node.topics?.length || 0 }} 个知识点
+            <template v-if="node.estimated_hours"> · {{ node.estimated_hours }} 小时</template>
+          </span>
+        </button>
+      </div>
+
+      <button
+        class="comprehensive-node"
+        :class="{ active: testLevel === 'comprehensive' }"
+        @click="switchLevel('comprehensive')"
+      >
+        <span class="comprehensive-node__index">最终</span>
+        <span class="comprehensive-node__body">
+          <strong>综合练习</strong>
+          <span>独立于 5 个学习节点，综合运用安全、装夹、检测、刀具、程序识读与异常处理知识</span>
+        </span>
+        <span class="comprehensive-node__action">
+          {{ testLevel === 'comprehensive' ? '当前练习' : '进入综合练习' }}
+          <span aria-hidden="true">→</span>
+        </span>
+      </button>
     </div>
 
+    <section v-if="testLevel === 'comprehensive' && scenarioMarkdown && !loading" class="card scenario-card">
+      <div class="scenario-card__head">
+        <div>
+          <span class="scenario-card__eyebrow">共享生产场景</span>
+          <h2>{{ comprehensiveScenario?.title || '最终综合练习场景' }}</h2>
+        </div>
+        <span class="badge badge--accent">5 题共用此场景</span>
+      </div>
+      <MarkdownRenderer :content="scenarioMarkdown" />
+    </section>
+
     <!-- 加载中 -->
-    <div v-else-if="loading" class="flex flex-col items-center justify-center py-20">
+    <div v-if="loading" class="flex flex-col items-center justify-center py-20">
       <div class="spinner"></div>
-      <p class="mt-4 text-text-2">正在生成试题，请稍候...</p>
+      <p class="mt-4 text-text-2">正在读取学习节点并加载试题...</p>
     </div>
 
     <!-- 加载失败 -->
@@ -24,7 +64,7 @@
       <button class="btn btn--primary" @click="initQuestions">重新加载</button>
     </div>
 
-    <!-- 考核完成结果页 -->
+    <!-- 练习完成结果页 -->
     <div v-else-if="testCompleted" class="card" style="max-width: 600px; margin: 0 auto; text-align: center; padding: 40px">
       <div style="font-size: 56px; margin-bottom: 16px">{{ resultEmoji }}</div>
       <h2 style="font-size: 22px; font-weight: 600; margin-bottom: 8px">{{ resultTitle }}</h2>
@@ -41,25 +81,16 @@
 
       <!-- 操作按钮 -->
       <div class="result-actions">
-        <button v-if="testLevel === 'basic' && passed" class="btn btn--primary" @click="goAdvanced">
-           进入提升考核
+        <button v-if="testLevel === 'node'" class="btn btn--primary" @click="goResources">
+          返回学习资源
         </button>
-        <button v-if="testLevel === 'basic' && !passed" class="btn btn--primary" @click="goResources">
-           返回学习资源，重新学习
+        <button v-if="testLevel === 'comprehensive'" class="btn btn--primary" @click="goReport">
+          查看分析报告
         </button>
-        <button v-if="testLevel === 'advanced' && passed" class="btn btn--primary" @click="handleAdvance">
-          {{ advanceResult?.all_completed ? '查看完整报告' : '更新学习路径' }}
-        </button>
-        <button v-if="testLevel === 'advanced' && !passed" class="btn btn--ghost" @click="goResources">
-          返回学习资源，重新学习
-        </button>
-        <button class="btn btn--ghost" @click="goReport">
-          返回学习路径
-        </button>
+        <button v-else class="btn btn--ghost" @click="goReport">查看分析报告</button>
         <button class="btn btn--ghost" @click="retryTest">重新答题</button>
       </div>
-      <p v-if="advancing" class="text-sm text-text-3 mt-4">正在更新学习进度...</p>
-      <p v-if="advanceError" class="text-sm text-err mt-2">{{ advanceError }}</p>
+      <p v-if="resultSaveError" class="text-sm text-err mt-2">{{ resultSaveError }}</p>
     </div>
 
     <!-- 答题区域 -->
@@ -68,10 +99,10 @@
       <div class="card">
         <div style="display: flex; align-items: center; justify-content: space-between">
           <span style="font-family: var(--mono); font-size: 12px; color: var(--text-3)">第 {{ currentIndex + 1 }} / {{ questions.length }} 题</span>
-          <span class="badge" :class="testLevel === 'basic' ? 'badge--accent' : 'badge--warn'">
-            {{ testLevel === 'basic' ? '基础考核' : '提升考核' }}
+          <span class="badge" :class="levelBadgeClass">
+            {{ testLabel }}
           </span>
-          <span class="badge badge--mute">{{ currentQuestion.question_type === 'multiple_choice' ? '选择题' : currentQuestion.question_type === 'true_false' ? '判断题' : '实操题' }}</span>
+          <span class="badge badge--mute">{{ currentQuestion.question_type === 'multiple_choice' ? '选择题' : currentQuestion.question_type === 'true_false' ? '判断题' : '简答题' }}</span>
         </div>
 
         <div style="font-size: 18px; font-weight: 600; line-height: 1.5; margin: 18px 0 24px; letter-spacing: -.01em">
@@ -86,7 +117,7 @@
           </div>
         </template>
 
-        <!-- 实操题 -->
+        <!-- 简答题 -->
         <template v-else>
           <div class="practical-input-box">
             <p class="practical-hint">请在下方输入你的答案：</p>
@@ -117,7 +148,7 @@
           </div>
         </div>
 
-        <!-- 实操题批改结果 -->
+        <!-- 简答题批改结果 -->
         <div v-if="practicalGraded" class="feedback-box" :class="practicalResult?.is_correct ? 'ok' : 'err'">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
             <div style="font-weight: 600">{{ practicalResult?.is_correct ? ' 通过' : ' 未通过' }}</div>
@@ -135,7 +166,7 @@
         <div style="display: flex; justify-content: space-between; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line)">
           <button class="btn btn--ghost" :disabled="currentIndex === 0" @click="prevQuestion">← 上一题</button>
           <button class="btn btn--primary" :disabled="!answered" @click="nextQuestion">
-            {{ currentIndex === questions.length - 1 ? '完成考核' : '下一题 →' }}
+            {{ currentIndex === questions.length - 1 ? '完成练习' : '下一题 →' }}
           </button>
         </div>
       </div>
@@ -153,8 +184,16 @@
             <div class="mini-stat ok"><span style="font-size: 13px; color: var(--ok)">正确</span><span style="font-size: 20px; font-weight: 600; font-family: var(--mono); color: var(--ok)">{{ correctCount }}</span></div>
             <div class="mini-stat err"><span style="font-size: 13px; color: var(--err)">错误</span><span style="font-size: 20px; font-weight: 600; font-family: var(--mono); color: var(--err)">{{ wrongCount }}</span></div>
           </div>
-          <div style="font-size: 12px; color: var(--text-3); margin-top: 12px; text-align: center">通过线：{{ PASS_THRESHOLD }}%</div>
+          <div style="font-size: 12px; color: var(--text-3); margin-top: 12px; text-align: center">达标参考线：{{ PASS_THRESHOLD }}%</div>
         </div>
+      </div>
+    </div>
+
+    <div v-else class="flex flex-col items-center justify-center py-20">
+      <p class="text-text-3 mb-4">暂无可用试题，请先完成 Agent 协同生成学习资源。</p>
+      <div class="result-actions">
+        <NuxtLink to="/workflow" class="btn btn--primary">前往 Agent 协同</NuxtLink>
+        <NuxtLink to="/report" class="btn btn--ghost">查看分析报告</NuxtLink>
       </div>
     </div>
   </div>
@@ -165,24 +204,40 @@ const router = useRouter()
 const route = useRoute()
 const api = useApi()
 const { sessionId } = useSession()
-const { currentStage } = useLearningPath()
-const { isLoggedIn } = useAuth()
+const { nodes, fetchLearningPath } = useLearningPath()
+const { isLoggedIn, isLoading: authLoading } = useAuth()
 
 const PASS_THRESHOLD = 70
+type TestLevel = 'node' | 'comprehensive'
 
-// === 考核等级 ===
-const testLevel = computed(() => (route.query.level as string) || '')
-const testLabel = computed(() => testLevel.value === 'advanced' ? '提升考核' : '基础考核')
+const normalizeTestLevel = (value: unknown): TestLevel | '' => {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (raw === 'basic' || raw === 'advanced') return 'node'
+  return raw === 'node' || raw === 'comprehensive' ? raw : ''
+}
+
+// === 练习等级 ===
+const testLevel = ref<TestLevel | ''>(normalizeTestLevel(route.query.level))
+const levelLabels: Record<TestLevel, string> = {
+  node: '节点练习',
+  comprehensive: '综合练习',
+}
+const testLabel = computed(() => testLevel.value ? levelLabels[testLevel.value] : '答题练习')
 const testDescription = computed(() =>
-  testLevel.value === 'advanced'
-    ? '基础考核已通过，现在进行更高难度的提升考核。'
-    : '请完成基础考核，答对率达 70% 即可解锁提升考核。'
+  testLevel.value === 'comprehensive'
+    ? '一个完整生产场景下设置 2 道选择题和 3 道简答题，覆盖 5 个学习节点的关键能力。'
+    : '可在 5 个学习节点间自由切换节点练习。每个节点包含 4 道选择题、3 道判断题、2 道简答题，结果用于报告分析和知识图谱掌握度。'
+)
+const levelBadgeClass = computed(() =>
+  testLevel.value === 'comprehensive' ? 'badge--err' : 'badge--accent'
 )
 
 // === 状态 ===
 const loading = ref(true)
 const loadError = ref('')
 const questions = ref<any[]>([])
+const comprehensiveScenario = ref<any>(null)
+const selectedStage = ref(Number(route.query.stage) || 1)
 const currentIndex = ref(0)
 const answered = ref(false)
 const showFeedback = ref(false)
@@ -195,34 +250,82 @@ const socraticHistory = ref<{ round: number; hint: string }[]>([])
 const revealAnswer = ref(false)
 const socraticLoading = ref(false)
 
-// 实操题
+// 简答题
 const practicalAnswer = ref('')
 const practicalGrading = ref(false)
 const practicalGraded = ref(false)
 const practicalResult = ref<any>(null)
 
-// 节点推进
-const advancing = ref(false)
-const advanceError = ref('')
-const advanceResult = ref<any>(null)
+const resultSaving = ref(false)
+const resultSaved = ref(false)
+const resultSaveError = ref('')
 
 // 计算
 const currentQuestion = computed(() => questions.value[currentIndex.value] || {})
+const markdownCell = (value: unknown) => String(value ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>')
+const markdownList = (items: unknown) => Array.isArray(items) && items.length
+  ? items.map(item => `- ${markdownCell(item)}`).join('\n')
+  : '- 暂无'
+const markdownTable = (headers: string[], rows: string[][]) => {
+  if (!rows.length) return '暂无'
+  return [
+    `| ${headers.join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
+    ...rows.map(row => `| ${row.map(markdownCell).join(' | ')} |`),
+  ].join('\n')
+}
+const scenarioMarkdown = computed(() => {
+  const s = comprehensiveScenario.value
+  if (!s) return ''
+  const facts = [
+    ['岗位身份', s.role],
+    ['生产任务', s.production_task],
+    ['机床/系统', [s.machine, s.controller].filter(Boolean).join(' / ')],
+    ['材料/毛坯', [s.material, s.blank_size].filter(Boolean).join(' / ')],
+    ['批量', s.batch_size],
+    ['装夹/坐标系', [s.clamping, s.work_coordinate].filter(Boolean).join(' / ')],
+  ].filter(row => row[1]) as string[][]
+  const requirements = Array.isArray(s.drawing_requirements)
+    ? s.drawing_requirements.map((item: any) => [item.item, item.requirement])
+    : []
+  const results = Array.isArray(s.first_article_results)
+    ? s.first_article_results.map((item: any) => [item.item, item.requirement, item.measured])
+    : []
+  return [
+    '## 生产任务资料',
+    markdownTable(['项目', '内容'], facts),
+    '## 图纸与质量要求',
+    markdownTable(['检测项目', '要求'], requirements),
+    '## 刀具信息',
+    markdownList(s.tools),
+    '## 关键程序片段',
+    `\`\`\`nc\n${String(s.program_excerpt || '暂无').trim()}\n\`\`\``,
+    '## 开工前现场状态',
+    markdownList(s.site_conditions),
+    '## 首件检测数据',
+    markdownTable(['检测项目', '要求', '实测值'], results),
+    '## 加工中异常现象',
+    markdownList(s.runtime_symptoms),
+  ].join('\n\n')
+})
+const questionWithScenario = computed(() => {
+  if (testLevel.value !== 'comprehensive' || !scenarioMarkdown.value) return currentQuestion.value.question
+  return `${scenarioMarkdown.value}\n\n## 当前问题\n${currentQuestion.value.question}`
+})
 const correctCount = computed(() => questions.value.filter(q => q.finalCorrect === true).length)
 const wrongCount = computed(() => questions.value.filter(q => q.answered && q.finalCorrect === false).length)
 const accuracy = computed(() => questions.value.length ? Math.round(correctCount.value / questions.value.length * 100) : 0)
 const passed = computed(() => accuracy.value >= PASS_THRESHOLD)
 const resultEmoji = computed(() => passed.value ? '' : '')
 const resultTitle = computed(() => {
-  if (passed.value && testLevel.value === 'advanced') return '恭喜！提升考核通过！'
-  if (passed.value) return '基础考核通过！'
-  return '考核未通过'
+  if (testLevel.value === 'comprehensive') return passed.value ? '综合练习已达标' : '综合练习已完成'
+  if (passed.value) return `${testLabel.value}已达标`
+  return `${testLabel.value}已完成`
 })
 const resultMessage = computed(() => {
-  if (passed.value && testLevel.value === 'advanced') return '你已掌握本节点知识，可以进入下一阶段学习了。'
-  if (passed.value) return '基础扎实，可以进行更高难度的挑战了。'
-  if (testLevel.value === 'advanced') return '提升考核有难度，建议回顾学习内容后重试。'
-  return '建议重新学习相关资源后再来挑战。'
+  if (testLevel.value === 'comprehensive') return passed.value ? '你已经能综合处理完整业务场景。' : '建议根据错题复盘装夹、检测、程序识读和异常处理环节。'
+  if (passed.value) return '本轮练习表现达标，可继续学习资源或进入综合练习。'
+  return '建议回到学习资源复习薄弱内容后再练一次。'
 })
 
 // === 辅助 ===
@@ -234,15 +337,53 @@ const resolveCorrectIndex = (q: any): number => {
   return q.options?.findIndex((opt: string) => stripOptionPrefix(opt) === stripped || opt === answer) ?? 0
 }
 
+const resolveSelectedStage = () => {
+  let stage = Number(route.query.stage) || selectedStage.value || 1
+  if (nodes.value.length > 0 && !nodes.value.some((n: any) => Number(n.stage) === stage)) {
+    stage = Number(nodes.value[0].stage) || 1
+  }
+  selectedStage.value = stage
+  return stage
+}
+
 // === 初始化 ===
 const initQuestions = async () => {
-  if (!sessionId.value || !testLevel.value) {
-    loading.value = false; loadError.value = '缺少必要参数'; return
+  if (!sessionId.value) {
+    loading.value = false; loadError.value = '缺少会话信息，请先完成学习者画像和 Agent 协同生成'; return
   }
   loading.value = true; loadError.value = ''
+  questions.value = []
+  resultSaved.value = false
+  resultSaveError.value = ''
 
   try {
-    const result = await api.getTieredQuestions(sessionId.value, testLevel.value as 'basic' | 'advanced', currentStage.value)
+    await fetchLearningPath()
+
+    let resolvedLevel = normalizeTestLevel(route.query.level) || 'node'
+    if (resolvedLevel === 'comprehensive') {
+      testLevel.value = resolvedLevel
+      const result = await api.getTieredQuestions(sessionId.value, resolvedLevel)
+      if (!result?.questions?.length) {
+        loadError.value = (result as any)?.error || '综合练习暂不可用'
+        loading.value = false
+        return
+      }
+      applyQuestions(result)
+      return
+    }
+
+    comprehensiveScenario.value = null
+    const stage = resolveSelectedStage()
+    const node = nodes.value.find((n: any) => Number(n.stage) === stage)
+    if (!node) {
+      loadError.value = '暂未找到学习节点，请先完成 Agent 协同生成'
+      loading.value = false
+      return
+    }
+
+    testLevel.value = resolvedLevel
+
+    const result = await api.getTieredQuestions(sessionId.value, resolvedLevel, stage)
     if (!result?.questions?.length) {
       loadError.value = '试题尚未生成，请先完成 Agent 协同生成'
       loading.value = false
@@ -256,6 +397,7 @@ const initQuestions = async () => {
 }
 
 const applyQuestions = (result: any) => {
+  comprehensiveScenario.value = testLevel.value === 'comprehensive' ? (result.scenario || null) : null
   questions.value = (result.questions || []).map((q: any) => ({
     ...q,
     correctIndex: resolveCorrectIndex(q),
@@ -267,13 +409,19 @@ const applyQuestions = (result: any) => {
   resetState()
   // 尝试恢复进度
   if (sessionId.value) {
-    api.getPracticeState(sessionId.value).then(saved => {
+    api.getPracticeState(
+      sessionId.value,
+      testLevel.value || undefined,
+      testLevel.value === 'comprehensive' ? null : selectedStage.value,
+    ).then(saved => {
       if (saved?.questions?.length) {
+        let matched = 0
         questions.value = questions.value.map((q: any) => {
           const match = saved.questions.find((s: any) => s.question === q.question)
+          if (match) matched += 1
           return match ? { ...q, selectedIndex: match.selectedIndex ?? -1, answered: match.answered ?? false, finalCorrect: match.finalCorrect ?? null, practicalAnswer: match.practicalAnswer || '', practicalGraded: match.practicalGraded ?? false, practicalResult: match.practicalResult || null } : q
         })
-        if (typeof saved.current_index === 'number') currentIndex.value = saved.current_index
+        if (matched > 0 && typeof saved.current_index === 'number') currentIndex.value = saved.current_index
         resetState()
       }
     }).catch(() => {})
@@ -287,7 +435,7 @@ const fetchHeuristic = async (round: number, optionIndex: number) => {
     const result = await api.submitFeedback({
       session_id: sessionId.value || 'demo',
       topic: currentQuestion.value.topic || '专业知识',
-      question: currentQuestion.value.question,
+      question: questionWithScenario.value,
       user_answer: String.fromCharCode(65 + optionIndex),
       correct_answer: currentQuestion.value.correctAnswer,
       round,
@@ -312,7 +460,7 @@ const submitPractical = async () => {
   try {
     const result = await api.submitPracticalFeedback({
       session_id: sessionId.value || 'demo', topic: currentQuestion.value.topic || '专业知识',
-      question: currentQuestion.value.question, user_answer: practicalAnswer.value,
+      question: questionWithScenario.value, user_answer: practicalAnswer.value,
       correct_answer: currentQuestion.value.correctAnswer, explanation: currentQuestion.value.explanation || '',
     })
     practicalResult.value = result; practicalGraded.value = true
@@ -346,9 +494,13 @@ const optionClass = (index: number) => {
 
 // === 翻页 ===
 const prevQuestion = () => { if (currentIndex.value > 0) { currentIndex.value--; resetState(); saveProgress() } }
-const nextQuestion = () => {
+const nextQuestion = async () => {
   if (currentIndex.value < questions.value.length - 1) { currentIndex.value++; resetState(); saveProgress() }
-  else { saveProgress(); testCompleted.value = true }
+  else {
+    saveProgress()
+    await submitPracticeResult()
+    testCompleted.value = true
+  }
 }
 
 const resetState = () => {
@@ -362,73 +514,231 @@ const saveProgress = () => {
   if (!sessionId.value) return
   api.savePracticeState(sessionId.value, {
     current_index: currentIndex.value,
+    level: testLevel.value || null,
+    stage: testLevel.value === 'comprehensive' ? null : selectedStage.value,
     questions: questions.value.map((q: any) => ({ question: q.question, selectedIndex: q.selectedIndex, answered: q.answered, finalCorrect: q.finalCorrect, practicalAnswer: q.practicalAnswer, practicalGraded: q.practicalGraded, practicalResult: q.practicalResult })),
   }).catch(() => {})
 }
 
-// 基础考核成绩（持久化到 session store 中，供高级考核推进时读取）
-const persistedBasicScore = useState<number>('basicTestScore', () => 0)
+const submitPracticeResult = async () => {
+  if (!sessionId.value || !testLevel.value || resultSaved.value || resultSaving.value) return
+  resultSaving.value = true
+  resultSaveError.value = ''
+  try {
+    await api.savePracticeResult(sessionId.value, {
+      level: testLevel.value,
+      stage: testLevel.value === 'comprehensive' ? null : selectedStage.value,
+      score: accuracy.value,
+      correct_count: correctCount.value,
+      wrong_count: wrongCount.value,
+      question_count: questions.value.length,
+      questions: questions.value.map((q: any) => ({
+        topic: q.topic || '',
+        question: q.question,
+        question_type: q.question_type,
+        is_correct: q.finalCorrect === true,
+        user_answer: q.question_type === 'practical'
+          ? q.practicalAnswer
+          : q.selectedIndex >= 0 ? String.fromCharCode(65 + q.selectedIndex) : '',
+        correct_answer: q.correctAnswer,
+      })),
+    })
+    resultSaved.value = true
+  } catch (err) {
+    console.warn('保存练习结果失败:', err)
+    resultSaveError.value = '练习结果保存失败，报告可能暂时无法显示本次成绩'
+  } finally {
+    resultSaving.value = false
+  }
+}
 
 // === 结果页操作 ===
-const goAdvanced = async () => {
-  // 持久化基础考核通过状态，确保报告页能显示"提升考核"按钮
-  try {
-    await api.markBasicPassed(sessionId.value, accuracy.value)
-    // 保存基础考核成绩，供后续推进时使用
-    persistedBasicScore.value = accuracy.value
-  } catch (err) {
-    console.warn('标记基础考核通过失败:', err)
-  }
-  router.push({ path: '/practice', query: { level: 'advanced' } })
-}
-const goResources = () => router.push('/resources')
+const goResources = () => router.push({ path: '/resources', query: { stage: String(selectedStage.value || 1) } })
 const goReport = () => router.push('/report')
+
+const switchLevel = (level: TestLevel) => {
+  if (level === testLevel.value) return
+  const query = level === 'comprehensive'
+    ? { level }
+    : { stage: String(selectedStage.value || 1), level }
+  router.push({ path: '/practice', query })
+}
+
+const switchStage = (stage: number) => {
+  if (!stage || (stage === selectedStage.value && testLevel.value !== 'comprehensive')) return
+  router.push({
+    path: '/practice',
+    query: { stage: String(stage), level: testLevel.value && testLevel.value !== 'comprehensive' ? testLevel.value : 'node' },
+  })
+}
 
 const retryTest = () => {
   questions.value.forEach(q => { q.selectedIndex = -1; q.answered = false; q.finalCorrect = null; q.practicalAnswer = ''; q.practicalGraded = false; q.practicalResult = null })
-  currentIndex.value = 0; testCompleted.value = false; resetState(); saveProgress()
-}
-
-const handleAdvance = async () => {
-  advancing.value = true; advanceError.value = ''
-  const feedback = questions.value.map(q => ({ topic: q.topic || '', question: q.question, is_correct: q.finalCorrect, finalCorrect: q.finalCorrect }))
-  // 在高级考核模式下使用之前保存的基础考核成绩，而非硬编码的阈值
-  const basicScore = testLevel.value === 'advanced' ? (persistedBasicScore.value || PASS_THRESHOLD) : accuracy.value
-  const { advanceNode } = useLearningPath()
-  const result = await advanceNode(basicScore, accuracy.value, feedback)
-  advancing.value = false
-  if (result) {
-    advanceResult.value = result
-    router.push('/report')
-  } else {
-    advanceError.value = '节点推进失败，请稍后重试'
-  }
+  currentIndex.value = 0; testCompleted.value = false; resultSaved.value = false; resetState(); saveProgress()
 }
 
 // === 初始化 ===
 onMounted(() => {
-  if (isLoggedIn.value && sessionId.value && testLevel.value) initQuestions()
+  if (isLoggedIn.value && sessionId.value) initQuestions()
   else if (!isLoggedIn.value) { loading.value = false; loadError.value = '请先登录' }
-  else if (!testLevel.value) { loading.value = false }
   else { loading.value = false; loadError.value = '请先完成学情诊断' }
 })
 
-watch(testLevel, (newLevel, oldLevel) => {
-  if (newLevel && newLevel !== oldLevel) {
+// F5 刷新时布局会异步恢复登录态和学习会话；恢复完成后自动加载，无需再点“重新加载”。
+watch([authLoading, isLoggedIn, sessionId], ([isAuthLoading, loggedIn, sid]) => {
+  if (!isAuthLoading && loggedIn && sid && !loading.value && questions.value.length === 0) {
+    initQuestions()
+  }
+})
+
+watch(() => [route.query.level, route.query.stage], ([newLevel, newStage], [oldLevel, oldStage]) => {
+  if (newLevel !== oldLevel || newStage !== oldStage) {
     testCompleted.value = false
     loading.value = true
     loadError.value = ''
     questions.value = []
     currentIndex.value = 0
-    if (sessionId.value) {
-      api.savePracticeState(sessionId.value, { current_index: 0, questions: [] }).catch(() => {})
-    }
     initQuestions()
   }
 })
 </script>
 
 <style scoped>
+.node-selector {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.node-selector__card {
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  min-height: 112px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.node-selector__card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.node-selector__card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, .12);
+}
+.node-selector__stage {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(99, 102, 241, .1);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.node-selector__card strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.node-selector__meta {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.practice-path { margin-bottom: 24px; }
+.comprehensive-node {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, var(--bg) 0%, var(--bg-muted) 100%);
+  border-radius: var(--radius-sm);
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.comprehensive-node:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.comprehensive-node.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, .12);
+}
+.comprehensive-node__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.comprehensive-node__body { min-width: 0; flex: 1; }
+.comprehensive-node__body strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+  font-size: 16px;
+}
+.comprehensive-node__body span {
+  display: block;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.comprehensive-node__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.scenario-card {
+  margin-bottom: 24px;
+  padding: 24px 28px;
+  border-color: rgba(99, 102, 241, .22);
+  background: linear-gradient(180deg, rgba(99, 102, 241, .035), var(--bg) 180px);
+}
+.scenario-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.scenario-card__head h2 {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 650;
+}
+.scenario-card__eyebrow {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 .quiz-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
 .opt-big { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); margin-bottom: 10px; cursor: pointer; transition: all .15s; }
 .opt-big:hover { border-color: var(--text-3); }
@@ -466,5 +776,12 @@ watch(testLevel, (newLevel, oldLevel) => {
 .bar__fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
 .bar__fill.ok { background: var(--ok); }
 .bar__fill.err { background: var(--err); }
-@media (max-width: 900px) { .quiz-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .node-selector { grid-template-columns: 1fr; }
+  .comprehensive-node { align-items: flex-start; }
+  .comprehensive-node__action { display: none; }
+  .scenario-card { padding: 18px; }
+  .scenario-card__head { flex-direction: column; gap: 10px; }
+  .quiz-grid { grid-template-columns: 1fr; }
+}
 </style>

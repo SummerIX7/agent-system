@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 from app.core.auth import get_current_user
 from app.core.store import get_session, update_session
@@ -14,7 +15,7 @@ from app.models.database import get_db
 from app.models.learner import Learner
 from app.models.resource import Resource
 from app.models.user import User
-from app.api.knowledge_graph import build_kg_progress_for_learner
+from app.api.knowledge_graph import build_kg_progress_for_learner, mark_learning_event_by_learner_id
 from app.agents.diagnosis import DiagnosisAgent
 from app.utils.db_helpers import retry_on_deadlock
 try:
@@ -231,6 +232,10 @@ async def advance_node(
     current_stage = session_data.get("current_stage", learning_path.get("current_stage", 1))
     path_stages = learning_path.get("path", [])
     total_stages = len(path_stages)
+    current_node = next((s for s in path_stages if s.get("stage") == current_stage), {})
+    current_knowledge_items = [
+        item for item in [current_node.get("title", ""), *current_node.get("topics", [])] if item
+    ]
 
     # 判断是否可推进
     can_advance = req.advanced_score >= PASS_THRESHOLD
@@ -270,6 +275,16 @@ async def advance_node(
                 )
             except Exception as e:
                 print(f"[警告] 更新学习者画像失败: {e}")
+            try:
+                await mark_learning_event_by_learner_id(
+                    db,
+                    learner_id,
+                    current_knowledge_items,
+                    100,
+                    "advanced_test",
+                )
+            except Exception as e:
+                print(f"[警告] 知识图谱掌握度更新失败: {e}")
 
         if new_stage > total_stages:
             result["message"] = "所有节点已完成，学习流程结束"
@@ -318,6 +333,10 @@ async def mark_basic_passed(
     基础考核通过后、进入提升考核前调用，用于持久化基础考核状态。
     """
     learning_path, current_stage = await _get_learning_path_from_any_source(session_id, db)
+    current_node = next((s for s in learning_path.get("path", []) if s.get("stage") == current_stage), {})
+    current_knowledge_items = [
+        item for item in [current_node.get("title", ""), *current_node.get("topics", [])] if item
+    ]
 
     # 更新当前节点状态
     learning_path = _update_node_state(learning_path, current_stage, {
@@ -332,11 +351,89 @@ async def mark_basic_passed(
     learner_id = session_data.get("learner_id", "")
     if learner_id and learner_id != "unknown":
         await _persist_learning_path_to_db(db, learner_id, learning_path)
+        try:
+            await mark_learning_event_by_learner_id(
+                db,
+                learner_id,
+                current_knowledge_items,
+                max(req.basic_score, 70),
+                "basic_test",
+            )
+        except Exception as e:
+            print(f"[警告] 知识图谱基础掌握度更新失败: {e}")
 
     return {
         "ok": True,
         "stage": current_stage,
         "basic_test_passed": True,
+    }
+
+
+@router.post("/{session_id}/complete-current")
+async def complete_current_node(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    学习资源页完成当前节点。
+    练习页不再推进节点，节点解锁统一由该接口触发。
+    """
+    learning_path, current_stage = await _get_learning_path_from_any_source(session_id, db)
+    path_stages = learning_path.get("path", [])
+    total_stages = len(path_stages)
+    if not path_stages:
+        return {"ok": False, "message": "暂无学习路径", "new_stage": None, "all_completed": False}
+
+    already_all_completed = all(s.get("completed") or s.get("advanced_test_passed") for s in path_stages)
+    if already_all_completed:
+        return {"ok": True, "message": "所有节点已完成", "new_stage": None, "all_completed": True}
+
+    current_node = next((s for s in path_stages if s.get("stage") == current_stage), None)
+    if not current_node:
+        return {"ok": False, "message": "未找到当前节点", "new_stage": None, "all_completed": False}
+
+    current_knowledge_items = [
+        item for item in [current_node.get("title", ""), *current_node.get("topics", [])] if item
+    ]
+    learning_path = _update_node_state(learning_path, current_stage, {
+        "completed": True,
+        "completed_by": "resource",
+        "completed_at": datetime.now().isoformat(),
+    })
+
+    new_stage = current_stage + 1
+    all_completed = new_stage > total_stages
+    learning_path["current_stage"] = new_stage
+    _persist_learning_path(session_id, learning_path)
+    update_session(session_id, {"current_stage": new_stage})
+
+    session_data = get_session(session_id)
+    learner_id = session_data.get("learner_id", "")
+    if learner_id and learner_id != "unknown":
+        await _persist_learning_path_to_db(db, learner_id, learning_path)
+        try:
+            await mark_learning_event_by_learner_id(
+                db,
+                learner_id,
+                current_knowledge_items,
+                85,
+                "resource_complete",
+            )
+        except Exception as e:
+            print(f"[警告] 资源学习完成更新知识图谱失败: {e}")
+
+    try:
+        from app.core.store import save_practice_state
+        save_practice_state(session_id, {})
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "stage": current_stage,
+        "new_stage": None if all_completed else new_stage,
+        "all_completed": all_completed,
+        "message": "所有节点已完成，综合练习已解锁" if all_completed else f"已解锁第 {new_stage} 节点",
     }
 
 
@@ -387,7 +484,8 @@ async def generate_node_content(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    为指定节点按需生成资源+试题。在报告页点击「生成节点学习资源」时触发。
+    为指定节点按需生成资源+试题。
+    兼容旧数据或人工补救场景；正常流程已在 Agent 协同阶段一次性生成 5 个节点资源。
     生成完自动调用 LLM，结果持久化到 DB + session store。
     """
     from app.graph.workflow import generate_resources_for_stage, _generate_and_cache_questions

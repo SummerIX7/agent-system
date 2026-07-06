@@ -6,7 +6,8 @@ from app.models.database import get_db
 from app.models.schemas import GenerateRequest, ResourceOutput
 from app.models.resource import Resource
 from app.graph.workflow import run_workflow
-from app.core.store import add_resource, get_session
+from app.core.store import add_resource, get_session, clear_cached_questions, save_practice_state, update_session
+from app.core.question_persistence import clear_persisted_practice_cache, persist_session_question_cache
 
 router = APIRouter(prefix="/api", tags=["资源生成"])
 
@@ -23,6 +24,10 @@ async def generate_resources(
     if not profile:
         session = get_session(request.session_id)
         profile = session.get("profile", {})
+        if not profile and request.session_id.startswith("user-"):
+            from app.core.store import resolve_learner_context
+            session = await resolve_learner_context(request.session_id, db)
+            profile = session.get("profile", {})
 
     # 构造 learner_input（传给工作流的诊断 Agent）
     learner_input = {
@@ -39,6 +44,25 @@ async def generate_resources(
     if not learner_id:
         session = get_session(request.session_id)
         learner_id = session.get("learner_id", "")
+        if not learner_id and request.session_id.startswith("user-"):
+            from app.core.store import resolve_learner_context
+            session = await resolve_learner_context(request.session_id, db)
+            learner_id = session.get("learner_id", "")
+
+    # 新一轮 Agent 协同生成代表题库版本更新：先清掉旧试题/未完成进度。
+    clear_cached_questions(request.session_id)
+    save_practice_state(request.session_id, {})
+    update_session(request.session_id, {
+        "tiered_questions_map": {},
+        "comprehensive_questions": None,
+        "practice_results": [],
+    })
+    try:
+        cleanup_learner_id = int(learner_id) if learner_id and learner_id != "unknown" else None
+    except (ValueError, TypeError):
+        cleanup_learner_id = None
+    if cleanup_learner_id is not None:
+        await clear_persisted_practice_cache(db, cleanup_learner_id)
 
     try:
         result = await run_workflow(
@@ -85,6 +109,12 @@ async def generate_resources(
 
             if learner_id_int is not None:
                 review = review_results.get(res_type, {})
+                review_score = res.get("review_score", review.get("score", None))
+                review_passed = res.get("review_passed", review.get("passed", True))
+                if isinstance(review_passed, str):
+                    review_status = review_passed if review_passed in ("passed", "failed") else "passed"
+                else:
+                    review_status = "passed" if review_passed else "failed"
                 db_resource = Resource(
                     learner_id=learner_id_int,
                     session_id=request.session_id,
@@ -94,8 +124,8 @@ async def generate_resources(
                     difficulty=res.get("difficulty", "beginner"),
                     stage=res_stage,
                     sources=res.get("sources", None),
-                    review_score=review.get("score", None),
-                    review_passed="passed" if review.get("passed", True) else "failed",
+                    review_score=review_score,
+                    review_passed=review_status,
                 )
                 db.add(db_resource)
 
@@ -127,7 +157,7 @@ async def generate_resources(
                 if "advanced_test_passed" not in stage:
                     stage["advanced_test_passed"] = False
                 if "has_resources" not in stage:
-                    stage["has_resources"] = (stage.get("stage", 0) == 1)  # 只有节点 1 初始有资源
+                    stage["has_resources"] = True
             learner_record.learning_path = learning_path_data
 
             # 计算并持久化报告指标快照
@@ -170,6 +200,15 @@ async def generate_resources(
                 from app.api.knowledge_graph import build_kg_progress_for_learner
                 learner_record.kg_progress = build_kg_progress_for_learner("")
 
+            saved_questions = await persist_session_question_cache(
+                db,
+                learner_record.id,
+                request.session_id,
+                get_session(request.session_id),
+            )
+            if saved_questions:
+                print(f"[试题缓存] 已持久化 {saved_questions} 套到数据库")
+
     await db.flush()
     return resources
 
@@ -182,7 +221,10 @@ async def get_resources(
 ):
     """获取指定会话的生成资源。传 stage 参数可按学习节点过滤。"""
     # 先从 MySQL 查询
-    stmt = select(Resource).where(Resource.session_id == session_id)
+    stmt = select(Resource).where(
+        Resource.session_id == session_id,
+        Resource.resource_type.in_(["lecture", "guide", "project"]),
+    )
     if stage is not None:
         stmt = stmt.where(Resource.stage == stage)
     result = await db.execute(stmt)

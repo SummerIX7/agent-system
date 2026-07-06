@@ -207,7 +207,8 @@ const startGenerate = async () => {
     )
 
     currentProgress.value = 100
-    currentMessage.value = `已生成 ${result.length} 个资源`
+    const resourceCount = result.filter((r: any) => ['lecture', 'guide', 'project'].includes(r.type)).length
+    currentMessage.value = `已生成 ${resourceCount} 个资源（覆盖 5 个学习节点）`
     hasExistingResources.value = true
   } catch (err: any) {
     currentMessage.value = `生成失败: ${err.message || '未知错误'}`

@@ -19,8 +19,8 @@ async def get_overview(
     """数据看板概览：总学员数、待审批数、今日活跃、平均通过率、知识点分布"""
     from datetime import datetime, timezone
 
-    # 总学员数
-    total_result = await db.execute(select(func.count(Learner.id)))
+    # 总学员数：按 learner 角色账号统计。未提交画像的账号还没有 learners 记录，也应在管理端可见。
+    total_result = await db.execute(select(func.count(User.id)).where(User.role == "learner"))
     total_learners = total_result.scalar() or 0
 
     # 待审批数

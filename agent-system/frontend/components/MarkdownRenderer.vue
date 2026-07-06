@@ -47,9 +47,10 @@ renderer.image = function({ href, title, text }: { href: string; title?: string;
   return `<img src="${href}" alt="${text}"${titleAttr} class="markdown-image" />`
 }
 
-// 表格样式
-renderer.table = function({ header, body }: { header: string; body: string }) {
-  return `<div class="table-wrapper"><table><thead>${header}</thead><tbody>${body}</tbody></table></div>`
+// marked 新版传入 Table token，由默认渲染器解析单元格后再包裹滚动容器。
+const defaultTableRenderer = renderer.table
+renderer.table = function(this: any, token: any) {
+  return `<div class="table-wrapper">${defaultTableRenderer.call(this, token)}</div>`
 }
 
 // 设置渲染器
