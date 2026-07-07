@@ -84,13 +84,17 @@ const chartOption = computed(() => {
       },
     } : undefined,
     tooltip: {
-      trigger: 'item',
+      trigger: 'axis',
       formatter: (params: any) => {
-        const val = typeof params.value === 'number' && !Number.isNaN(params.value) ? params.value : 0
-        const idx = params.dataIndex ?? params.value?.findIndex((v: number) => v === params.value)
-        const matchedIdx = idx >= 0 ? idx : value.findIndex(v => v === params.value)
-        const ind = indicator[matchedIdx >= 0 ? matchedIdx : 0]
-        if (!ind) return `${params.name}: ${val}`
+        // axis trigger 时 params 是数组（每个 series 一个元素），取第一个
+        const p = Array.isArray(params) ? params[0] : params
+        // dimensionIndex 是当前 hover 的维度索引
+        const dimIdx = typeof p.dimensionIndex === 'number' ? p.dimensionIndex : 0
+        // radar 的 value 是数组（每个维度一个值）
+        const values = Array.isArray(p.value) ? p.value : [p.value]
+        const val = typeof values[dimIdx] === 'number' && !Number.isNaN(values[dimIdx]) ? values[dimIdx] : 0
+        const ind = indicator[dimIdx] || indicator[0]
+        if (!ind) return `${p.name}: ${val}`
         const percentage = Math.round(val / ind.max * 100)
         return `${ind.name}<br/>覆盖度: <b>${percentage}%</b> (${val}/${ind.max})`
       },

@@ -57,6 +57,57 @@ def _align_kps_to_skills(kps: list, required_skills: List[str]) -> list:
     return aligned
 
 
+def _merge_kps(llm_kps: list, existing_kps: list) -> list:
+    """
+    用 LLM 重新评估的 score/level/confidence 更新 existing_kps，name 保持不变。
+
+    - name 命中的项：用 LLM 的 score/level/confidence（反映学习成长）
+    - name 未命中的项：保留原值（不会因 LLM 漏掉而归零）
+    - 顺序按 existing_kps 排列，保证雷达图维度稳定
+    """
+    if not existing_kps:
+        return list(llm_kps or [])
+
+    def _norm(s: str) -> str:
+        return (s or "").lower().replace(" ", "").replace("（", "(").replace("）", ")")
+
+    # 建立 LLM name → kp 索引
+    llm_by_norm = {}
+    for kp in (llm_kps or []):
+        if isinstance(kp, dict):
+            llm_by_norm[_norm(kp.get("name", ""))] = kp
+
+    merged = []
+    for kp in existing_kps:
+        name = kp.get("name", "")
+        norm_name = _norm(name)
+        # 精确匹配
+        llm_kp = llm_by_norm.get(norm_name)
+        if llm_kp is None:
+            # 模糊匹配
+            for nk, lkp in llm_by_norm.items():
+                if norm_name and (norm_name in nk or nk in norm_name):
+                    llm_kp = lkp
+                    break
+        if llm_kp is not None:
+            # LLM 有对应项：用 LLM 的 score/level/confidence
+            score = llm_kp.get("score", 0)
+            try:
+                score = max(0.0, min(100.0, float(score)))
+            except (TypeError, ValueError):
+                score = 0.0
+            merged.append({
+                "name": name,  # 保持原名
+                "score": score,
+                "level": llm_kp.get("level", kp.get("level", "beginner")),
+                "confidence": max(0.0, min(1.0, float(llm_kp.get("confidence", 0.5) or 0.5))),
+            })
+        else:
+            # LLM 没有对应项：保留原值
+            merged.append(dict(kp))
+    return merged
+
+
 class DiagnosisAgent(BaseAgent):
     """学情诊断 Agent：构建学习者画像，定位知识盲区，匹配难度"""
 
@@ -76,6 +127,25 @@ class DiagnosisAgent(BaseAgent):
         required_skills = list(track.self_assessment_skills)
         required_skills_json = json.dumps(required_skills, ensure_ascii=False)
 
+        # 构建 learning_context 段落（仅 reassess 时提供，首次诊断无）
+        learning_context = input_data.get("learning_context") or {}
+        learning_context_str = ""
+        if learning_context:
+            completed = learning_context.get("completed_nodes", [])
+            practice = learning_context.get("practice_summary", [])
+            kg_pct = learning_context.get("kg_mastery_percentage", 0)
+            current_kps = learning_context.get("updated_knowledge_points", [])
+            learning_context_str = f"""
+[学习数据]（重新评估时提供，基于客观学习数据更新评分）
+- 已完成节点: {', '.join(completed) if completed else '无'}
+- 总节点数: {learning_context.get('total_nodes', 0)}
+- 练习成绩汇总: {json.dumps(practice, ensure_ascii=False)}
+- 知识图谱掌握度: {kg_pct}%
+- 当前知识点评分: {json.dumps(current_kps, ensure_ascii=False)}
+
+重要：以上学习数据反映了学习者的实际学习成果。请基于这些数据重新评估各知识点的 score/level/confidence，反映学习者的成长。完成学习并练习达标的技能应提升 score，未涉及或未练习的技能保留原水平。score 应基于客观数据而非主观猜测。
+"""
+
         prompt = f"""你是一位 CNC 数控加工领域的教育诊断专家，专精于 {track.name} 方向。请根据以下学习者信息，构建详细的学习者画像。
 
 {track_prompt}
@@ -85,10 +155,11 @@ class DiagnosisAgent(BaseAgent):
 - 专业方向: {input_data.get('major', '未知')}
 - 工作经验: {input_data.get('work_experience_years', 0)} 年
 - 职业方向: {track.name}（{track.description}）
+- 用户自评当前水平: {input_data.get('current_level', '未提供')}
 - 技能自评: {json.dumps(input_data.get('self_assessment', {}), ensure_ascii=False)}
 - 学习风格: {input_data.get('learning_style', '未知')}
 - 学习目标: {json.dumps(input_data.get('goals', []), ensure_ascii=False)}
-
+{learning_context_str}
 [前置知识要求]
 {track.prerequisite_knowledge}
 

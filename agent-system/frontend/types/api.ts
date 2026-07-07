@@ -5,6 +5,7 @@ export interface LearnerProfileInput {
   major: string
   work_experience_years: number
   career_track?: string
+  current_level?: string
   self_assessment: Record<string, string>
   learning_style: string
   goals: string[]
@@ -25,6 +26,7 @@ export interface LearnerProfile {
   major: string
   work_experience_years: number
   career_track?: string
+  current_level?: string
   self_assessment: Record<string, string>
   learning_style: string
   goals: string[]

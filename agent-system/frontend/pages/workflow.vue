@@ -207,6 +207,13 @@ const startGenerate = async () => {
     )
 
     currentProgress.value = 100
+    // API 返回 = workflow 完成，强制所有 agent 显示为完成
+    // 不依赖 WebSocket 最后一条消息是否送达（避免消息丢失导致卡在 running）
+    agents.value = agents.value.map(a => ({
+      ...a,
+      status: 'completed' as const,
+      progress: 100,
+    }))
     const resourceCount = result.filter((r: any) => ['lecture', 'guide', 'project'].includes(r.type)).length
     currentMessage.value = `已生成 ${resourceCount} 个资源（覆盖 5 个学习节点）`
     hasExistingResources.value = true

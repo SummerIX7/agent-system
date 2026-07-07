@@ -22,7 +22,7 @@ async def get_visualization(
     db: AsyncSession = Depends(get_db),
     _validated: str = Depends(validate_session_ownership),
 ):
-    """获取可视化数据。优先从 learner.report_cache 读取快照。"""
+    """获取可视化数据。优先从 report_caches 表读取快照。"""
     from app.core.store import resolve_learner_context
     await resolve_learner_context(session_id, db)
 
@@ -39,7 +39,12 @@ async def get_visualization(
         learner = result.scalar_one_or_none()
 
     if learner:
-        report_cache = learner.report_cache or {}
+        # 从独立的 report_caches 表读取（1:1）
+        from app.models.agent_state import ReportCache
+        rc_stmt = select(ReportCache).where(ReportCache.learner_id == learner.id)
+        rc_result = await db.execute(rc_stmt)
+        rc = rc_result.scalar_one_or_none()
+        report_cache = (rc.cache_data if rc else {}) or {}
         # 确保 profile 完整（session store 可能丢失）
         if not profile.get("knowledge_points") and learner.knowledge_points:
             profile = {

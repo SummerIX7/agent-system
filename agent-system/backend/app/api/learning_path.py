@@ -474,7 +474,15 @@ async def _persist_learner_path_and_cache(
     if learner:
         learner.learning_path = learning_path
         if report_cache is not None:
-            learner.report_cache = report_cache
+            # 写入独立的 report_caches 表（1:1）
+            from app.models.agent_state import ReportCache
+            rc_stmt = select(ReportCache).where(ReportCache.learner_id == learner.id)
+            rc_result = await db.execute(rc_stmt)
+            rc = rc_result.scalar_one_or_none()
+            if rc:
+                rc.cache_data = report_cache
+            else:
+                db.add(ReportCache(learner_id=learner.id, cache_data=report_cache))
         await db.flush()
 
 

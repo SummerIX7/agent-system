@@ -34,6 +34,7 @@ class LearnerProfileInput(BaseModel):
     major: str
     work_experience_years: float = 0
     career_track: str = "operator"  # 职业方向: operator / setup_tech / programmer
+    current_level: str = ""  # 用户自评当前水平: beginner/intermediate/advanced/expert
     self_assessment: Dict[str, str] = {}
     learning_style: str = "practice"
     goals: List[str] = []
@@ -46,6 +47,7 @@ class LearnerProfile(BaseModel):
     major: str
     work_experience_years: float
     career_track: str = "operator"  # 职业方向
+    current_level: str = ""  # 用户自评当前水平
     self_assessment: Dict[str, str]
     learning_style: str
     goals: List[str]

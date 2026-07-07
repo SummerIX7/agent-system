@@ -50,3 +50,37 @@ class FeedbackRecord(Base):
 
     def __repr__(self):
         return f"<FeedbackRecord(topic={self.topic}, is_correct={self.is_correct}, stage={self.stage}, level={self.test_level})>"
+
+
+class PracticeResult(Base):
+    """练习汇总成绩（每轮练习一条记录），持久化到 DB，Redis 作降级缓存。"""
+    __tablename__ = "practice_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    learner_id = Column(Integer, ForeignKey("learners.id", ondelete="CASCADE"), nullable=False, index=True, comment="学习者 ID")
+    session_id = Column(String(64), nullable=False, index=True, comment="会话 ID")
+    level = Column(String(20), nullable=True, comment="练习等级")
+    stage = Column(Integer, nullable=True, comment="所属学习路径节点编号")
+    score = Column(Integer, default=0, comment="得分 0-100")
+    correct_count = Column(Integer, default=0, comment="正确数")
+    wrong_count = Column(Integer, default=0, comment="错误数")
+    question_count = Column(Integer, default=0, comment="总题数")
+    questions = Column(JsonText, nullable=True, comment="题目明细列表")
+    label = Column(String(20), nullable=True, comment="等级中文标签")
+    created_at = Column(DateTime, default=_utcnow, index=True)
+
+    def __repr__(self):
+        return f"<PracticeResult(learner_id={self.learner_id}, level={self.level}, score={self.score}, stage={self.stage})>"
+
+
+class ReportCache(Base):
+    """报告指标快照（从 learners 表拆出，1:1 关系）。"""
+    __tablename__ = "report_caches"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    learner_id = Column(Integer, ForeignKey("learners.id", ondelete="CASCADE"), nullable=False, unique=True, index=True, comment="学习者 ID")
+    cache_data = Column(JsonText, nullable=True, comment="报告指标快照 {hallucination_rate, difficulty_match_rate, knowledge_coverage_rate, match_curve, learning_stats}")
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    def __repr__(self):
+        return f"<ReportCache(learner_id={self.learner_id})>"

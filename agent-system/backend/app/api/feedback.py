@@ -9,7 +9,7 @@ from app.models.schemas import FeedbackInput, FeedbackResponse, PracticalFeedbac
 from app.models.agent_state import FeedbackRecord
 from app.models.learner import Learner
 from app.models.user import User
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, make_session_id
 from app.core.llm import get_llm
 from app.core.store import add_feedback, get_session
 from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
@@ -72,7 +72,7 @@ async def submit_feedback(
 ):
     """提交答题反馈，支持多轮苏格拉底式追问"""
     # 校验 session 归属
-    expected_session = f"user-{current_user.id}"
+    expected_session = make_session_id(current_user.id, current_user.created_at)
     if feedback.session_id != expected_session and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="无权操作其他用户的会话")
     MAX_ROUNDS = 3
@@ -271,7 +271,7 @@ async def submit_practical_feedback(
 ):
     """提交实操题答案，由 LLM Agent 批改"""
     # 校验 session 归属
-    expected_session = f"user-{current_user.id}"
+    expected_session = make_session_id(current_user.id, current_user.created_at)
     if feedback.session_id != expected_session and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="无权操作其他用户的会话")
 

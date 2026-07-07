@@ -441,7 +441,8 @@ async def mark_learning_event_by_learner_id(
         return {"marked_count": 0, "matched": []}
 
     learner, username = row
-    progress = _load_progress(username)
+    # 进度按 user_id 索引（而非 username），避免同用户名跨账户共享残留数据
+    progress = _load_progress(learner.user_id)
     leaf_nodes = _collect_leaf_index()
     matched: list[dict] = []
 
@@ -466,10 +467,10 @@ async def mark_learning_event_by_learner_id(
         })
 
     if matched:
-        _save_progress(username, progress)
-        await _sync_progress_to_db(username, progress, db)
+        _save_progress(learner.user_id, progress)
+        await _sync_progress_to_db(learner.user_id, progress, db)
     elif learner.kg_progress is None:
-        learner.kg_progress = build_kg_progress_for_learner(username)
+        learner.kg_progress = build_kg_progress_for_learner(learner.user_id)
 
     return {
         "marked_count": len(matched),
@@ -477,12 +478,12 @@ async def mark_learning_event_by_learner_id(
     }
 
 
-def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
+def auto_mark_completed(user_id: int | str, knowledge_items: list[str]) -> dict:
     """
     根据分析报告涉及的知识点，自动标记对应知识图谱节点为已学习。
 
     Args:
-        username: 用户名
+        user_id: 用户 ID
         knowledge_items: 知识点名称列表（从分析报告或 learner profile 中提取）
 
     Returns:
@@ -492,7 +493,7 @@ def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
         _init_category_labels()
 
     tree = _build_tree()
-    progress = _load_progress(username)
+    progress = _load_progress(user_id)
     completed = set(progress["completed_nodes"])
 
     import datetime
@@ -564,19 +565,19 @@ def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
 
     progress["completed_nodes"] = sorted(completed)
     progress = _normalize_progress(progress)
-    _save_progress(username, progress)
+    _save_progress(user_id, progress)
 
     total_leaves = tree.get("total_leaves", 0)
     percentage = round(len(completed) / total_leaves * 100, 1) if total_leaves > 0 else 0
 
     logger.info(
-        f"[知识图谱自动标记] 用户={username}, "
+        f"[知识图谱自动标记] user_id={user_id}, "
         f"提供知识点={len(knowledge_items)}, 匹配成功={marked_count}, "
         f"总进度={len(completed)}/{total_leaves} ({percentage}%)"
     )
 
     return {
-        "username": username,
+        "user_id": user_id,
         "marked_count": marked_count,
         "total_provided": len(knowledge_items),
         "completed_nodes": progress.get("completed_nodes", []),
@@ -587,19 +588,18 @@ def auto_mark_completed(username: str, knowledge_items: list[str]) -> dict:
 
 # ── 进度文件管理（文件作为持久化备份，DB 作为主存储）──
 
-def _progress_file_path(username: str) -> Path:
-    """获取用户进度文件路径"""
+def _progress_file_path(user_id: int | str) -> Path:
+    """获取用户进度文件路径（按 user_id 索引，避免同用户名跨账户共享残留数据）"""
     _PROGRESS_DIR.mkdir(parents=True, exist_ok=True)
-    # 安全处理用户名，避免路径遍历
-    safe_name = "".join(c for c in username if c.isalnum() or c in "_-")
-    if not safe_name:
-        safe_name = "anonymous"
-    return _PROGRESS_DIR / f"{safe_name}.json"
+    safe_id = "".join(c for c in str(user_id) if c.isalnum())
+    if not safe_id:
+        safe_id = "anonymous"
+    return _PROGRESS_DIR / f"user_{safe_id}.json"
 
 
-def _load_progress(username: str) -> dict:
+def _load_progress(user_id: int | str) -> dict:
     """加载用户学习进度，返回 {completed_nodes, node_scores, history}"""
-    file_path = _progress_file_path(username)
+    file_path = _progress_file_path(user_id)
     if file_path.exists():
         try:
             data = json.loads(file_path.read_text(encoding="utf-8"))
@@ -610,16 +610,16 @@ def _load_progress(username: str) -> dict:
     return _normalize_progress({})
 
 
-def _save_progress(username: str, progress: dict) -> None:
-    """保存用户学习进度到文件"""
-    file_path = _progress_file_path(username)
+def _save_progress(user_id: int | str, progress: dict) -> None:
+    """保存用户学习进度到文件（仅作为 DB 降级缓存）"""
+    file_path = _progress_file_path(user_id)
     file_path.write_text(
         json.dumps(progress, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
 
-async def _sync_progress_to_db(username: str, progress: dict, db: AsyncSession) -> None:
+async def _sync_progress_to_db(user_id: int | str, progress: dict, db: AsyncSession) -> None:
     """将知识图谱进度同步到数据库 learners.kg_progress"""
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
@@ -639,22 +639,22 @@ async def _sync_progress_to_db(username: str, progress: dict, db: AsyncSession) 
     }
 
     try:
-        # 通过 username 查找 learner
-        stmt = select(Learner).join(User, Learner.user_id == User.id).where(User.username == username)
+        # 通过 user_id 直接查找 learner（无需 join User 表）
+        stmt = select(Learner).where(Learner.user_id == int(user_id))
         result = await db.execute(stmt)
         learner = result.scalar_one_or_none()
         if learner:
             learner.kg_progress = kg_data
             await db.flush()
-            logger.info(f"[KG进度同步到DB] 用户={username}, 进度={stats['percentage']}%")
+            logger.info(f"[KG进度同步到DB] user_id={user_id}, 进度={stats['percentage']}%")
     except Exception as e:
-        logger.warning(f"[KG进度同步到DB失败] 用户={username}: {e}")
+        logger.warning(f"[KG进度同步到DB失败] user_id={user_id}: {e}")
 
 
-async def _load_progress_from_db(username: str, db: AsyncSession) -> dict | None:
+async def _load_progress_from_db(user_id: int | str, db: AsyncSession) -> dict | None:
     """从数据库加载知识图谱进度"""
     try:
-        stmt = select(Learner).join(User, Learner.user_id == User.id).where(User.username == username)
+        stmt = select(Learner).where(Learner.user_id == int(user_id))
         result = await db.execute(stmt)
         learner = result.scalar_one_or_none()
         if learner and learner.kg_progress and isinstance(learner.kg_progress, dict):
@@ -665,19 +665,20 @@ async def _load_progress_from_db(username: str, db: AsyncSession) -> dict | None
                 "history": kg.get("history", []),
             })
     except Exception as e:
-        logger.warning(f"[KG进度从DB加载失败] 用户={username}: {e}")
+        logger.warning(f"[KG进度从DB加载失败] user_id={user_id}: {e}")
     return None
 
 
-def build_kg_progress_for_learner(username: str) -> dict:
+def build_kg_progress_for_learner(user_id: int | str = "") -> dict:
     """
     构建可写入 learner.kg_progress 的知识图谱进度字典。
     纯同步函数，不依赖 DB session，可安全地在任何上下文中调用。
+    user_id 为空时返回空进度（用于初始化）。
     """
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
     leaf_ids = _leaf_ids_from_tree(tree)
-    progress = _load_progress(username)
+    progress = _load_progress(user_id) if user_id != "" else _normalize_progress({})
     stats = _progress_stats(progress, total_leaves, leaf_ids)
     return {
         "completed_nodes": progress.get("completed_nodes", []),
@@ -689,9 +690,9 @@ def build_kg_progress_for_learner(username: str) -> dict:
     }
 
 
-def _get_or_init_progress(username: str, db: AsyncSession | None = None) -> dict:
+def _get_or_init_progress(user_id: int | str, db: AsyncSession | None = None) -> dict:
     """获取用户进度：优先从文件读取，DB 作为补充"""
-    return _load_progress(username)
+    return _load_progress(user_id)
 
 
 def _build_graph(progress: dict | None = None) -> dict:
@@ -921,8 +922,8 @@ async def mark_progress(
     标记/取消标记某知识点为"已学习"。
     同时同步进度到数据库。
     """
-    username = current_user.username
-    progress = _load_progress(username)
+    user_id = current_user.id
+    progress = _load_progress(user_id)
     target_score = req.score
     if target_score is None:
         target_score = 100 if req.completed else 0
@@ -934,10 +935,10 @@ async def mark_progress(
         source=req.source or "manual",
         action=action,
     )
-    _save_progress(username, progress)
+    _save_progress(user_id, progress)
 
     # 同步到数据库
-    await _sync_progress_to_db(username, progress, db)
+    await _sync_progress_to_db(user_id, progress, db)
 
     # 计算进度百分比
     tree = _build_tree()
@@ -946,7 +947,7 @@ async def mark_progress(
     stats = _progress_stats(progress, total_leaves, leaf_ids)
 
     return {
-        "username": username,
+        "username": current_user.username,
         "completed_nodes": progress.get("completed_nodes", []),
         "node_scores": progress.get("node_scores", {}),
         "total": total_leaves,
@@ -962,13 +963,15 @@ async def get_progress(
 ):
     """
     获取当前用户的学习进度。
+    DB 优先（可信源），文件作为降级缓存。
     """
-    username = current_user.username
-    progress = _load_progress(username)
-    if not progress.get("completed_nodes") and not progress.get("node_scores"):
-        db_progress = await _load_progress_from_db(username, db)
-        if db_progress:
-            progress = db_progress
+    user_id = current_user.id
+    # DB 优先：避免删库重建后读到同用户名的旧文件残留
+    db_progress = await _load_progress_from_db(user_id, db)
+    if db_progress and (db_progress.get("completed_nodes") or db_progress.get("node_scores")):
+        progress = db_progress
+    else:
+        progress = _load_progress(user_id)
 
     tree = _build_tree()
     total_leaves = tree.get("total_leaves", 0)
@@ -976,7 +979,7 @@ async def get_progress(
     stats = _progress_stats(progress, total_leaves, leaf_ids)
 
     return {
-        "username": username,
+        "username": current_user.username,
         "completed_nodes": progress.get("completed_nodes", []),
         "node_scores": progress.get("node_scores", {}),
         "total": total_leaves,
@@ -992,12 +995,14 @@ async def get_graph_with_progress(
 ):
     """
     获取带当前用户掌握度的力导向图数据。
+    DB 优先（可信源），文件作为降级缓存。
     """
-    progress = _load_progress(current_user.username)
-    if not progress.get("completed_nodes") and not progress.get("node_scores"):
-        db_progress = await _load_progress_from_db(current_user.username, db)
-        if db_progress:
-            progress = db_progress
+    user_id = current_user.id
+    db_progress = await _load_progress_from_db(user_id, db)
+    if db_progress and (db_progress.get("completed_nodes") or db_progress.get("node_scores")):
+        progress = db_progress
+    else:
+        progress = _load_progress(user_id)
     return _build_graph(progress)
 
 
@@ -1018,7 +1023,7 @@ async def get_all_progress(
 
     # 从数据库查询所有 learner 账号；未建档账号没有 Learner 记录，按 0 进度展示。
     stmt = (
-        select(User.username, Learner.kg_progress)
+        select(User.id, User.username, Learner.kg_progress)
         .select_from(User)
         .outerjoin(Learner, Learner.user_id == User.id)
         .where(User.role == "learner")
@@ -1026,13 +1031,13 @@ async def get_all_progress(
     result = await db.execute(stmt)
     rows = result.all()
 
-    for username, kg_progress in rows:
+    for uid, username, kg_progress in rows:
         # 优先从 DB 的 kg_progress 读取
         if kg_progress and isinstance(kg_progress, dict):
             kg = _normalize_progress(kg_progress)
         else:
-            # 降级到文件
-            kg = _load_progress(username)
+            # 降级到文件（按 user_id 索引）
+            kg = _load_progress(uid)
 
         completed = kg.get("completed_nodes", [])
         stats = _progress_stats(kg, total_leaves, leaf_ids)
@@ -1062,16 +1067,18 @@ async def get_tree_with_progress(
     """
     获取带当前用户学习进度标记的树状图数据。
     每个叶子节点附加 completed 字段。
+    DB 优先（可信源），文件作为降级缓存。
     """
     if not _CATEGORY_LABELS:
         _init_category_labels()
 
     tree = _build_tree()
-    progress = _load_progress(current_user.username)
-    if not progress.get("completed_nodes") and not progress.get("node_scores"):
-        db_progress = await _load_progress_from_db(current_user.username, db)
-        if db_progress:
-            progress = db_progress
+    user_id = current_user.id
+    db_progress = await _load_progress_from_db(user_id, db)
+    if db_progress and (db_progress.get("completed_nodes") or db_progress.get("node_scores")):
+        progress = db_progress
+    else:
+        progress = _load_progress(user_id)
     completed = set(progress.get("completed_nodes", []))
     node_scores = progress.get("node_scores", {})
 
@@ -1111,8 +1118,18 @@ async def sync_all_progress_to_db(
 
     if _PROGRESS_DIR.exists():
         for f in _PROGRESS_DIR.glob("*.json"):
-            username = f.stem
+            stem = f.stem
             try:
+                # 文件名格式：user_{user_id}.json
+                if not stem.startswith("user_"):
+                    logger.warning(f"跳过旧格式进度文件: {f.name}（应为 user_{{id}}.json）")
+                    continue
+                id_str = stem[5:]
+                if not id_str.isdigit():
+                    logger.warning(f"跳过非法进度文件: {f.name}")
+                    continue
+                user_id = int(id_str)
+
                 data = json.loads(f.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
                     progress = _normalize_progress(data)
@@ -1128,7 +1145,7 @@ async def sync_all_progress_to_db(
                         "stats": stats,
                     }
 
-                    stmt = select(Learner).join(User, Learner.user_id == User.id).where(User.username == username)
+                    stmt = select(Learner).where(Learner.user_id == user_id)
                     r = await db.execute(stmt)
                     learner = r.scalar_one_or_none()
                     if learner:
@@ -1137,7 +1154,7 @@ async def sync_all_progress_to_db(
                     else:
                         failed += 1
             except Exception as e:
-                logger.warning(f"同步进度失败 {username}: {e}")
+                logger.warning(f"同步进度失败 {stem}: {e}")
                 failed += 1
 
         if synced > 0:

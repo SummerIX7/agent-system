@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import hashlib
 
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -94,18 +95,34 @@ async def require_admin(
     return current_user
 
 
+def make_session_id(user_id: int, created_at) -> str:
+    """
+    生成与账户周期绑定的 session_id。
+    格式：user-{id}-{created_at_hash 前 8 位}
+
+    同一用户的 created_at 永久不变（除非删库重建），所以 session_id 稳定，
+    退出再登录能续接 Redis 里的学习记录。
+    删库重建后新用户即使复用了同一个 user_id，created_at 也不同，
+    session_id 随之变化，读不到旧用户残留在 Redis 里的脏数据。
+    """
+    if created_at is None:
+        return f"user-{user_id}"
+    epoch = hashlib.md5(str(created_at).encode("utf-8")).hexdigest()[:8]
+    return f"user-{user_id}-{epoch}"
+
+
 async def validate_session_ownership(
     session_id: str,
     current_user = Depends(get_current_user),
 ):
     """
     FastAPI 依赖：校验 session_id 属于当前登录用户。
-    session_id 格式为 user-{userId}，必须与当前用户的 ID 匹配。
+    session_id 必须与当前用户的账户周期（user_id + created_at）匹配。
     管理员可以访问任意 session。
     """
     if current_user.role == "admin":
         return session_id
-    expected = f"user-{current_user.id}"
+    expected = make_session_id(current_user.id, current_user.created_at)
     if session_id != expected:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -29,6 +29,7 @@ from app.core.question_persistence import (
 from app.core.domains import get_domain_from_input, get_default_domain
 from app.models.database import get_db
 from app.models.learner import Learner
+from app.models.agent_state import PracticeResult
 from app.models.schemas import QuestionSet
 from app.models.user import User
 from app.agents.question_generator import QuestionGeneratorAgent
@@ -571,7 +572,28 @@ async def save_practice_result(
     payload = result.model_dump()
     payload["level"] = _normalize_level(result.level)
     payload["label"] = LEVEL_LABELS.get(payload["level"], payload["level"])
+    # 双写：Redis（作缓存）+ DB（持久化，"接着学"的可靠存储）
     all_results = append_practice_result(session_id, payload)
+
+    # 写入 DB
+    learner_id = session_data.get("learner_id")
+    if learner_id and learner_id != "unknown":
+        try:
+            db.add(PracticeResult(
+                learner_id=int(learner_id),
+                session_id=session_id,
+                level=payload.get("level"),
+                stage=payload.get("stage"),
+                score=payload.get("score", 0),
+                correct_count=payload.get("correct_count", 0),
+                wrong_count=payload.get("wrong_count", 0),
+                question_count=payload.get("question_count", 0),
+                questions=payload.get("questions"),
+                label=payload.get("label"),
+            ))
+            await db.flush()
+        except Exception as e:
+            print(f"[警告] 练习结果写入DB失败: {e}")
 
     try:
         from app.api.knowledge_graph import mark_learning_event_by_learner_id
@@ -602,7 +624,33 @@ async def save_practice_result(
 @router.get("/practice/results/{session_id}")
 async def list_practice_results(
     session_id: str,
+    db: AsyncSession = Depends(get_db),
     _validated: str = Depends(validate_session_ownership),
 ):
-    """获取练习结果列表，供分析报告展示。"""
+    """获取练习结果列表，供分析报告展示。DB 优先，Redis 降级。"""
+    # DB 优先（持久化可信源）
+    stmt = (
+        select(PracticeResult)
+        .where(PracticeResult.session_id == session_id)
+        .order_by(PracticeResult.created_at)
+    )
+    result = await db.execute(stmt)
+    db_results = result.scalars().all()
+    if db_results:
+        return {"results": [
+            {
+                "level": r.level,
+                "stage": r.stage,
+                "score": r.score,
+                "correct_count": r.correct_count,
+                "wrong_count": r.wrong_count,
+                "question_count": r.question_count,
+                "questions": r.questions or [],
+                "label": r.label,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in db_results
+        ]}
+
+    # 降级 Redis
     return {"results": get_practice_results(session_id)}

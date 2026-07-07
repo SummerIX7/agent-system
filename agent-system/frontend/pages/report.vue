@@ -259,9 +259,13 @@ const handleReassess = async () => {
   try {
     const newProfile = await api.reassessProfile()
     setProfile(newProfile)
-    // 也更新 session 中的 profile，确保全局状态一致
+    // 更新 session，确保全局状态一致（仅在后端返回合法 session_id 时才更新）
     const { setSession } = useSession()
-    setSession(newProfile.session_id || `user-${newProfile.id}`, String(newProfile.id))
+    if (newProfile.session_id) {
+      setSession(newProfile.session_id, String(newProfile.id))
+    }
+    // 跳转到学情诊断界面，dashboard 会重新挂载并从 profile + visualization 拉取新数据
+    await navigateTo('/dashboard')
   } catch (err: any) {
     console.warn('画像更新失败:', err)
   } finally {
@@ -269,48 +273,51 @@ const handleReassess = async () => {
   }
 }
 
+async function loadReportData() {
+  if (!sessionId.value) return
+  try {
+    const [pathData, vizData, practiceData] = await Promise.allSettled([
+      api.getLearningPath(sessionId.value),
+      api.getVisualization(sessionId.value).catch(() => null),
+      api.getPracticeResults(sessionId.value).catch(() => ({ results: [] })),
+    ])
+
+    if (pathData.status === 'fulfilled' && pathData.value) {
+      nodes.value = pathData.value.nodes || []
+      currentStage.value = pathData.value.current_stage || 1
+      allCompleted.value = pathData.value.all_completed || false
+    }
+
+    const viz = vizData.status === 'fulfilled' ? vizData.value : null
+    if (viz) {
+      if (viz.match_curve) {
+        matchCurveData.value = {
+          learnerLevel: viz.match_curve.learner_level === 'advanced' ? 4 :
+                        viz.match_curve.learner_level === 'intermediate' ? 3 : 2,
+          resources: viz.match_curve.resources || [],
+        }
+      }
+      if (viz.metrics) metrics.value = viz.metrics
+    }
+
+    if (practiceData.status === 'fulfilled') {
+      practiceResults.value = practiceData.value.results || []
+    }
+  } catch (err) {
+    console.warn('获取报告数据失败:', err)
+  }
+
+  try {
+    const profile = await api.getMyProfile()
+    machineStatus.value = (profile as any).machine_approval_status || 'none'
+  } catch {
+    // 用户尚未建档时忽略
+  }
+}
+
 onMounted(async () => {
   loading.value = true
-  if (sessionId.value) {
-    try {
-      const [pathData, vizData, practiceData] = await Promise.allSettled([
-        api.getLearningPath(sessionId.value),
-        api.getVisualization(sessionId.value).catch(() => null),
-        api.getPracticeResults(sessionId.value).catch(() => ({ results: [] })),
-      ])
-
-      if (pathData.status === 'fulfilled' && pathData.value) {
-        nodes.value = pathData.value.nodes || []
-        currentStage.value = pathData.value.current_stage || 1
-        allCompleted.value = pathData.value.all_completed || false
-      }
-
-      const viz = vizData.status === 'fulfilled' ? vizData.value : null
-      if (viz) {
-        if (viz.match_curve) {
-          matchCurveData.value = {
-            learnerLevel: viz.match_curve.learner_level === 'advanced' ? 4 :
-                          viz.match_curve.learner_level === 'intermediate' ? 3 : 2,
-            resources: viz.match_curve.resources || [],
-          }
-        }
-        if (viz.metrics) metrics.value = viz.metrics
-      }
-
-      if (practiceData.status === 'fulfilled') {
-        practiceResults.value = practiceData.value.results || []
-      }
-    } catch (err) {
-      console.warn('获取报告数据失败:', err)
-    }
-
-    try {
-      const profile = await api.getMyProfile()
-      machineStatus.value = (profile as any).machine_approval_status || 'none'
-    } catch {
-      // 用户尚未建档时忽略
-    }
-  }
+  await loadReportData()
   loading.value = false
 })
 </script>

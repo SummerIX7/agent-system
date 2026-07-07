@@ -126,7 +126,9 @@ onMounted(async () => {
     try {
       const profile = await api.getMyProfile()
       if (profile) {
-        setSession(profile.session_id || `user-${profile.id}`, String(profile.id))
+        if (profile.session_id) {
+          setSession(profile.session_id, String(profile.id))
+        }
         setProfile(profile)
       }
     } catch {

@@ -102,7 +102,7 @@ def main():
     print()
     print("   B 端管理后台:   http://localhost:3001")
     print("   C 端学习平台:   http://localhost:3000")
-    print("   API 文档:       http://localhost:8000/docs")
+    print("   API 文档:      http://localhost:8000/docs")
     print("=" * 60)
 
 

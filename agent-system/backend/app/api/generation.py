@@ -8,7 +8,7 @@ from app.models.resource import Resource
 from app.graph.workflow import run_workflow
 from app.core.store import add_resource, get_session, clear_cached_questions, save_practice_state, update_session
 from app.core.question_persistence import clear_persisted_practice_cache, persist_session_question_cache
-from app.core.auth import get_current_user, validate_session_ownership
+from app.core.auth import get_current_user, validate_session_ownership, make_session_id
 from app.models.user import User
 
 router = APIRouter(prefix="/api", tags=["资源生成"])
@@ -22,7 +22,7 @@ async def generate_resources(
 ):
     """触发资源生成（讲义/指南/试题）— 运行完整 Agent 工作流"""
     # 校验 session 归属
-    expected_session = f"user-{current_user.id}"
+    expected_session = make_session_id(current_user.id, current_user.created_at)
     if request.session_id != expected_session and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="无权操作其他用户的会话")
 
@@ -196,7 +196,17 @@ async def generate_resources(
                     profile=profile_for_report,
                     learning_path=learning_path_data or {},
                 )
-                learner_record.report_cache = report_cache
+                # 写入独立的 report_caches 表（1:1）
+                from app.models.agent_state import ReportCache
+                from sqlalchemy import select as _sel
+                rc_stmt = _sel(ReportCache).where(ReportCache.learner_id == learner_record.id)
+                rc_result = await db.execute(rc_stmt)
+                rc = rc_result.scalar_one_or_none()
+                if rc:
+                    rc.cache_data = report_cache
+                else:
+                    db.add(ReportCache(learner_id=learner_record.id, cache_data=report_cache))
+                await db.flush()
                 print(f"[报告快照] 已计算并持久化")
 
             except Exception as e:

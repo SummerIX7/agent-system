@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, make_session_id
 from app.models.database import get_db
 from app.models.schemas import LearnerProfileInput, LearnerProfile
 from app.models.learner import Learner
@@ -137,13 +137,15 @@ async def create_profile(
     profile_data["knowledge_points"] = _filter_knowledge_points_by_track(
         profile_data.get("knowledge_points", []), track_code
     )
-    session_id = f"user-{current_user.id}"
+    session_id = make_session_id(current_user.id, current_user.created_at)
 
     if existing_learner:
         # 更新已有画像
         existing_learner.education_background = profile_input.education_background
         existing_learner.major = profile_input.major
         existing_learner.work_experience_years = profile_input.work_experience_years
+        existing_learner.career_track = profile_input.career_track or "operator"
+        existing_learner.current_level = profile_input.current_level or ""
         existing_learner.self_assessment = profile_input.self_assessment
         existing_learner.learning_style = profile_input.learning_style
         existing_learner.goals = profile_input.goals
@@ -160,6 +162,8 @@ async def create_profile(
             education_background=profile_input.education_background,
             major=profile_input.major,
             work_experience_years=profile_input.work_experience_years,
+            career_track=profile_input.career_track or "operator",
+            current_level=profile_input.current_level or "",
             self_assessment=profile_input.self_assessment,
             learning_style=profile_input.learning_style,
             goals=profile_input.goals,
@@ -194,6 +198,8 @@ async def create_profile(
         education_background=profile_input.education_background,
         major=profile_input.major,
         work_experience_years=profile_input.work_experience_years,
+        career_track=learner.career_track or "operator",
+        current_level=learner.current_level or "",
         self_assessment=profile_input.self_assessment,
         learning_style=profile_input.learning_style,
         goals=profile_input.goals,
@@ -240,10 +246,12 @@ async def get_my_profile(
 
     return LearnerProfile(
         id=learner.id,
-        session_id=f"user-{current_user.id}",
+        session_id=make_session_id(current_user.id, current_user.created_at),
         education_background=learner.education_background,
         major=learner.major,
         work_experience_years=learner.work_experience_years,
+        career_track=learner.career_track or "operator",
+        current_level=learner.current_level or "",
         self_assessment=learner.self_assessment or {},
         learning_style=learner.learning_style or "practice",
         goals=learner.goals or [],
@@ -309,7 +317,7 @@ async def reassess_profile(
         raise HTTPException(status_code=404, detail="请先创建学习者画像")
 
     # 2. 聚合客观学习数据
-    session_id = f"user-{current_user.id}"
+    session_id = make_session_id(current_user.id, current_user.created_at)
     session = get_session(session_id)
 
     # 学习路径完成情况
@@ -388,8 +396,7 @@ async def reassess_profile(
         },
     }
 
-    # 4. 调用诊断 Agent —— 仅用于评估 blind_spots / overall_level / recommended_difficulty
-    #    knowledge_points 不采用 LLM 输出，直接用 updated_kps（保留原维度名，只更新数值）
+    # 4. 调用诊断 Agent —— LLM 基于学习数据重新评估 knowledge_points 的 score
     try:
         diag_result = await diagnosis_agent.run(input_data)
     except RuntimeError as e:
@@ -400,8 +407,13 @@ async def reassess_profile(
     profile_data = diag_result.get("profile", {})
 
     # 5. 更新 Learner 记录
-    #    知识点维度锚定：直接用 updated_kps，保证与首次诊断维度完全一致
-    learner.knowledge_points = updated_kps
+    #    知识点：用 _merge_kps 合并 LLM 输出和原 kps
+    #    - name 保持不变（维度锚定，雷达图不变形）
+    #    - score/level/confidence 用 LLM 基于学习数据重新评估的值（反映成长）
+    #    - LLM 未覆盖的项保留原值（不会归零）
+    from app.agents.diagnosis import _merge_kps
+    merged_kps = _merge_kps(profile_data.get("knowledge_points", []), updated_kps)
+    learner.knowledge_points = merged_kps
     learner.blind_spots = profile_data.get("blind_spots", learner.blind_spots or [])
     learner.overall_level = profile_data.get("overall_level", learner.overall_level)
     learner.recommended_difficulty = profile_data.get("recommended_difficulty", learner.recommended_difficulty)
@@ -415,10 +427,12 @@ async def reassess_profile(
             "education_background": learner.education_background,
             "major": learner.major,
             "work_experience_years": learner.work_experience_years,
+            "career_track": learner.career_track or "operator",
+            "current_level": learner.current_level or "",
             "self_assessment": learner.self_assessment or {},
             "learning_style": learner.learning_style,
             "goals": learner.goals or [],
-            "knowledge_points": updated_kps,
+            "knowledge_points": merged_kps,
             "blind_spots": profile_data.get("blind_spots", []),
             "overall_level": profile_data.get("overall_level", "beginner"),
             "recommended_difficulty": profile_data.get("recommended_difficulty", "beginner"),
@@ -431,13 +445,15 @@ async def reassess_profile(
         education_background=learner.education_background,
         major=learner.major,
         work_experience_years=learner.work_experience_years,
+        career_track=learner.career_track or "operator",
+        current_level=learner.current_level or "",
         self_assessment=learner.self_assessment or {},
         learning_style=learner.learning_style or "practice",
         goals=learner.goals or [],
         knowledge_points=[{
             "name": kp.get("name", ""), "level": kp.get("level", "beginner"),
             "score": kp.get("score", 0), "confidence": kp.get("confidence", 0),
-        } for kp in updated_kps],
+        } for kp in merged_kps],
         blind_spots=profile_data.get("blind_spots", []),
         overall_level=profile_data.get("overall_level", "beginner"),
         recommended_difficulty=profile_data.get("recommended_difficulty", "beginner"),

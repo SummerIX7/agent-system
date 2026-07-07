@@ -146,6 +146,13 @@ async def get_user_detail(
         "total": kg_progress.get("total", 0) if isinstance(kg_progress, dict) else 0,
     }
 
+    # 报告快照（从独立的 report_caches 表读取）
+    from app.models.agent_state import ReportCache
+    rc_result = await db.execute(
+        select(ReportCache.cache_data).where(ReportCache.learner_id == learner.id)
+    )
+    rc_data = rc_result.scalar_one_or_none()
+
     return {
         "id": learner.id,
         "user_id": learner.user_id,
@@ -166,7 +173,7 @@ async def get_user_detail(
         "machine_approval_status": learner.machine_approval_status,
         "machine_approval_at": learner.machine_approval_at.isoformat() if learner.machine_approval_at else None,
         "machine_approval_by": learner.machine_approval_by,
-        "report_cache": learner.report_cache,
+        "report_cache": rc_data,
         "created_at": learner.created_at.isoformat() if learner.created_at else None,
         "updated_at": learner.updated_at.isoformat() if learner.updated_at else None,
     }

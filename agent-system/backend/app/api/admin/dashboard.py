@@ -36,10 +36,11 @@ async def get_overview(
     )
     active_today = active_result.scalar() or 0
 
-    # 平均通过率（从 report_cache 计算。hallucination_rate 存储为百分比 0-100，需转为小数）
-    all_learners = await db.execute(select(Learner.report_cache))
+    # 平均通过率（从 report_caches 表计算。hallucination_rate 存储为百分比 0-100，需转为小数）
+    from app.models.agent_state import ReportCache
+    all_rc = await db.execute(select(ReportCache.cache_data))
     rates = []
-    for row in all_learners.scalars():
+    for row in all_rc.scalars():
         if row and isinstance(row, dict):
             rate = row.get("hallucination_rate")
             if rate is not None:

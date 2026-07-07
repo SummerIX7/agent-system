@@ -151,7 +151,9 @@ watch(isLoggedIn, async (loggedIn) => {
   try {
     const existing = await api.getMyProfile()
     if (existing) {
-      setSession(existing.session_id || `user-${existing.id}`, String(existing.id))
+      if (existing.session_id) {
+        setSession(existing.session_id, String(existing.id))
+      }
       setProfile(existing)
       // 预填表单
       formState.education_background = existing.education_background || '本科'
@@ -159,7 +161,7 @@ watch(isLoggedIn, async (loggedIn) => {
       formState.work_experience_years = existing.work_experience_years || 0
       formState.learning_style = existing.learning_style || 'practice'
       formState.career_track = existing.career_track || 'operator'
-      formState.current_level = existing.recommended_difficulty || 'beginner'
+      formState.current_level = existing.current_level || existing.recommended_difficulty || 'beginner'
       formState.self_assessment = existing.self_assessment || {}
       formState.goals = existing.goals?.length ? existing.goals : ['']
       profileLoaded.value = true
@@ -238,10 +240,13 @@ const submitProfile = async () => {
       learning_style: formState.learning_style || 'practice',
       goals: formState.goals.filter(g => g.trim()),
       career_track: formState.career_track || 'operator',
+      current_level: formState.current_level || '',
     })
 
     // 存入全局状态
-    setSession(result.session_id || `user-${result.id}`, String(result.id))
+    if (result.session_id) {
+      setSession(result.session_id, String(result.id))
+    }
     setProfile(result)
 
     toast.add({ title: '画像已提交，正在启动学情诊断...', color: 'primary' })

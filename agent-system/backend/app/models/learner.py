@@ -20,6 +20,7 @@ class Learner(Base):
     major = Column(String(100), nullable=False, comment="专业方向")
     work_experience_years = Column(Float, default=0, comment="工作年限")
     career_track = Column(String(30), default="operator", comment="职业方向: operator/setup_tech/programmer")
+    current_level = Column(String(20), nullable=True, comment="用户自评当前水平: beginner/intermediate/advanced/expert")
     self_assessment = Column(JsonText, nullable=True, comment="技能自评")
     learning_style = Column(String(20), nullable=True, comment="学习风格: visual/theory/practice")
     goals = Column(JsonText, nullable=True, comment="学习目标列表")
@@ -30,7 +31,6 @@ class Learner(Base):
     overall_level = Column(String(20), nullable=True, comment="整体水平: beginner/intermediate/advanced/expert")
     recommended_difficulty = Column(String(20), nullable=True, comment="推荐难度: beginner/intermediate/advanced/expert")
     learning_path = Column(JsonText, nullable=True, comment="学习路径 [{stage, title, topics, estimated_hours, difficulty, prerequisites, resources_type}]")
-    report_cache = Column(JsonText, nullable=True, comment="报告指标快照 {hallucination_rate, difficulty_match_rate, knowledge_coverage_rate, match_curve, learning_stats}")
     kg_progress = Column(JsonText, nullable=True, comment="知识图谱学习进度 {completed_nodes: [...], history: [...], percentage: float}")
 
     # 机台使用审批
