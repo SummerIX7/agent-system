@@ -106,16 +106,25 @@
             <div v-else>综合练习已达标，可准备提交机台使用申请或进入实操训练。</div>
           </div>
           <div v-if="allCompleted" class="machine-block">
-            <button
-              v-if="machineStatus === 'none' || machineStatus === 'rejected'"
-              class="btn btn--primary"
-              :disabled="applyingMachine"
-              @click="handleApplyMachine"
-            >
-              {{ applyingMachine ? '提交中...' : '申请机台使用' }}
-            </button>
-            <div v-else class="machine-status" :class="machineStatus === 'approved' ? 'machine-status--approved' : 'machine-status--pending'">
-              {{ machineStatus === 'approved' ? '机台使用权限已批准' : '机台使用申请审批中' }}
+            <div class="machine-actions">
+              <button
+                class="btn btn--ghost"
+                :disabled="reassessing"
+                @click="handleReassess"
+              >
+                {{ reassessing ? '正在重新诊断...' : '更新学习者画像' }}
+              </button>
+              <button
+                v-if="machineStatus === 'none' || machineStatus === 'rejected'"
+                class="btn btn--primary"
+                :disabled="applyingMachine"
+                @click="handleApplyMachine"
+              >
+                {{ applyingMachine ? '提交中...' : '申请机台使用' }}
+              </button>
+              <div v-else class="machine-status" :class="machineStatus === 'approved' ? 'machine-status--approved' : 'machine-status--pending'">
+                {{ machineStatus === 'approved' ? '机台使用权限已批准' : '机台使用申请审批中' }}
+              </div>
             </div>
           </div>
         </div>
@@ -169,13 +178,14 @@
 
 <script setup lang="ts">
 const api = useApi()
-const { sessionId } = useSession()
+const { sessionId, setProfile } = useSession()
 const { nodes, currentStage, allCompleted } = useLearningPath()
 
 const loading = ref(true)
 const practiceResults = ref<any[]>([])
 const machineStatus = ref<string>('none')
 const applyingMachine = ref(false)
+const reassessing = ref(false)
 
 const matchCurveData = ref({
   learnerLevel: 2.5,
@@ -241,6 +251,21 @@ const handleApplyMachine = async () => {
     console.warn('机台申请失败:', err)
   } finally {
     applyingMachine.value = false
+  }
+}
+
+const handleReassess = async () => {
+  reassessing.value = true
+  try {
+    const newProfile = await api.reassessProfile()
+    setProfile(newProfile)
+    // 也更新 session 中的 profile，确保全局状态一致
+    const { setSession } = useSession()
+    setSession(newProfile.session_id || `user-${newProfile.id}`, String(newProfile.id))
+  } catch (err: any) {
+    console.warn('画像更新失败:', err)
+  } finally {
+    reassessing.value = false
   }
 }
 
@@ -313,6 +338,7 @@ onMounted(async () => {
 .weak-item__count { flex-shrink: 0; font-family: var(--mono); color: var(--err); background: var(--err-soft); border-radius: 99px; padding: 2px 8px; font-size: 12px; }
 .advice-list { color: var(--text-2); line-height: 1.8; font-size: 14px; }
 .machine-block { margin-top: 18px; }
+.machine-actions { display: flex; align-items: center; gap: 12px; }
 .machine-status { display: inline-flex; align-items: center; padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; }
 .machine-status--pending { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
 .machine-status--approved { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }

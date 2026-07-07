@@ -50,15 +50,19 @@ async def get_visualization(
                 "recommended_difficulty": learner.recommended_difficulty or "beginner",
             }
 
-    # ── 知识点 ──
-    knowledge_points = [
-        SchemaKnowledgePoint(
-            name=kp.get("name", ""),
-            score=kp.get("score", 0),
-            level=kp.get("level", "beginner"),
-        ).model_dump()
-        for kp in profile.get("knowledge_points", [])
-    ]
+    # ── 知识点（消毒分数，防止 NaN 传递到前端）──
+    knowledge_points = []
+    for kp in profile.get("knowledge_points", []):
+        score = float(kp.get("score", 0) or 0)
+        if score != score:  # NaN check
+            score = 0.0
+        knowledge_points.append(
+            SchemaKnowledgePoint(
+                name=kp.get("name", ""),
+                score=score,
+                level=kp.get("level", "beginner"),
+            ).model_dump()
+        )
 
     # ── 盲区 ──
     blind_spots = [

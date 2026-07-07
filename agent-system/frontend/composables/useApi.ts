@@ -220,5 +220,11 @@ export function useApi() {
       request<{ message: string; status: string }>('/api/profile/apply-machine', {
         method: 'POST',
       }),
+
+    // 重新评估学习者画像
+    reassessProfile: () =>
+      request<import('~/types/api').LearnerProfile>('/api/profile/reassess', {
+        method: 'POST',
+      }),
   }
 }

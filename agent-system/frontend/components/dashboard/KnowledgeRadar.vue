@@ -37,11 +37,11 @@ const props = defineProps<{
 const isValidData = computed(() => {
   // 模式1：knowledgePoints
   if (Array.isArray(props.knowledgePoints) && props.knowledgePoints.length > 0) {
-    return props.knowledgePoints.every((kp) => kp && kp.name && typeof kp.score === 'number')
+    return props.knowledgePoints.every((kp) => kp && kp.name && typeof kp.score === 'number' && !Number.isNaN(kp.score))
   }
   // 模式2：indicators + values
   if (Array.isArray(props.indicators) && props.indicators.length > 0 && Array.isArray(props.values)) {
-    return props.indicators.length === props.values.length
+    return props.indicators.length === props.values.length && props.values.every((v) => !Number.isNaN(v))
   }
   return false
 })
@@ -58,7 +58,10 @@ const chartOption = computed(() => {
       name: kp.name,
       max: 100,
     }))
-    value = props.knowledgePoints!.map((kp) => kp.score)
+    value = props.knowledgePoints!.map((kp) => {
+      const s = kp.score
+      return (typeof s === 'number' && !Number.isNaN(s)) ? s : 0
+    })
   } else {
     indicator = props.indicators!.map((ind) => ({
       name: ind.name,
@@ -83,13 +86,13 @@ const chartOption = computed(() => {
     tooltip: {
       trigger: 'item',
       formatter: (params: any) => {
+        const val = typeof params.value === 'number' && !Number.isNaN(params.value) ? params.value : 0
         const idx = params.dataIndex ?? params.value?.findIndex((v: number) => v === params.value)
-        // Fallback: try matching by value
         const matchedIdx = idx >= 0 ? idx : value.findIndex(v => v === params.value)
         const ind = indicator[matchedIdx >= 0 ? matchedIdx : 0]
-        if (!ind) return `${params.name}: ${params.value}`
-        const percentage = Math.round(params.value / ind.max * 100)
-        return `${ind.name}<br/>覆盖度: <b>${percentage}%</b> (${params.value}/${ind.max})`
+        if (!ind) return `${params.name}: ${val}`
+        const percentage = Math.round(val / ind.max * 100)
+        return `${ind.name}<br/>覆盖度: <b>${percentage}%</b> (${val}/${ind.max})`
       },
     },
     legend: {

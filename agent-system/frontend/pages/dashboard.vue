@@ -155,11 +155,15 @@ const sanitizeKnowledgePoints = (kps: any[]): any[] => {
   if (!Array.isArray(kps)) return []
   return kps
     .filter((kp) => kp && typeof kp === 'object' && kp.name)
-    .map((kp) => ({
-      name: String(kp.name),
-      score: typeof kp.score === 'number' ? kp.score : Number(kp.score) || 0,
-      level: kp.level || 'beginner',
-    }))
+    .map((kp) => {
+      let score = typeof kp.score === 'number' && !Number.isNaN(kp.score) ? kp.score : Number(kp.score)
+      if (Number.isNaN(score) || score === null || score === undefined) score = 0
+      return {
+        name: String(kp.name),
+        score: Math.max(0, Math.min(100, score)),
+        level: kp.level || 'beginner',
+      }
+    })
 }
 
 // 获取进度条样式类

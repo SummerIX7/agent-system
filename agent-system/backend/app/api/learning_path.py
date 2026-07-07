@@ -17,6 +17,7 @@ from app.models.resource import Resource
 from app.models.user import User
 from app.api.knowledge_graph import build_kg_progress_for_learner, mark_learning_event_by_learner_id
 from app.agents.diagnosis import DiagnosisAgent
+from app.api.profile import _level_from_score, _sanitize_score
 from app.utils.db_helpers import retry_on_deadlock
 try:
     from app.graph.workflow import _broadcast
@@ -591,7 +592,8 @@ async def _update_learner_profile(
         else:
             wrong_topics.append(topic)
 
-    # 3. 更新 knowledge_points 评分
+    # 3. 更新 knowledge_points 评分（保留原维度名，只更新 score/level）
+    #    重要：节点推进时不重新生成维度，避免雷达图变形
     kps = list(profile.get("knowledge_points", []))
     for kp in kps:
         name = kp.get("name", "")
@@ -599,13 +601,18 @@ async def _update_learner_profile(
             kp["score"] = min(100, kp.get("score", 0) + 15)
         elif name in wrong_topics:
             kp["score"] = max(0, kp.get("score", 0) - 5)
+        kp["score"] = _sanitize_score(kp.get("score", 0))
+        kp["level"] = _level_from_score(kp["score"])
 
-    # 4. 重新调用学情诊断更新画像
+    # 4. 调用学情诊断 —— 仅用于评估 blind_spots / overall_level / recommended_difficulty
+    #    knowledge_points 不采用 LLM 输出，直接用本地更新的 kps（保留原维度名）
+    track_code = learner.career_track or (learner.learning_path or {}).get("career_track", "operator")
     try:
         input_data = {
             "education_background": learner.education_background or profile.get("education_background", ""),
             "major": learner.major or profile.get("major", ""),
             "work_experience_years": learner.work_experience_years or 0,
+            "career_track": track_code,
             "self_assessment": learner.self_assessment or {},
             "learning_style": profile.get("learning_style", "practice"),
             "goals": learner.goals or profile.get("goals", []),
@@ -618,9 +625,10 @@ async def _update_learner_profile(
         new_profile = profile
         new_difficulty = profile.get("recommended_difficulty", "beginner")
 
-    # 5. 持久化到数据库（对象属性已在内存中更新，flush 带死锁重试）
-    learner.knowledge_points = new_profile.get("knowledge_points", kps)
-    learner.blind_spots = new_profile.get("blind_spots", [])
+    # 5. 持久化到数据库
+    #    知识点维度锚定：直接用本地更新的 kps，保证与首次诊断维度完全一致
+    learner.knowledge_points = kps
+    learner.blind_spots = new_profile.get("blind_spots", learner.blind_spots or [])
     learner.overall_level = new_profile.get("overall_level", learner.overall_level)
     learner.recommended_difficulty = new_difficulty
 
