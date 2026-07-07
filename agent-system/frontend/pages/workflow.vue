@@ -59,7 +59,7 @@
       </div>
     </div>
 
-    <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
+    <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap">
       <button
         class="btn btn--primary btn--lg"
         :disabled="!sessionId || generating || checkingResources"
@@ -67,6 +67,9 @@
       >
         {{ checkingResources ? '检查中...' : generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : hasExistingResources ? '重新生成资源' : '触发资源生成' }}
       </button>
+      <NuxtLink v-if="hasExistingResources && !generating" to="/resources" class="btn btn--primary btn--lg">
+        开始学习 →
+      </NuxtLink>
       <NuxtLink to="/report" class="btn btn--ghost btn--lg" :class="{ 'opacity-50 pointer-events-none': generating && currentProgress < 100 }">
         查看学习报告 →
       </NuxtLink>

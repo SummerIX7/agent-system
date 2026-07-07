@@ -81,7 +81,13 @@
 
       <!-- 操作按钮 -->
       <div class="result-actions">
-        <button v-if="testLevel === 'node'" class="btn btn--primary" @click="goResources">
+        <button v-if="testLevel === 'node' && hasNextStage" class="btn btn--primary" @click="goNextStage">
+          下一节点练习 →
+        </button>
+        <button v-else-if="testLevel === 'node' && !hasNextStage" class="btn btn--primary" @click="goComprehensive">
+          综合练习 →
+        </button>
+        <button v-if="testLevel === 'node'" class="btn btn--ghost" @click="goResources">
           返回学习资源
         </button>
         <button v-if="testLevel === 'comprehensive'" class="btn btn--primary" @click="goReport">
@@ -564,6 +570,20 @@ const submitPracticeResult = async () => {
 // === 结果页操作 ===
 const goResources = () => router.push({ path: '/resources', query: { stage: String(selectedStage.value || 1) } })
 const goReport = () => router.push('/report')
+
+const hasNextStage = computed(() => {
+  const idx = nodes.value.findIndex((n: any) => Number(n.stage) === selectedStage.value)
+  return idx >= 0 && idx < nodes.value.length - 1
+})
+
+const goNextStage = () => {
+  const idx = nodes.value.findIndex((n: any) => Number(n.stage) === selectedStage.value)
+  if (idx >= 0 && idx < nodes.value.length - 1) {
+    switchStage(Number(nodes.value[idx + 1].stage))
+  }
+}
+
+const goComprehensive = () => switchLevel('comprehensive')
 
 const switchLevel = (level: TestLevel) => {
   if (level === testLevel.value) return

@@ -13,7 +13,8 @@
       </div>
 
       <div v-else-if="historyRecords.length === 0" class="text-center py-8 text-text-3">
-        暂无学习记录
+        暂无学习记录<br/>
+        <NuxtLink to="/resources" class="btn btn--ghost btn--sm" style="margin-top: 12px">去学习产生记录 →</NuxtLink>
       </div>
 
       <div v-else class="history-list">

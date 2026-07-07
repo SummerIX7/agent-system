@@ -100,7 +100,7 @@ const api = useApi()
 
 const mobileMenuOpen = ref(false)
 
-const navItems = [
+const allNavItems = [
   { path: '/', label: '首页' },
   { path: '/profile', label: '学习者画像' },
   { path: '/dashboard', label: '学情诊断' },
@@ -111,6 +111,14 @@ const navItems = [
   { path: '/knowledge-graph', label: '知识图谱' },
   { path: '/history', label: '历史记录' },
 ]
+
+// 未登录只显示首页，避免点进去被拦截跳回登录页的割裂体验
+const navItems = computed(() => {
+  if (!isLoggedIn.value) {
+    return allNavItems.filter(item => item.path === '/')
+  }
+  return allNavItems
+})
 
 // 用户名首字母（用于头像显示）
 const userInitial = computed(() => {

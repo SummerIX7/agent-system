@@ -172,6 +172,12 @@
           </template>
         </ClientOnly>
       </div>
+
+      <!-- 底部出口 -->
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap">
+        <NuxtLink to="/knowledge-graph" class="btn btn--ghost btn--lg">查看知识图谱 →</NuxtLink>
+        <NuxtLink to="/resources" class="btn btn--ghost btn--lg">复习学习资源 →</NuxtLink>
+      </div>
     </template>
   </div>
 </template>

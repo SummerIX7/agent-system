@@ -52,7 +52,10 @@
               </div>
             </template>
           </ClientOnly>
-          <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-12">暂无诊断数据</p>
+          <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-12">
+            暂无诊断数据<br/>
+            <NuxtLink to="/profile" class="btn btn--ghost btn--sm" style="margin-top: 12px">去创建学习者画像 →</NuxtLink>
+          </p>
         </div>
       </div>
 
@@ -100,7 +103,10 @@
           <span class="badge" :class="getBadgeClass(kp.score)">{{ LEVEL_MAP[kp.level] || kp.level }}</span>
         </div>
       </div>
-      <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-8">暂无能力维度数据</p>
+      <p v-if="knowledgePoints.length === 0" class="text-text-3 text-center py-8">
+        暂无能力维度数据<br/>
+        <NuxtLink to="/profile" class="btn btn--ghost btn--sm" style="margin-top: 12px">去创建学习者画像 →</NuxtLink>
+      </p>
     </div>
 
     <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
