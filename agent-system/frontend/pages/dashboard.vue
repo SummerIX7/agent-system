@@ -110,8 +110,7 @@
     </div>
 
     <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
-      <NuxtLink to="/workflow" class="btn btn--primary btn--lg">查看 Agent 协同过程 →</NuxtLink>
-      <NuxtLink to="/report" class="btn btn--ghost btn--lg">查看学习报告</NuxtLink>
+      <NuxtLink to="/workflow" class="btn btn--primary btn--lg">生成学习资源→</NuxtLink>
     </div>
   </div>
 </template>

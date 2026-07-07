@@ -70,9 +70,6 @@
       <NuxtLink v-if="hasExistingResources && !generating" to="/resources" class="btn btn--primary btn--lg">
         开始学习 →
       </NuxtLink>
-      <NuxtLink to="/report" class="btn btn--ghost btn--lg" :class="{ 'opacity-50 pointer-events-none': generating && currentProgress < 100 }">
-        查看学习报告 →
-      </NuxtLink>
     </div>
   </div>
 </template>
