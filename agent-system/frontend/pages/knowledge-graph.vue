@@ -40,7 +40,10 @@
               <div class="text-center py-12 text-text-3">正在加载图表...</div>
             </template>
           </ClientOnly>
-          <p v-else class="text-text-3 text-center py-12">暂无知识图谱数据</p>
+          <p v-else class="text-text-3 text-center py-12">
+            暂无知识图谱数据<br/>
+            <NuxtLink to="/workflow" class="btn btn--ghost btn--sm" style="margin-top: 12px">去生成学习资源 →</NuxtLink>
+          </p>
         </div>
 
         <div class="legend-row">
@@ -190,6 +193,12 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 底部出口 -->
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px">
+        <NuxtLink to="/resources" class="btn btn--primary btn--lg">去学习资源 →</NuxtLink>
+        <NuxtLink to="/dashboard" class="btn btn--ghost btn--lg">查看学情诊断 →</NuxtLink>
       </div>
     </template>
   </div>
