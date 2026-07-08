@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_MAX_CONNECTIONS: int = 50
 
-    # LLM
-    LLM_PROVIDER: str = "deepseek"
+    # LLM（OpenAI 兼容接口，支持 DeepSeek / Kimi / GLM / Qwen / MiniMax 等任意平台）
+    LLM_PROVIDER: str = "deepseek"  # 仅用于日志展示，不再决定 base_url
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = "https://api.deepseek.com/v1"
     LLM_MODEL: str = "deepseek-chat"

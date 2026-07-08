@@ -67,7 +67,7 @@
       >
         {{ checkingResources ? '检查中...' : generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : hasExistingResources ? '重新生成资源' : '触发资源生成' }}
       </button>
-      <NuxtLink v-if="hasExistingResources && !generating" to="/resources" class="btn btn--primary btn--lg">
+      <NuxtLink v-if="hasExistingResources" to="/resources" class="btn btn--primary btn--lg">
         开始学习 →
       </NuxtLink>
     </div>
