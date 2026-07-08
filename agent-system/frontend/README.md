@@ -48,6 +48,7 @@ frontend/
 │   ├── resources.vue         # 学习资源 (Step 4) — 讲义/实验指导/项目案例
 │   ├── practice.vue          # 答题练习 (Step 5) — 分阶练习 + 苏格拉底追问
 │   ├── report.vue            # 学习报告 (Step 6) — 学习路径 + 核心指标
+│   ├── knowledge-graph.vue   # 知识图谱 — 掌握度驱动的知识点点亮（SSR 已禁用）
 │   ├── history.vue           # 学习历程
 │   └── trace.vue             # 工作流追踪 (调试)
 ├── components/
@@ -89,13 +90,14 @@ frontend/
     → 答题练习 (Step 5) — 节点练习 / 综合练习
     → 学习报告 (Step 6) — 路径进度 + 机台申请
     → 推进到下一节点 → 回到 Step 4 ...
+    → 知识图谱 (独立页面) — 可视化知识体系掌握度
 ```
 
 ## 页面说明
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 首页 | `/` | 6 Agent 介绍 + 学习闭环展示 |
+| 首页 | `/` | Agent 介绍 + 学习闭环展示 |
 | 登录/注册 | `/login`, `/register` | JWT 认证 |
 | 学习者画像 | `/profile` | 学历/专业/技能自评/学习目标 |
 | 学情诊断 | `/dashboard` | 知识雷达图 + 盲区定位 + 推荐难度 |
@@ -103,5 +105,6 @@ frontend/
 | 学习资源 | `/resources?stage=N` | 讲义/实验指导/项目案例 + 参考来源 |
 | 答题练习 | `/practice?level=node\|comprehensive` | 节点练习 + 综合练习 + 苏格拉底追问 + 简答批改 |
 | 学习报告 | `/report` | 学习路径进度 + 核心指标 + 机台申请 |
+| 知识图谱 | `/knowledge-graph` | 树状知识体系 + 掌握度点亮（深绿/浅绿/黄/灰） |
 | 学习历程 | `/history` | 画像演变历史 |
 | 工作流追踪 | `/trace` | Agent LLM 调用明细 (调试) |

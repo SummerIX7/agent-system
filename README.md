@@ -30,7 +30,7 @@
 │                       ↕ 决策调度 ↕                     │
 ├─────────────────────────────────────────────────────┤
 │                     基础设施层                         │
-│   LLM (DeepSeek)  │  ChromaDB  │  MySQL 8.0  │  Redis │
+│   LLM (OpenAI 兼容)  │  ChromaDB  │  MySQL 8.0  │  Redis │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -50,8 +50,10 @@
 
 | 服务 | 用途 | 获取地址 |
 |------|------|----------|
-| DeepSeek | 大语言模型 | https://platform.deepseek.com |
-| 阿里云 DashScope | 文本嵌入 | https://dashscope.aliyun.com |
+| LLM（OpenAI 兼容） | 大语言模型 | 见下方「切换 LLM 平台」章节 |
+| 嵌入模型（OpenAI 兼容） | 文本嵌入 | 默认使用阿里云 DashScope |
+
+默认配置使用 DeepSeek（LLM）和阿里云 DashScope（嵌入），可在 `.env` 中替换为任意 OpenAI 兼容平台（Kimi、GLM、MiniMax 等）。
 
 ---
 
@@ -80,6 +82,7 @@ pip install -r requirements.txt
 # 配置环境变量
 cp .env.example .env
 # 编辑 .env，填入 LLM_API_KEY 和 EMBEDDING_API_KEY
+# 可选：修改 LLM_BASE_URL 和 LLM_MODEL 切换其他模型平台
 
 # 一键初始化（创建管理员 + 构建知识库索引）
 python setup.py
@@ -116,14 +119,16 @@ pnpm dev          # http://localhost:5173
 agent-system/
 ├── backend/                     # 后端 FastAPI 服务
 │   ├── app/
-│   │   ├── agents/              # 6 个 AI Agent 实现
+│   │   ├── agents/              # 6 个 AI Agent（学情诊断 / 路径规划 / 知识生成 / 审核纠偏 / 试题生成 / 决策调度）
 │   │   ├── graph/               # LangGraph 工作流编排
 │   │   ├── knowledge/           # RAG 知识库（ChromaDB）
 │   │   ├── metrics/             # 谬误检测 + 指标计算
+│   │   ├── mock/                # Mock 模式（MOCK_MODE=true 时使用）
 │   │   ├── api/                 # API 路由
 │   │   │   └── admin/           # B 端管理接口
 │   │   ├── models/              # SQLAlchemy 数据模型
-│   │   └── core/                # 配置 / 认证 / 存储
+│   │   ├── core/                # 配置 / 认证 / 存储 / LLM
+│   │   └── utils/               # 工具函数
 │   ├── alembic/                 # 数据库迁移
 │   ├── tests/                   # 单元测试
 │   ├── main.py                  # 应用入口
@@ -131,25 +136,27 @@ agent-system/
 │   ├── requirements.txt
 │   └── .env.example
 ├── frontend/                    # C 端 Nuxt 3 学习平台
-│   ├── pages/                   # 页面路由
-│   ├── components/              # Vue 组件
-│   ├── composables/             # 组合式函数
+│   ├── pages/                   # 页面路由（含知识图谱、答题练习、学习报告等）
+│   ├── components/              # Vue 组件（Agent 可视化、雷达图、报告图表等）
+│   ├── composables/             # 组合式函数（API / 认证 / WebSocket / 学习路径）
 │   ├── utils/                   # 工具函数
 │   └── nuxt.config.ts
 ├── admin-frontend/              # B 端 Vue 3 管理后台
 │   ├── src/
-│   │   ├── views/               # 页面视图
+│   │   ├── views/               # 页面视图（含知识图谱进度）
 │   │   ├── api/                 # API 请求封装
 │   │   ├── stores/              # Pinia 状态管理
 │   │   ├── router/              # 路由配置
 │   │   ├── layouts/             # 布局组件
 │   │   └── utils/               # 工具函数
 │   └── vite.config.ts
-└── knowledge-base/              # 知识库 Markdown 文档
-    └── cnc_domain/
-        ├── theory/              # 理论知识
-        ├── practice/            # 实践操作
-        └── standards/           # 标准规范
+├── knowledge-base/              # 知识库 Markdown 文档（50+ 篇 CNC 领域文档）
+│   └── cnc_domain/
+│       ├── theory/              # 理论知识（数控基础 / 坐标系 / 切削理论 / G 代码等）
+│       ├── practice/            # 实践操作（刀具选择 / 装夹 / CAM / 测量等）
+│       └── standards/           # 标准规范（GB / ISO / 安全规程 / 质量控制等）
+├── data/                        # 数据文件
+└── tests/                       # 顶层测试脚本
 ```
 
 ---
@@ -175,7 +182,6 @@ python -m pytest tests/ -v
 
 # 特定模块
 python -m pytest tests/test_agents.py -v
-python -m pytest tests/test_domain_migration.py -v
 python -m pytest tests/test_ablation.py -v
 python -m pytest tests/test_redis_store.py -v
 python -m pytest tests/test_main.py -v
@@ -193,6 +199,24 @@ python -m pytest tests/test_main.py -v
 
 ### MySQL 连接失败
 确保 `.env` 中数据库配置正确，或 MySQL 服务已启动。
+
+### 切换 LLM 平台
+
+系统通过 OpenAI 兼容接口调用 LLM，支持 DeepSeek、Kimi（月之暗面）、GLM（智谱）、Qwen（通义千问）、MiniMax 等任意平台。只需修改 `.env` 中以下三个变量：
+
+```env
+LLM_BASE_URL=https://api.moonshot.cn/v1   # 平台 API 地址
+LLM_MODEL=moonshot-v1-8k                    # 模型名称
+LLM_API_KEY=你的 API Key
+```
+
+### Mock 模式
+
+开发调试时，可在 `.env` 中启用 Mock 模式，所有 LLM/嵌入调用返回本地模拟数据，不消耗 API 额度：
+
+```env
+MOCK_MODE=true
+```
 
 ---
 

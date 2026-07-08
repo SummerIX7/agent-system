@@ -9,6 +9,7 @@
 - **缓存**: Redis 7.0（自动降级为内存存储）
 - **向量索引**: ChromaDB
 - **工作流**: LangGraph
+- **LLM**: OpenAI 兼容接口（支持 DeepSeek / Kimi / GLM / Qwen / MiniMax 等任意平台）
 
 ## 快速开始
 
@@ -24,8 +25,9 @@ pip install -r requirements.txt
 # 3. 配置环境变量
 cp .env.example .env
 # 编辑 .env，至少填入:
-#   LLM_API_KEY=sk-your-deepseek-key
-#   EMBEDDING_API_KEY=sk-your-dashscope-key
+#   LLM_API_KEY=sk-your-key
+#   EMBEDDING_API_KEY=sk-your-key
+# 可选：修改 LLM_BASE_URL 和 LLM_MODEL 切换其他模型平台
 
 # 4. 一键初始化（创建管理员 + 构建知识库索引）
 python setup.py
@@ -48,7 +50,9 @@ backend/
 │   │   ├── diagnosis.py     # 学情诊断
 │   │   ├── path_planner.py  # 路径规划
 │   │   ├── generation.py    # 知识生成
-│   │   ├── review.py        # 审核纠偏（双视角）
+│   │   ├── review.py        # 审核纠偏（双视角审查 + 修正）
+│   │   ├── debate.py        # 辩论管理器（备用）
+│   │   ├── judge.py         # 独立裁判 Agent（备用）
 │   │   ├── question_generator.py  # 试题生成
 │   │   └── orchestrator.py  # 决策调度
 │   ├── graph/               # LangGraph 工作流
@@ -61,6 +65,11 @@ backend/
 │   ├── metrics/             # 质量指标
 │   │   ├── hallucination_checker.py  # 谬误检测
 │   │   └── report_builder.py         # 报告快照
+│   ├── mock/                # Mock 模式（MOCK_MODE=true 时使用，不调用外部 API）
+│   │   ├── llm.py           # 模拟 LLM
+│   │   ├── embeddings.py    # 模拟嵌入
+│   │   ├── knowledge.py     # 模拟检索器
+│   │   └── responses.py     # 预设响应数据
 │   ├── api/                 # REST API 路由
 │   │   ├── auth.py          # 认证
 │   │   ├── profile.py       # 学习者画像
@@ -69,7 +78,9 @@ backend/
 │   │   ├── questions.py     # 分阶试题
 │   │   ├── learning_path.py # 学习路径与节点推进
 │   │   ├── visualization.py # 可视化数据
+│   │   ├── knowledge_graph.py  # 知识图谱（树状结构 + 学习进度）
 │   │   ├── domains.py       # 领域配置
+│   │   ├── career_tracks.py # 职业路径配置
 │   │   ├── ws.py            # WebSocket
 │   │   └── admin/           # B 端管理接口
 │   │       ├── router.py    # 路由汇总
@@ -85,12 +96,16 @@ backend/
 │   │   ├── agent_state.py   # Agent 日志 + 答题记录
 │   │   ├── approval_log.py  # 审批日志
 │   │   └── schemas.py       # Pydantic Schema
-│   └── core/                # 核心模块
-│       ├── config.py        # 配置管理
-│       ├── auth.py          # JWT 认证
-│       ├── llm.py           # LLM 调用封装
-│       ├── store.py         # Redis 存储层
-│       └── domains.py       # 多领域配置
+│   ├── core/                # 核心模块
+│   │   ├── config.py        # 配置管理
+│   │   ├── auth.py          # JWT 认证
+│   │   ├── llm.py           # LLM 调用封装（OpenAI 兼容）
+│   │   ├── store.py         # Redis 存储层
+│   │   ├── domains.py       # 多领域配置
+│   │   ├── career_tracks.py # 职业路径配置
+│   │   └── question_persistence.py  # 试题持久化
+│   └── utils/               # 工具函数
+│       └── db_helpers.py    # 数据库辅助
 ├── alembic/                 # 数据库迁移脚本
 ├── tests/                   # 单元测试
 ├── main.py                  # 应用入口
@@ -120,15 +135,16 @@ alembic upgrade head
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| LLM_API_KEY | ✅ | DeepSeek API Key |
-| EMBEDDING_API_KEY | ✅ | 阿里云 DashScope API Key |
+| LLM_API_KEY | ✅ | LLM API Key（支持任意 OpenAI 兼容平台） |
+| LLM_BASE_URL | - | LLM API 地址，默认 DeepSeek |
+| LLM_MODEL | - | LLM 模型名，默认 deepseek-chat |
+| EMBEDDING_API_KEY | ✅ | 嵌入模型 API Key |
+| EMBEDDING_BASE_URL | - | 嵌入模型 API 地址，默认 DashScope |
+| EMBEDDING_MODEL | - | 嵌入模型名，默认 text-embedding-v3 |
 | MYSQL_HOST | - | 默认 localhost |
 | MYSQL_PORT | - | 默认 3306 |
 | MYSQL_USER | - | 默认 root |
-| MYSQL_PASSWORD | - | 数据库密码 |
-| MYSQL_DATABASE | - | 默认 agent_system |
-| REDIS_HOST | - | 默认 localhost |
-| REDIS_PORT | - | 默认 6379 |
+| MOCK_MODE | - | 设为 true 启用 Mock 模式，不调用外部 API |
 
 ## 测试
 

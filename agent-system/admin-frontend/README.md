@@ -36,6 +36,7 @@ admin-frontend/
 │   │   ├── UsersView.vue     # 学员管理
 │   │   ├── UserDetailView.vue# 学员详情
 │   │   ├── ApprovalView.vue  # 审批管理
+│   │   ├── KnowledgeProgressView.vue  # 知识图谱进度（全体学员掌握情况）
 │   │   └── SettingsView.vue  # 系统设置
 │   ├── api/                  # API 请求封装
 │   │   ├── request.ts        # Axios 实例 + 拦截器
@@ -43,7 +44,8 @@ admin-frontend/
 │   │   ├── dashboard.ts      # 数据看板接口
 │   │   ├── users.ts          # 学员管理接口
 │   │   ├── approval.ts       # 审批管理接口
-│   │   └── knowledge.ts      # 知识库管理接口
+│   │   ├── knowledge.ts      # 知识库管理接口
+│   │   └── knowledgeProgress.ts  # 知识图谱进度接口
 │   ├── stores/               # Pinia 状态管理
 │   │   ├── auth.ts           # 认证状态
 │   │   └── admin.ts          # UI 状态（侧边栏折叠等）
@@ -67,8 +69,9 @@ admin-frontend/
 |------|------|------|
 | 数据看板 | `/` | 统计卡片、知识点分布表、学习趋势、学历/等级分布 |
 | 学员管理 | `/users` | 搜索/筛选/分页列表，点击查看详情 |
-| 学员详情 | `/users/:id` | 基本信���、学习路径、知识掌握、答题记录、审批历史 |
+| 学员详情 | `/users/:id` | 基本信息、学习路径、知识掌握、答题记录、审批历史 |
 | 审批管理 | `/approval` | 左右双栏：待审批列表 + 学情查看 + 通过/拒绝操作 |
+| 知识图谱进度 | `/knowledge-progress` | 全体学员知识掌握概览、单个学员节点进度详情 |
 | 系统设置 | `/settings` | 知识库目录树、文件查看/编辑/新建/删除、向量索引重建 |
 
 ## 路由配置
@@ -80,6 +83,7 @@ admin-frontend/
 | `/users` | UsersView | 需登录 + admin 角色 |
 | `/users/:id` | UserDetailView | 需登录 + admin 角色 |
 | `/approval` | ApprovalView | 需登录 + admin 角色 |
+| `/knowledge-progress` | KnowledgeProgressView | 需登录 + admin 角色 |
 | `/settings` | SettingsView | 需登录 + admin 角色 |
 
 路由守卫 (`router/index.ts`) 会检查：
