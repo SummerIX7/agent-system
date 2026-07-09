@@ -14,22 +14,24 @@
       </span>
       <span class="muted">·</span>
       <span class="t2">会话: <span class="mono">{{ sessionId || '未设置' }}</span></span>
-      <span style="margin-left: auto" :class="['badge', hasExistingResources ? 'badge--ok' : generating ? (currentProgress >= 100 ? 'badge--ok' : 'badge--accent') : 'badge--mute']">
-        {{ hasExistingResources ? '已有资源' : generating ? (currentProgress >= 100 ? '生成完成' : '生成中...') : '等待触发' }}
+      <span style="margin-left: auto" :class="['badge', hasExistingResources ? 'badge--ok' : savingResources ? 'badge--accent' : generating ? 'badge--accent' : 'badge--mute']">
+        {{ hasExistingResources ? '已有资源' : savingResources ? '保存中...' : generating ? '生成中...' : '等待触发' }}
       </span>
     </div>
 
     <!-- 生成进度 -->
     <div v-if="generating" class="gen-box">
       <div class="gen-box__icon">
-        <svg v-if="currentProgress >= 100" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        <svg v-if="currentProgress >= 100 && !savingResources" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="animate-spin"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>
       </div>
       <div style="flex: 1">
         <div style="font-size: 14px; font-weight: 600">
-          {{ currentProgress >= 100 ? '生成完成！' : '正在生成个性化资源...' }}
+          {{ savingResources ? '正在保存资源，请稍候...' : currentProgress >= 100 ? '生成完成！' : '正在生成个性化资源...' }}
         </div>
-        <div style="font-size: 13px; color: var(--text-2); margin-top: 4px">{{ currentMessage }}</div>
+        <div style="font-size: 13px; color: var(--text-2); margin-top: 4px">
+          {{ savingResources ? '资源已生成，正在持久化到数据库，请勿离开本页面' : currentMessage }}
+        </div>
       </div>
       <div style="font-size: 22px; font-weight: 600; font-family: var(--mono); color: var(--accent)">{{ Math.round(currentProgress) }}%</div>
     </div>
@@ -65,7 +67,7 @@
         :disabled="!sessionId || generating || checkingResources"
         @click="startGenerate"
       >
-        {{ checkingResources ? '检查中...' : generating ? (currentProgress >= 100 ? '生成完成' : '正在生成...') : hasExistingResources ? '重新生成资源' : '触发资源生成' }}
+        {{ checkingResources ? '检查中...' : savingResources ? '保存中...' : generating ? '正在生成...' : hasExistingResources ? '重新生成资源' : '触发资源生成' }}
       </button>
       <NuxtLink v-if="hasExistingResources" to="/resources" class="btn btn--primary btn--lg">
         开始学习 →
@@ -86,6 +88,13 @@ const currentMessage = ref('准备中...')
 const generating = ref(false)
 const hasExistingResources = ref(false)
 const checkingResources = ref(true)
+
+// 资源已生成但仍在保存的窗口期：
+// WebSocket 推送 progress=100 后，HTTP 还在跑 build_report_cache/持久化，尚未返回。
+// 此时 hasExistingResources 仍为 false，需提示用户"保存中，请勿离开"。
+const savingResources = computed(() =>
+  generating.value && currentProgress.value >= 100 && !hasExistingResources.value
+)
 
 const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
