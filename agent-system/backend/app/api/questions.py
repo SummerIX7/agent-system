@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, validate_session_ownership
+from app.core.rate_limit import RateLimit
 from app.core.store import (
     get_session,
     save_practice_state,
@@ -376,6 +377,7 @@ async def regenerate_questions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _validated: str = Depends(validate_session_ownership),
+    _rl: None = Depends(RateLimit("questions:regenerate", max_requests=5, window=60)),
 ):
     """清除缓存并重新生成试题"""
     clear_cached_questions(session_id)

@@ -4,7 +4,7 @@
     <header class="topnav">
       <NuxtLink to="/" class="topnav__brand">
         <span class="dot" style="background: var(--accent); width: 7px; height: 7px; border-radius: 50%"></span>
-        领域知识个性化生成系统
+        CNC技术培训多智能体个性化学习系统
       </NuxtLink>
 
       <!-- 桌面端导航 -->

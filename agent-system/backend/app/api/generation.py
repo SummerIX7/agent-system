@@ -9,9 +9,13 @@ from app.graph.workflow import run_workflow
 from app.core.store import add_resource, get_session, clear_cached_questions, save_practice_state, update_session
 from app.core.question_persistence import clear_persisted_practice_cache, persist_session_question_cache
 from app.core.auth import get_current_user, validate_session_ownership, make_session_id
+from app.core.rate_limit import RateLimit
 from app.models.user import User
 
 router = APIRouter(prefix="/api", tags=["资源生成"])
+
+# 频率限制：完整工作流成本高，默认每用户 60s 内最多 5 次
+_generate_ratelimit = RateLimit("generate", max_requests=5, window=60)
 
 
 @router.post("/generate", response_model=list[ResourceOutput])
@@ -19,6 +23,7 @@ async def generate_resources(
     request: GenerateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(_generate_ratelimit),
 ):
     """触发资源生成（讲义/指南/试题）— 运行完整 Agent 工作流"""
     # 校验 session 归属

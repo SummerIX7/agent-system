@@ -1,4 +1,5 @@
 from typing import Any
+from contextvars import ContextVar
 from datetime import datetime
 import time
 
@@ -6,6 +7,21 @@ from langchain_core.language_models import BaseChatModel
 
 from app.core.config import get_settings
 from app.core.llm import get_llm
+
+# 追踪埋点：用 ContextVar 隔离协程/请求，避免模块级 Agent 单例在并发工作流中互相覆盖 trace。
+# ainvoke() 调用会在独立的 asyncio Task 上运行，每个 Task 有自己的 Context 副本，天然隔离。
+_trace_calls_var: ContextVar[list | None] = ContextVar("agent_trace_calls", default=None)
+_trace_agent_name_var: ContextVar[str] = ContextVar("agent_trace_agent_name", default="")
+
+# LLM 缓存：label 包含以下关键词时自动启用（幂等场景：审核/断言检测等）
+_CACHEABLE_LABEL_KEYWORDS = ("审核", "回归验证", "谬误检测", "断言提取", "事实核查")
+
+
+def _should_use_llm_cache(label: str) -> bool:
+    """根据 label 判断是否命中默认可缓存场景"""
+    if not label:
+        return False
+    return any(kw in label for kw in _CACHEABLE_LABEL_KEYWORDS)
 
 
 class BaseAgent:
@@ -17,9 +33,27 @@ class BaseAgent:
     ):
         self.llm = llm or get_llm()
         self._kb = None  # 延迟初始化，避免启动时阻塞
-        # 追踪埋点
-        self._trace_calls: list = []
-        self._trace_agent_name: str = ""
+
+    # ── 追踪埋点：属性代理到 ContextVar，保持旧调用点（agent._trace_calls = []）不变 ──
+    @property
+    def _trace_calls(self) -> list:
+        val = _trace_calls_var.get()
+        if val is None:
+            val = []
+            _trace_calls_var.set(val)
+        return val
+
+    @_trace_calls.setter
+    def _trace_calls(self, value: list | None) -> None:
+        _trace_calls_var.set(list(value) if value is not None else [])
+
+    @property
+    def _trace_agent_name(self) -> str:
+        return _trace_agent_name_var.get()
+
+    @_trace_agent_name.setter
+    def _trace_agent_name(self, value: str) -> None:
+        _trace_agent_name_var.set(value or "")
 
     @property
     def kb(self):
@@ -92,8 +126,21 @@ class BaseAgent:
 
         return " | ".join(parts)
 
-    async def call_llm(self, prompt: str, max_retries: int = 3, label: str = "") -> str:
-        """调用 LLM 获取响应，带重试机制和追踪埋点"""
+    async def call_llm(
+        self,
+        prompt: str,
+        max_retries: int = 3,
+        label: str = "",
+        use_cache: bool | None = None,
+    ) -> str:
+        """调用 LLM 获取响应，带重试机制、追踪埋点与可选缓存
+
+        参数:
+            use_cache:
+              - None（默认）：根据 label 自动判断（审核类命中缓存）
+              - True：强制启用（同一模型 + 同一 prompt 缓存 1 小时）
+              - False：强制禁用
+        """
         import asyncio
 
         # Mock 模式：通过 contextvars 将 label 传递给 MockLLM.ainvoke()
@@ -102,6 +149,39 @@ class BaseAgent:
             _mock_label.set(label)
         except ImportError:
             pass  # 非 mock 模式，正常跳过
+
+        settings = get_settings()
+        # 判定是否使用缓存：mock 模式禁用（会跳过外部调用，缓存无收益且可能污染）
+        if use_cache is None:
+            use_cache = _should_use_llm_cache(label)
+        if use_cache and getattr(settings, "MOCK_MODE", False):
+            use_cache = False
+
+        # 拿到模型标识，作为缓存 topic，避免模型切换后错命中
+        model_name = (
+            getattr(self.llm, "model_name", "")
+            or getattr(self.llm, "model", "")
+            or ""
+        )
+
+        # ── 缓存读 ──
+        if use_cache:
+            try:
+                from app.core.store import get_llm_cache
+                cached = get_llm_cache(prompt, topic=str(model_name))
+            except Exception as cache_err:
+                cached = None
+                print(f"[LLM缓存] 读取失败，退回真实调用: {cache_err}")
+            if cached is not None:
+                self._trace_calls.append({
+                    "label": (label or "LLM调用") + " [cache-hit]",
+                    "prompt": prompt,
+                    "response": cached[:8000],
+                    "elapsed_ms": 0,
+                    "cache_hit": True,
+                    "timestamp": datetime.now().isoformat(),
+                })
+                return cached
 
         last_error = None
         start = time.time()
@@ -116,8 +196,18 @@ class BaseAgent:
                     "prompt": prompt,
                     "response": response.content[:8000],
                     "elapsed_ms": elapsed_ms,
+                    "cache_hit": False,
                     "timestamp": datetime.now().isoformat(),
                 })
+
+                # ── 缓存写 ──
+                if use_cache:
+                    try:
+                        from app.core.store import set_llm_cache
+                        set_llm_cache(prompt, response.content, topic=str(model_name))
+                    except Exception as cache_err:
+                        print(f"[LLM缓存] 写入失败: {cache_err}")
+
                 return response.content
             except Exception as e:
                 last_error = e
@@ -130,7 +220,7 @@ class BaseAgent:
     def collect_trace(self) -> list:
         """收集并清空当前 Agent 的 LLM 调用追踪记录"""
         calls = list(self._trace_calls)
-        self._trace_calls = []
+        _trace_calls_var.set([])
         return calls
 
     async def run(self, **kwargs) -> Any:

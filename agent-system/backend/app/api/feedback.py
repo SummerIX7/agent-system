@@ -13,12 +13,17 @@ from app.core.auth import get_current_user, make_session_id
 from app.core.llm import get_llm
 from app.core.store import add_feedback, get_session
 from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
+from app.core.rate_limit import RateLimit
 from app.agents.orchestrator import DecisionOrchestrator
 
 router = APIRouter(prefix="/api/feedback", tags=["交互反馈"])
 
 # 决策调度 Agent（用于学习路径调整）
 orchestrator = DecisionOrchestrator()
+
+# 频率限制：反馈提交伴随苏格拉底追问/实操题批改，均为 LLM 调用
+_feedback_ratelimit = RateLimit("feedback", max_requests=30, window=60)
+_practical_ratelimit = RateLimit("feedback:practical", max_requests=20, window=60)
 
 
 async def generate_heuristic_question(
@@ -69,6 +74,7 @@ async def submit_feedback(
     feedback: FeedbackInput,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(_feedback_ratelimit),
 ):
     """提交答题反馈，支持多轮苏格拉底式追问"""
     # 校验 session 归属
@@ -268,6 +274,7 @@ async def submit_practical_feedback(
     feedback: PracticalFeedbackInput,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(_practical_ratelimit),
 ):
     """提交实操题答案，由 LLM Agent 批改"""
     # 校验 session 归属

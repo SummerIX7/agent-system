@@ -1,9 +1,12 @@
 import logging
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import auth, career_tracks, domains, feedback, generation, knowledge_graph, learning_path, profile, questions, visualization, ws
 from app.api.admin.router import router as admin_router
@@ -85,6 +88,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """为每个请求分配 request_id：
+    - 将 request_id 挂到 request.state，供异常处理器与业务日志引用
+    - 回写到响应头 X-Request-Id，方便前后端联合排查
+    """
+    request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    return response
+
 # 挂载路由
 app.include_router(auth.router)
 app.include_router(career_tracks.router)
@@ -102,10 +118,22 @@ app.include_router(admin_router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """全局异常处理，防止未捕获异常返回 500 HTML"""
+    """全局异常处理：
+    - HTTPException 仍由 FastAPI 默认处理器处理（直接旁过）
+    - 其他未捕获异常：日志记录完整堆栈 + request_id，向客户端只返回脱敏消息
+    """
+    # HTTPException 旁路到 FastAPI/Starlette 内置处理器
+    if isinstance(exc, (FastAPIHTTPException, StarletteHTTPException)):
+        raise exc
+
+    request_id = getattr(request.state, "request_id", "-") if hasattr(request, "state") else "-"
+    logger.exception(
+        f"Unhandled exception [request_id={request_id}] {type(exc).__name__}: {exc}"
+    )
     return JSONResponse(
         status_code=500,
-        content={"detail": f"服务器内部错误: {type(exc).__name__}: {str(exc)}"},
+        content={"detail": "服务器内部错误", "request_id": request_id},
+        headers={"X-Request-Id": request_id},
     )
 
 
