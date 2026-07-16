@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,8 @@ from app.core.question_persistence import clear_persisted_practice_cache, persis
 from app.core.auth import get_current_user, validate_session_ownership, make_session_id
 from app.core.rate_limit import RateLimit
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["资源生成"])
 
@@ -92,7 +95,7 @@ async def generate_resources(
     from app.core.store import flush_agent_logs_to_db
     log_count = await flush_agent_logs_to_db(request.session_id, db)
     if log_count:
-        print(f"[Agent日志] 已持久化 {log_count} 条到数据库")
+        logger.info("[Agent日志] 已持久化 %d 条到数据库", log_count)
 
     # 允许写入数据库的资源类型（与 Enum 定义一致）
     DB_RESOURCE_TYPES = {"lecture", "guide", "project", "test"}
@@ -212,10 +215,10 @@ async def generate_resources(
                 else:
                     db.add(ReportCache(learner_id=learner_record.id, cache_data=report_cache))
                 await db.flush()
-                print(f"[报告快照] 已计算并持久化")
+                logger.info("[报告快照] 已计算并持久化")
 
             except Exception as e:
-                print(f"[警告] 报告快照计算失败: {e}")
+                logger.warning("[警告] 报告快照计算失败: %s", e)
 
             # 初始化知识图谱进度（如果尚未设置）
             if learner_record and learner_record.kg_progress is None:
@@ -229,7 +232,7 @@ async def generate_resources(
                 get_session(request.session_id),
             )
             if saved_questions:
-                print(f"[试题缓存] 已持久化 {saved_questions} 套到数据库")
+                logger.info("[试题缓存] 已持久化 %d 套到数据库", saved_questions)
 
     await db.flush()
     return resources

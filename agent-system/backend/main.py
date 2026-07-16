@@ -8,7 +8,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import auth, career_tracks, domains, feedback, generation, knowledge_graph, learning_path, profile, questions, visualization, ws
+# 先初始化日志系统，避免其它模块 import 时用默认 logger
+from app.core.logging_config import (
+    bind_request_context,
+    reset_request_context,
+    setup_logging,
+)
+
+setup_logging()
+
+from app.api import auth, career_tracks, domains, feedback, generation, health, knowledge_graph, learning_path, profile, questions, visualization, ws
 from app.api.admin.router import router as admin_router
 from app.core.config import get_settings
 from app.core.store import check_redis_health
@@ -45,24 +54,24 @@ async def lifespan(app: FastAPI):
             "️ Redis 不可用，已降级为内存存储。"
             "多用户部署时请确保 Redis 已启动且配置正确。"
         )
-        print("[启动] ️ Redis 不可用，已降级为内存存储")
     else:
-        logger.info(f" Redis 连接正常: {health}")
-        print(f"[启动]  Redis 连接正常: {health}")
+        logger.info("Redis 连接正常: %s", health)
 
     # 3½. 打印 Mock 模式状态
     settings = get_settings()
     if settings.MOCK_MODE:
-        print("[启动] 🟡 MOCK 模式已启用 — 所有 LLM / 嵌入 / 知识库调用使用本地模拟数据")
+        logger.info("🟡 MOCK 模式已启用 — 所有 LLM / 嵌入 / 知识库调用使用本地模拟数据")
     else:
-        print("[启动] 🟢 真实 API 模式 — LLM: {}({}), 嵌入: {}".format(
-            settings.LLM_PROVIDER, settings.LLM_MODEL, settings.EMBEDDING_MODEL))
-    print("[启动] 配置已刷新")
+        logger.info(
+            "🟢 真实 API 模式 — LLM: %s(%s), 嵌入: %s",
+            settings.LLM_PROVIDER, settings.LLM_MODEL, settings.EMBEDDING_MODEL,
+        )
+    logger.info("启动配置已刷新")
 
     # 4. 创建数据库表（如果不存在）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("[启动] 数据库表已就绪")
+    logger.info("数据库表已就绪")
 
     yield
 
@@ -93,12 +102,26 @@ app.add_middleware(
 async def request_id_middleware(request: Request, call_next):
     """为每个请求分配 request_id：
     - 将 request_id 挂到 request.state，供异常处理器与业务日志引用
+    - 通过 ContextVar 绑定到日志上下文，所有 logger.xxx() 自动带 rid=
     - 回写到响应头 X-Request-Id，方便前后端联合排查
+    - 同时记录 HTTP 状态码到 /metrics 计数器
     """
     request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
     request.state.request_id = request_id
-    response = await call_next(request)
+    # 从 path 中尝试提取 session_id（形如 /ws/agent-status/{session_id} 或 query 参数），
+    # 无匹配则保持 "-"。这里不引入正则以免误伤，交给业务代码显式 bind。
+    tokens = bind_request_context(request_id)
+    try:
+        response = await call_next(request)
+    finally:
+        reset_request_context(tokens)
     response.headers["X-Request-Id"] = request_id
+    try:
+        from app.api.health import record_http_status
+        record_http_status(int(response.status_code))
+    except Exception:  # noqa: BLE001
+        # metrics 不可阻断主请求
+        pass
     return response
 
 # 挂载路由
@@ -114,6 +137,7 @@ app.include_router(knowledge_graph.router)
 app.include_router(questions.router)
 app.include_router(ws.router)
 app.include_router(admin_router)
+app.include_router(health.router)
 
 
 @app.exception_handler(Exception)

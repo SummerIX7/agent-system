@@ -2,6 +2,7 @@
 学习路径节点管理 API
 支持学习路径查看、当前节点获取、节点推进等功能
 """
+import logging
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -24,6 +25,8 @@ try:
 except ImportError:
     def _broadcast(session_id: str, agent: str, status: str, message: str, progress: float = 0):
         pass
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/learning-path", tags=["学习路径管理"])
 
@@ -278,7 +281,7 @@ async def advance_node(
                     req.test_feedback, current_stage, new_stage,
                 )
             except Exception as e:
-                print(f"[警告] 更新学习者画像失败: {e}")
+                logger.warning("更新学习者画像失败: %s", e)
             try:
                 await mark_learning_event_by_learner_id(
                     db,
@@ -288,7 +291,7 @@ async def advance_node(
                     "advanced_test",
                 )
             except Exception as e:
-                print(f"[警告] 知识图谱掌握度更新失败: {e}")
+                logger.warning("知识图谱掌握度更新失败: %s", e)
 
         if new_stage > total_stages:
             result["message"] = "所有节点已完成，学习流程结束"
@@ -315,7 +318,7 @@ async def advance_node(
                 except (ValueError, TypeError):
                     pass
         except Exception as e:
-            print(f"[警告] 知识图谱进度初始化失败: {e}")
+            logger.warning("知识图谱进度初始化失败: %s", e)
     else:
         learning_path = _update_node_state(learning_path, current_stage, {"need_review": True})
         _persist_learning_path(session_id, learning_path)
@@ -365,7 +368,7 @@ async def mark_basic_passed(
                 "basic_test",
             )
         except Exception as e:
-            print(f"[警告] 知识图谱基础掌握度更新失败: {e}")
+            logger.warning("知识图谱基础掌握度更新失败: %s", e)
 
     return {
         "ok": True,

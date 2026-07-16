@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+import logging
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +35,8 @@ from app.models.agent_state import PracticeResult
 from app.models.schemas import QuestionSet
 from app.models.user import User
 from app.agents.question_generator import QuestionGeneratorAgent
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/questions", tags=["试题生成"])
 
@@ -209,7 +212,7 @@ async def _generate_stage_tiered_questions(
             "questions": node_result.get("questions", []),
         }
     except Exception as e:
-        print(f"[警告] 节点{stage}练习题按需生成失败: {e}")
+        logger.warning("节点%d练习题按需生成失败: %s", stage, e)
         tiered["node"] = {"level": "node", "label": "节点练习", "stage": stage, "questions": [], "topic": topic, "difficulty": node_difficulty}
 
     save_tiered_questions_for_stage(session_id, stage, tiered)
@@ -233,7 +236,7 @@ async def get_questions(
     if not regenerate:
         cached = get_cached_questions(session_id)
         if cached and cached.get("questions"):
-            print(f"[试题] 命中缓存，共 {len(cached['questions'])} 题")
+            logger.info("[试题] 命中缓存，共 %d 题", len(cached["questions"]))
             return QuestionSet(
                 topic=cached.get("topic", ""),
                 difficulty=cached.get("difficulty", "beginner"),
@@ -295,7 +298,7 @@ async def get_questions(
             avoid_questions=_collect_avoid_questions(session_id),
         )
     except Exception as e:
-        print(f"[警告] 试题生成失败: {e}")
+        logger.warning("试题生成失败: %s", e)
         result_dict = {"topic": topic, "difficulty": difficulty, "domain": domain.code, "questions": []}
 
     # ── 6. 写入缓存 ──
@@ -307,7 +310,7 @@ async def get_questions(
     save_cached_questions(session_id, cache_data)
     # 新试题生成后清除旧进度
     save_practice_state(session_id, {})
-    print(f"[试题] 生成并缓存完成，共 {len(cache_data['questions'])} 题")
+    logger.info("[试题] 生成并缓存完成，共 %d 题", len(cache_data["questions"]))
 
     return QuestionSet(
         topic=cache_data["topic"],
@@ -424,7 +427,7 @@ async def generate_tiered_questions(
     node_title, _, _ = _stage_node_context(session_data, stage)
     node_set = tiered.get("node", {})
     question_count = len(node_set.get("questions", []))
-    print(f"[节点练习] 节点{stage}: {question_count}题")
+    logger.info("[节点练习] 节点%d: %d题", stage, question_count)
 
     return {
         "stage": stage,
@@ -595,7 +598,7 @@ async def save_practice_result(
             ))
             await db.flush()
         except Exception as e:
-            print(f"[警告] 练习结果写入DB失败: {e}")
+            logger.warning("练习结果写入DB失败: %s", e)
 
     try:
         from app.api.knowledge_graph import mark_learning_event_by_learner_id
@@ -618,7 +621,7 @@ async def save_practice_result(
                 f"{result_level}_practice",
             )
     except Exception as e:
-        print(f"[警告] 练习结果更新知识图谱失败: {e}")
+        logger.warning("练习结果更新知识图谱失败: %s", e)
 
     return {"ok": True, "total": len(all_results)}
 

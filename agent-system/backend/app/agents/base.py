@@ -1,12 +1,15 @@
 from typing import Any
 from contextvars import ContextVar
 from datetime import datetime
+import logging
 import time
 
 from langchain_core.language_models import BaseChatModel
 
 from app.core.config import get_settings
 from app.core.llm import get_llm
+
+logger = logging.getLogger(__name__)
 
 # 追踪埋点：用 ContextVar 隔离协程/请求，避免模块级 Agent 单例在并发工作流中互相覆盖 trace。
 # ainvoke() 调用会在独立的 asyncio Task 上运行，每个 Task 有自己的 Context 副本，天然隔离。
@@ -66,7 +69,7 @@ class BaseAgent:
                 from app.knowledge.retriever import get_retriever
                 self._kb = get_retriever()
             except Exception as e:
-                print(f"[警告] 知识库不可用: {e}")
+                logger.warning("知识库不可用: %s", e)
                 self._kb = False
         return self._kb
 
@@ -88,7 +91,7 @@ class BaseAgent:
                 )
             return "\n\n".join(context_parts)
         except Exception as e:
-            print(f"[警告] 知识库检索失败: {e}")
+            logger.warning("知识库检索失败: %s", e)
             return ""
 
     def _build_source_info(self, metadata: dict) -> str:
@@ -171,7 +174,7 @@ class BaseAgent:
                 cached = get_llm_cache(prompt, topic=str(model_name))
             except Exception as cache_err:
                 cached = None
-                print(f"[LLM缓存] 读取失败，退回真实调用: {cache_err}")
+                logger.warning("[LLM缓存] 读取失败，退回真实调用: %s", cache_err)
             if cached is not None:
                 self._trace_calls.append({
                     "label": (label or "LLM调用") + " [cache-hit]",
@@ -181,6 +184,12 @@ class BaseAgent:
                     "cache_hit": True,
                     "timestamp": datetime.now().isoformat(),
                 })
+                # 监控指标（失败不影响主流程）
+                try:
+                    from app.api.health import record_llm_call
+                    record_llm_call(cache_hit=True)
+                except Exception:  # noqa: BLE001
+                    pass
                 return cached
 
         last_error = None
@@ -206,14 +215,24 @@ class BaseAgent:
                         from app.core.store import set_llm_cache
                         set_llm_cache(prompt, response.content, topic=str(model_name))
                     except Exception as cache_err:
-                        print(f"[LLM缓存] 写入失败: {cache_err}")
+                        logger.warning("[LLM缓存] 写入失败: %s", cache_err)
+
+                # 监控指标（失败不影响主流程）
+                try:
+                    from app.api.health import record_llm_call
+                    record_llm_call(cache_hit=False)
+                except Exception:  # noqa: BLE001
+                    pass
 
                 return response.content
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt  # 1s, 2s, 4s
-                    print(f"[重试] LLM 调用失败 (第{attempt+1}次)，{wait_time}秒后重试: {e}")
+                    logger.warning(
+                        "[重试] LLM 调用失败 (第%d次)，%d秒后重试: %s",
+                        attempt + 1, wait_time, e,
+                    )
                     await asyncio.sleep(wait_time)
         raise RuntimeError(f"LLM 调用失败（已重试{max_retries}次）: {last_error}")
 

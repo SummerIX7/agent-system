@@ -58,3 +58,6 @@ docs/
 
 # Data (运行时生成的进度/数据文件)
 data/
+
+# E2E test database
+test_e2e.db

@@ -1,6 +1,8 @@
 /**
  * 用户认证状态管理
  */
+import axios from 'axios'
+
 export function useAuth() {
   const token = useState<string>('auth_token', () => '')
   const user = useState<{ id: number; username: string; role: string } | null>('auth_user', () => null)
@@ -14,14 +16,14 @@ export function useAuth() {
       const saved = localStorage.getItem('auth_token')
       if (saved) {
         token.value = saved
-        // 恢复用户信息
+        // 恢复用户信息（直接用 axios，不复用 useApi 的拦截器：此时若 401 应静默清 token 而不是二次触发登出跳转）
         try {
           const config = useRuntimeConfig()
-          const response = await fetch(`${config.public.apiBase}/api/auth/me`, {
+          const { data } = await axios.get(`${config.public.apiBase}/api/auth/me`, {
             headers: { Authorization: `Bearer ${saved}` },
+            validateStatus: (status: number) => status < 500,
           })
-          if (response.ok) {
-            const data = await response.json()
+          if (data && data.id) {
             user.value = { id: data.id, username: data.username, role: data.role || 'learner' }
           } else {
             // token 过期，清除

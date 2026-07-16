@@ -114,6 +114,7 @@ const openLlmCalls = ref<Record<string, boolean>>({})
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
 const route = useRoute()
+const api = useApi()
 
 // 从 URL 自动加载
 onMounted(() => {
@@ -132,7 +133,7 @@ const loadTrace = async () => {
   openSections.value = {}
   openLlmCalls.value = {}
   try {
-    const data = await $fetch(`${apiBase}/api/trace/${inputSid.value}`)
+    const data = await api.getTrace(inputSid.value)
     traceData.value = data
     // 默认展开第一个节点
     if (data.nodes?.length > 0) {

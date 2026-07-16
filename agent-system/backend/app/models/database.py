@@ -29,13 +29,14 @@ class JsonText(TypeDecorator):
         return value
 
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-)
+_is_sqlite = "sqlite" in settings.DATABASE_URL
+_engine_kwargs: dict = {"echo": False}
+if not _is_sqlite:
+    _engine_kwargs.update(pool_size=10, max_overflow=20, pool_pre_ping=True)
+else:
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 async_session = async_sessionmaker(
     engine,

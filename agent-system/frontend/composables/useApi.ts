@@ -1,7 +1,8 @@
+import type { AxiosInstance } from 'axios'
+import { createHttpClient } from '~/utils/http'
 import type {
   LearnerProfileInput,
   LearnerProfile,
-  GenerateRequest,
   ResourceOutput,
   FeedbackInput,
   FeedbackResponse,
@@ -9,11 +10,15 @@ import type {
   PracticalFeedbackResponse,
   VisualizationData,
   CareerTrackConfig,
-  DomainConfig,
 } from '~/types/api'
 
 /**
- * 后端 API 封装（带认证）
+ * 后端 API 封装（axios 版）
+ *
+ * 所有请求统一走 utils/http.ts 中的 axios 实例：
+ * - 请求拦截自动带上 Authorization Bearer token
+ * - 401 触发 logout + 跳转 /login
+ * - 其他非 2xx 抽取 detail 抛错，调用方直接 try/catch (err as Error).message
  */
 export function useApi() {
   const config = useRuntimeConfig()
@@ -21,210 +26,222 @@ export function useApi() {
   const { token, logout } = useAuth()
   const router = useRouter()
 
-  const request = async <T>(url: string, options: RequestInit = {}): Promise<T> => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...options.headers as Record<string, string>,
-    }
-
-    // 自动添加认证头
-    if (token.value) {
-      headers['Authorization'] = `Bearer ${token.value}`
-    }
-
-    const response = await fetch(`${baseURL}${url}`, {
-      headers,
-      ...options,
-    })
-
-    if (response.status === 401) {
-      // token 过期或无效，跳转登录
+  const http: AxiosInstance = createHttpClient({
+    baseURL,
+    getToken: () => token.value,
+    onUnauthorized: () => {
       logout()
+      // router.push 在 SSR 时是同步；组件卸载路径下也安全
       router.push('/login')
-      throw new Error('认证已过期，请重新登录')
-    }
+    },
+  })
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => response.text())
-      throw new Error(error.detail || `API Error ${response.status}`)
-    }
-
-    return response.json()
+  // 统一小助手：把 axios 返回体拆到 data，业务侧只处理业务对象
+  const req = async <T>(method: string, url: string, body?: unknown): Promise<T> => {
+    const res = await http.request<T>({
+      url,
+      method,
+      data: body,
+    })
+    return res.data
   }
+
+  const get = <T>(url: string) => req<T>('GET', url)
+  const post = <T>(url: string, body?: unknown) => req<T>('POST', url, body)
 
   return {
     // 认证
     register: (data: { username: string; password: string; email?: string }) =>
-      request<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      post<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/register', data),
 
     login: (data: { username: string; password: string }) =>
-      request<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      post<{ access_token: string; user_id: number; username: string; role: string }>('/api/auth/login', data),
 
     getMe: () =>
-      request<{ id: number; username: string; email?: string; role: string }>('/api/auth/me'),
+      get<{ id: number; username: string; email?: string; role: string }>('/api/auth/me'),
 
     // 学习者画像
     createProfile: (data: LearnerProfileInput) =>
-      request<LearnerProfile>('/api/profile/', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      post<LearnerProfile>('/api/profile/', data),
 
     getMyProfile: () =>
-      request<LearnerProfile>('/api/profile/me'),
+      get<LearnerProfile>('/api/profile/me'),
 
     // 资源生成
     generateResources: (sessionId: string, topic: string, resourceTypes?: string[], profile?: any) =>
-      request<ResourceOutput[]>('/api/generate', {
-        method: 'POST',
-        body: JSON.stringify({
-          session_id: sessionId,
-          topic,
-          resource_types: resourceTypes || ['lecture', 'guide', 'test'],
-          profile: profile || null,
-        }),
+      post<ResourceOutput[]>('/api/generate', {
+        session_id: sessionId,
+        topic,
+        resource_types: resourceTypes || ['lecture', 'guide', 'test'],
+        profile: profile || null,
       }),
 
     getResources: (sessionId: string, stage?: number) =>
-      request<ResourceOutput[]>(`/api/resources/${sessionId}${stage !== undefined ? `?stage=${stage}` : ''}`),
+      get<ResourceOutput[]>(`/api/resources/${sessionId}${stage !== undefined ? `?stage=${stage}` : ''}`),
 
     // 反馈
     submitFeedback: (data: FeedbackInput) =>
-      request<FeedbackResponse>('/api/feedback/', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      post<FeedbackResponse>('/api/feedback/', data),
 
     // 实操题批改
     submitPracticalFeedback: (data: PracticalFeedbackInput) =>
-      request<PracticalFeedbackResponse>('/api/feedback/practical', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      post<PracticalFeedbackResponse>('/api/feedback/practical', data),
 
     // 可视化
     getVisualization: (sessionId: string) =>
-      request<VisualizationData>(`/api/visualization/${sessionId}`),
+      get<VisualizationData>(`/api/visualization/${sessionId}`),
 
     // 历史
     getHistory: (learnerId: number | string, page: number = 1, pageSize: number = 20) =>
-      request<{ items: any[]; total: number; page: number; page_size: number; total_pages: number }>(`/api/history/${learnerId}?page=${page}&page_size=${pageSize}`),
+      get<{ items: any[]; total: number; page: number; page_size: number; total_pages: number }>(
+        `/api/history/${learnerId}?page=${page}&page_size=${pageSize}`,
+      ),
 
     // 试题
     getQuestions: (sessionId: string) =>
-      request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
+      get<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
 
     // 答题进度持久化
-    savePracticeState: (sessionId: string, data: { current_index: number; questions: any[]; level?: string | null; stage?: number | null }) =>
-      request<{ ok: boolean }>(`/api/questions/practice/state/${sessionId}`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+    savePracticeState: (
+      sessionId: string,
+      data: { current_index: number; questions: any[]; level?: string | null; stage?: number | null },
+    ) => post<{ ok: boolean }>(`/api/questions/practice/state/${sessionId}`, data),
 
     getPracticeState: (sessionId: string, level?: string | null, stage?: number | null) => {
       const query = new URLSearchParams()
       if (level) query.set('level', level)
       if (stage !== undefined && stage !== null) query.set('stage', String(stage))
       const suffix = query.toString() ? `?${query.toString()}` : ''
-      return request<{ current_index: number; questions: any[]; level?: string | null; stage?: number | null }>(`/api/questions/practice/state/${sessionId}${suffix}`)
+      return get<{ current_index: number; questions: any[]; level?: string | null; stage?: number | null }>(
+        `/api/questions/practice/state/${sessionId}${suffix}`,
+      )
     },
 
-    // 重新生成试题（清除缓存后重新调用 LLM 生成）
+    // 重新生成试题
     regenerateQuestions: (sessionId: string) =>
-      request<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/practice/regenerate/${sessionId}`, {
-        method: 'POST',
-      }),
+      post<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/practice/regenerate/${sessionId}`),
 
     // 节点练习
     generateTieredQuestions: (sessionId: string) =>
-      request<{ node_title: string; node: any }>(`/api/questions/generate/${sessionId}`, {
-        method: 'POST',
-      }),
+      post<{ node_title: string; node: any }>(`/api/questions/generate/${sessionId}`),
 
     getTieredQuestions: (sessionId: string, level: 'node' | 'comprehensive', stage?: number) =>
-      request<{ level: string; label: string; topic: string; difficulty: string; format_version?: string; scenario?: Record<string, any>; questions: any[] }>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
+      get<{
+        level: string
+        label: string
+        topic: string
+        difficulty: string
+        format_version?: string
+        scenario?: Record<string, any>
+        questions: any[]
+      }>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
 
-    savePracticeResult: (sessionId: string, data: { level: string; stage?: number | null; score: number; correct_count: number; wrong_count: number; question_count: number; questions: any[] }) =>
-      request<{ ok: boolean; total: number }>(`/api/questions/practice/result/${sessionId}`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+    savePracticeResult: (
+      sessionId: string,
+      data: {
+        level: string
+        stage?: number | null
+        score: number
+        correct_count: number
+        wrong_count: number
+        question_count: number
+        questions: any[]
+      },
+    ) => post<{ ok: boolean; total: number }>(`/api/questions/practice/result/${sessionId}`, data),
 
     getPracticeResults: (sessionId: string) =>
-      request<{ results: any[] }>(`/api/questions/practice/results/${sessionId}`),
+      get<{ results: any[] }>(`/api/questions/practice/results/${sessionId}`),
 
     // 学习路径管理
     getLearningPath: (sessionId: string) =>
-      request<{ nodes: any[]; total_estimated_hours: number; current_stage: number; recommended_order: string; all_completed: boolean }>(`/api/learning-path/${sessionId}`),
+      get<{
+        nodes: any[]
+        total_estimated_hours: number
+        current_stage: number
+        recommended_order: string
+        all_completed: boolean
+      }>(`/api/learning-path/${sessionId}`),
 
     getCurrentNode: (sessionId: string) =>
-      request<{ current_node: any; total_nodes: number; all_completed: boolean }>(`/api/learning-path/${sessionId}/current-node`),
+      get<{ current_node: any; total_nodes: number; all_completed: boolean }>(
+        `/api/learning-path/${sessionId}/current-node`,
+      ),
 
     advanceNode: (sessionId: string, data: { basic_score: number; advanced_score: number; test_feedback: any[] }) =>
-      request<{ advanced_passed: boolean; current_stage: number; total_stages: number; message: string; new_stage: number | null; all_completed: boolean }>(`/api/learning-path/${sessionId}/advance`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      post<{
+        advanced_passed: boolean
+        current_stage: number
+        total_stages: number
+        message: string
+        new_stage: number | null
+        all_completed: boolean
+      }>(`/api/learning-path/${sessionId}/advance`, data),
 
     markBasicPassed: (sessionId: string, basicScore: number = 70) =>
-      request<{ ok: boolean; stage: number; basic_test_passed: boolean }>(`/api/learning-path/${sessionId}/mark-basic-passed`, {
-        method: 'POST',
-        body: JSON.stringify({ basic_score: basicScore }),
-      }),
+      post<{ ok: boolean; stage: number; basic_test_passed: boolean }>(
+        `/api/learning-path/${sessionId}/mark-basic-passed`,
+        { basic_score: basicScore },
+      ),
 
     completeCurrentNode: (sessionId: string) =>
-      request<{ ok: boolean; stage?: number; new_stage: number | null; all_completed: boolean; message: string }>(`/api/learning-path/${sessionId}/complete-current`, {
-        method: 'POST',
-      }),
+      post<{
+        ok: boolean
+        stage?: number
+        new_stage: number | null
+        all_completed: boolean
+        message: string
+      }>(`/api/learning-path/${sessionId}/complete-current`),
 
     generateNodeContent: (sessionId: string, stage: number) =>
-      request<{ ok: boolean; stage: number; resource_count: number }>(`/api/learning-path/${sessionId}/generate-node-content`, {
-        method: 'POST',
-        body: JSON.stringify({ session_id: sessionId, stage }),
-      }),
+      post<{ ok: boolean; stage: number; resource_count: number }>(
+        `/api/learning-path/${sessionId}/generate-node-content`,
+        { session_id: sessionId, stage },
+      ),
 
     // 职业方向
-    getCareerTracks: () =>
-      request<CareerTrackConfig[]>('/api/career-tracks'),
+    getCareerTracks: () => get<CareerTrackConfig[]>('/api/career-tracks'),
     // 兼容
-    getDomains: () =>
-      request<CareerTrackConfig[]>('/api/domains'),
+    getDomains: () => get<CareerTrackConfig[]>('/api/domains'),
 
     // 知识图谱
-    getKnowledgeGraph: () =>
-      request<any>('/api/knowledge-graph'),
+    getKnowledgeGraph: () => get<any>('/api/knowledge-graph'),
 
     getKnowledgeGraphGraph: (withProgress: boolean = true) =>
-      request<any>(withProgress ? '/api/knowledge-graph/progress/graph' : '/api/knowledge-graph/graph'),
+      get<any>(withProgress ? '/api/knowledge-graph/progress/graph' : '/api/knowledge-graph/graph'),
 
     getKnowledgeGraphProgress: () =>
-      request<{ username: string; completed_nodes: string[]; node_scores?: Record<string, any>; total: number; percentage: number; stats?: any }>('/api/knowledge-graph/progress'),
+      get<{
+        username: string
+        completed_nodes: string[]
+        node_scores?: Record<string, any>
+        total: number
+        percentage: number
+        stats?: any
+      }>('/api/knowledge-graph/progress'),
 
     getKnowledgeGraphTreeWithProgress: () =>
-      request<any>('/api/knowledge-graph/progress/tree'),
+      get<any>('/api/knowledge-graph/progress/tree'),
 
     markKnowledgeNode: (nodeId: string, completed: boolean, score?: number) =>
-      request<{ username: string; completed_nodes: string[]; node_scores?: Record<string, any>; total: number; percentage: number; stats?: any }>('/api/knowledge-graph/progress', {
-        method: 'POST',
-        body: JSON.stringify({ node_id: nodeId, completed, score }),
-      }),
+      post<{
+        username: string
+        completed_nodes: string[]
+        node_scores?: Record<string, any>
+        total: number
+        percentage: number
+        stats?: any
+      }>('/api/knowledge-graph/progress', { node_id: nodeId, completed, score }),
 
     // 机台使用申请
     applyMachine: () =>
-      request<{ message: string; status: string }>('/api/profile/apply-machine', {
-        method: 'POST',
-      }),
+      post<{ message: string; status: string }>('/api/profile/apply-machine'),
 
     // 重新评估学习者画像
     reassessProfile: () =>
-      request<import('~/types/api').LearnerProfile>('/api/profile/reassess', {
-        method: 'POST',
-      }),
+      post<import('~/types/api').LearnerProfile>('/api/profile/reassess'),
+
+    // 追踪（调试）
+    getTrace: (sessionId: string) =>
+      get<any>(`/api/trace/${sessionId}`),
   }
 }

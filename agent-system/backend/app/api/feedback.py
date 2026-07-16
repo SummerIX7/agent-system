@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -15,6 +16,8 @@ from app.core.store import add_feedback, get_session
 from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
 from app.core.rate_limit import RateLimit
 from app.agents.orchestrator import DecisionOrchestrator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/feedback", tags=["交互反馈"])
 
@@ -109,7 +112,7 @@ async def submit_feedback(
                     domain=domain,
                 )
             except Exception as e:
-                print(f"[警告] 启发式追问生成失败: {e}")
+                logger.warning("启发式追问生成失败: %s", e)
 
     # 只有确实存在 learner_id 时才写入数据库（避免 foreign key 约束报错）
     if learner_id and learner_id != "unknown":
@@ -179,7 +182,10 @@ async def submit_feedback(
                         if learner:
                             learner.learning_path = adjusted_path
                             await db.flush()
-                            print(f"[学习路径] 已根据答题反馈调整并持久化: learner_id={learner_id_int}")
+                            logger.info(
+                                "[学习路径] 已根据答题反馈调整并持久化: learner_id=%s",
+                                learner_id_int,
+                            )
 
                 # 回答正确时初始化知识图谱进度（如果尚未设置）
                 if is_correct and learner_id_int is not None:
@@ -191,9 +197,9 @@ async def submit_feedback(
                         if kg_learner and kg_learner.kg_progress is None:
                             kg_learner.kg_progress = build_kg_progress_for_learner("")
                     except Exception as e:
-                        print(f"[警告] 知识图谱进度初始化失败: {e}")
+                        logger.warning("知识图谱进度初始化失败: %s", e)
         except Exception as e:
-            print(f"[警告] 学习路径调整失败: {e}")
+            logger.warning("学习路径调整失败: %s", e)
             # 路径调整失败不影响反馈返回
 
     return FeedbackResponse(
@@ -298,7 +304,7 @@ async def submit_practical_feedback(
             domain=domain,
         )
     except Exception as e:
-        print(f"[警告] 实操题批改失败: {e}")
+        logger.warning("实操题批改失败: %s", e)
         grading = {
             "score": 0,
             "feedback": f"批改服务暂时不可用: {str(e)}",
