@@ -1,0 +1,35 @@
+[
+  {
+    "profile_name": "零基础学习者",
+    "topic": "数控编程基础",
+    "domain": "cnc",
+    "education_background": "高中",
+    "major": "非工科",
+    "work_experience_years": 0,
+    "self_assessment": {"数控编程": "不了解"},
+    "goals": ["学习数控编程基础"],
+    "expected_difficulty": "beginner"
+  },
+  {
+    "profile_name": "有机械基础学习者",
+    "topic": "数控车床编程",
+    "domain": "cnc",
+    "education_background": "本科",
+    "major": "机械工程",
+    "work_experience_years": 2,
+    "self_assessment": {"机械制图": "熟练", "数控编程": "不了解"},
+    "goals": ["学习数控车床编程"],
+    "expected_difficulty": "intermediate"
+  },
+  {
+    "profile_name": "有数控经验学习者",
+    "topic": "五轴加工技术",
+    "domain": "cnc",
+    "education_background": "本科",
+    "major": "机械工程",
+    "work_experience_years": 5,
+    "self_assessment": {"数控编程": "熟练", "G代码": "熟练"},
+    "goals": ["学习五轴加工技术"],
+    "expected_difficulty": "advanced"
+  }
+]

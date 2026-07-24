@@ -59,5 +59,8 @@ docs/
 # Data (运行时生成的进度/数据文件)
 data/
 
+# Reports (消融实验运行时生成的报告产物)
+**/reports/
+
 # E2E test database
 test_e2e.db
