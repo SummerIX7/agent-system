@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "https://api.deepseek.com/v1"
     LLM_MODEL: str = "deepseek-chat"
 
+    # 校验 LLM（跨模型谬误核查用；留空则回落主 LLM）
+    # 建议配置为与生成模型不同厂商/模型，降低"自评偏差"
+    VERIFIER_LLM_API_KEY: str = ""
+    VERIFIER_LLM_BASE_URL: str = ""
+    VERIFIER_LLM_MODEL: str = ""
+
     # 嵌入模型 API（OpenAI 兼容接口）
     EMBEDDING_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     EMBEDDING_API_KEY: str = ""  # 阿里云 DashScope API Key

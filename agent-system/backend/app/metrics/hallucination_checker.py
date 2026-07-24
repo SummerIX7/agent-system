@@ -5,18 +5,29 @@
 
 import json
 import logging
+import random
+import re
 from typing import List, Dict, Any
 
 from app.agents.base import BaseAgent
+from app.core.llm import get_verifier_llm
 
 logger = logging.getLogger(__name__)
+
+# 断言分层类别（用于分层抽样，避免只采样某一类）
+_ASSERTION_CATEGORIES = ("数值型", "步骤型", "定义型")
+_STEP_KEYWORDS = ("先", "然后", "接着", "步骤", "第一步", "第二步", "首先", "其次", "再", "最后", "依次")
 
 
 class HallucinationChecker(BaseAgent):
     """
     独立谬误检测器
-    不依赖 Judge 评分，直接通过 RAG 检索进行事实核查
+    不依赖 Judge 评分，直接通过 RAG 检索进行事实核查。
+    默认使用跨模型的校验 LLM（VERIFIER_LLM_*），与生成模型解耦以降低自评偏差。
     """
+
+    def __init__(self, llm=None):
+        super().__init__(llm=llm or get_verifier_llm())
 
     async def check_content(self, content: str, topic: str) -> dict:
         """
@@ -40,14 +51,15 @@ class HallucinationChecker(BaseAgent):
                 "total_assertions": 0,
                 "errors": 0,
                 "unverifiable": 0,
+                "unverifiable_rate": 0,
+                "reliability_score": 0,
                 "hallucination_rate": 0,
                 "details": [],
-                "method": "独立事实核查 — RAG 知识库逐条比对",
+                "method": "独立事实核查 — RAG 知识库逐条比对（跨模型 + 分层抽样）",
             }
 
-        # 2. 对每个断言进行 RAG 检索和验证（随机抽样上限 20 个，避免只采样前半部分）
-        import random
-        sample = random.sample(assertions, min(20, len(assertions)))
+        # 2. 分层抽样（定义型/数值型/步骤型按比例抽，合计上限 20）再逐条验证
+        sample = self._stratified_sample(assertions, cap=20)
         results = []
         for assertion in sample:
             try:
@@ -68,19 +80,74 @@ class HallucinationChecker(BaseAgent):
         unverifiable = sum(1 for r in results if r.get("verdict") == "无法验证")
         correct = sum(1 for r in results if r.get("verdict") == "正确")
 
-        # 谬误率 = 错误断言数 / 总断言数
+        # 谬误率 = 错误断言数 / 总断言数（保持原语义）
         hallucination_rate = errors / total if total > 0 else 0
+        # 无法验证率：过多"无法验证"往往意味着含糊表达，需计入惩罚
+        unverifiable_rate = unverifiable / total if total > 0 else 0
+        # 可信度评分：正确率再按无法验证率打折，避免含糊表达绕过检测
+        reliability_score = (correct / total) * (1 - 0.5 * unverifiable_rate) if total > 0 else 0
 
         return {
             "total_assertions": total,
             "correct": correct,
             "errors": errors,
             "unverifiable": unverifiable,
+            "unverifiable_rate": round(unverifiable_rate, 4),
+            "reliability_score": round(reliability_score, 4),
             "hallucination_rate": round(hallucination_rate, 4),
             "hallucination_rate_percent": round(hallucination_rate * 100, 1),
             "details": results,
-            "method": "独立事实核查 — RAG 知识库逐条比对",
+            "method": "独立事实核查 — RAG 知识库逐条比对（跨模型 + 分层抽样）",
         }
+
+    @staticmethod
+    def _classify_assertion(assertion: str) -> str:
+        """启发式将断言分类为 数值型 / 步骤型 / 定义型"""
+        # 数值型：含数字（含范围、单位）
+        if re.search(r"\d", assertion):
+            return "数值型"
+        # 步骤型：含流程关键词
+        if any(kw in assertion for kw in _STEP_KEYWORDS):
+            return "步骤型"
+        return "定义型"
+
+    def _stratified_sample(self, assertions: List[str], cap: int = 20) -> List[str]:
+        """分层抽样：按类别比例分配名额，各类内随机抽取，合计不超过 cap"""
+        if len(assertions) <= cap:
+            return list(assertions)
+
+        # 按类别分组
+        groups: Dict[str, List[str]] = {c: [] for c in _ASSERTION_CATEGORIES}
+        for a in assertions:
+            groups[self._classify_assertion(a)].append(a)
+
+        total = len(assertions)
+        sample: List[str] = []
+        # 按比例分配名额（向下取整），各组内随机抽
+        remainders = []
+        for cat, items in groups.items():
+            if not items:
+                continue
+            exact = cap * len(items) / total
+            quota = int(exact)
+            quota = min(quota, len(items))
+            picked = random.sample(items, quota) if quota > 0 else []
+            sample.extend(picked)
+            leftover = [x for x in items if x not in picked]
+            remainders.append((exact - quota, leftover))
+
+        # 用小数余量从大到小补齐到 cap
+        remainders.sort(key=lambda t: t[0], reverse=True)
+        for _, leftover in remainders:
+            if len(sample) >= cap:
+                break
+            random.shuffle(leftover)
+            for x in leftover:
+                if len(sample) >= cap:
+                    break
+                sample.append(x)
+
+        return sample[:cap]
 
     async def _extract_assertions(self, content: str) -> List[str]:
         """

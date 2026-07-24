@@ -30,3 +30,29 @@ def get_llm(provider: str | None = None, temperature: float = 0.7) -> ChatOpenAI
         base_url=settings.LLM_BASE_URL,
         temperature=temperature,
     )
+
+
+def get_verifier_llm(temperature: float = 0.0) -> ChatOpenAI:
+    """
+    获取用于跨模型谬误核查的校验 LLM。
+
+    若 VERIFIER_LLM_* 三项均配置，则返回独立的（通常与生成模型不同厂商/模型的）
+    ChatOpenAI，用不同模型做事实核查以降低"自评偏差"；否则回落主 LLM。
+    MOCK_MODE=true 时返回 MockLLM。
+    """
+    settings = get_settings()
+
+    if settings.MOCK_MODE:
+        from app.mock.llm import MockLLM
+        return MockLLM()
+
+    if settings.VERIFIER_LLM_API_KEY and settings.VERIFIER_LLM_BASE_URL and settings.VERIFIER_LLM_MODEL:
+        return ChatOpenAI(
+            model=settings.VERIFIER_LLM_MODEL,
+            api_key=settings.VERIFIER_LLM_API_KEY,
+            base_url=settings.VERIFIER_LLM_BASE_URL,
+            temperature=temperature,
+        )
+
+    # 未配置独立校验模型：回落主 LLM
+    return get_llm(temperature=temperature)
