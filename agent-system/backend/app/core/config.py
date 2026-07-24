@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     VERIFIER_LLM_BASE_URL: str = ""
     VERIFIER_LLM_MODEL: str = ""
 
+    # Agent 工具调用（tool-calling）开关
+    # 默认关闭：Generation/Review 走现有纯 prompt 流程，行为与当前一致。
+    # 开启后：Generation 可用 retrieve_knowledge 按需补充检索，Review 可用 fact_check_lookup 核查断言。
+    # MOCK_MODE=true 时工具路径自动回落纯 prompt（MockLLM 不支持 tool-calling）。
+    USE_AGENT_TOOLS: bool = False
+    AGENT_TOOL_MAX_ROUNDS: int = 3
+
     # 嵌入模型 API（OpenAI 兼容接口）
     EMBEDDING_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     EMBEDDING_API_KEY: str = ""  # 阿里云 DashScope API Key

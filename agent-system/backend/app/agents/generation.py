@@ -2,6 +2,7 @@ import json
 from typing import List, Optional
 
 from app.agents.base import BaseAgent
+from app.agents.tools import GENERATION_TOOLS
 from app.core.career_tracks import CareerTrackConfig, build_career_prompt, get_default_career_track
 
 
@@ -89,7 +90,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成讲义："""
 
-        return await self.call_llm(prompt, label="生成讲义")
+        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成讲义")
 
     async def generate_practical_guide(self, topic: str, profile: dict,
                                        track: Optional[CareerTrackConfig] = None,
@@ -142,7 +143,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成实验指导："""
 
-        return await self.call_llm(prompt, label="生成实验指导")
+        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成实验指导")
 
     async def generate_project_case(self, topic: str, profile: dict,
                                     track: Optional[CareerTrackConfig] = None,
@@ -198,7 +199,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成项目案例："""
 
-        return await self.call_llm(prompt, label="生成项目案例")
+        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成项目案例")
 
     async def run(self, topic: str = "", profile: dict = None,
                   resource_types: List[str] = None,

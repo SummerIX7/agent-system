@@ -78,56 +78,12 @@ class BaseAgent:
         if self.kb is False:
             return ""
         try:
+            from app.knowledge.formatting import format_docs
             docs = self.kb.search(query, k=k)
-            context_parts = []
-            for i, doc in enumerate(docs, 1):
-                m = doc.metadata
-                # 构建来源信息
-                source_info = self._build_source_info(m)
-                context_parts.append(
-                    f"[知识库第{i}条]\n"
-                    f"{source_info}\n"
-                    f"内容:\n{doc.page_content}"
-                )
-            return "\n\n".join(context_parts)
+            return format_docs(docs)
         except Exception as e:
             logger.warning("知识库检索失败: %s", e)
             return ""
-
-    def _build_source_info(self, metadata: dict) -> str:
-        """从 metadata 构建来源描述字符串"""
-        parts = []
-        source_name = metadata.get("source_name", "")
-        author = metadata.get("author", "")
-        publisher = metadata.get("publisher", "")
-        year = metadata.get("year", "")
-        chapter = metadata.get("chapter", "")
-        url = metadata.get("url", "")
-        source_type = metadata.get("source_type", "文档")
-
-        # 来源类型映射
-        type_map = {"book": "", "paper": "", "standard": "", "website": "", "文档": ""}
-        icon = type_map.get(source_type, "")
-
-        if source_name:
-            parts.append(f"{icon} 来源：《{source_name}》")
-        if author:
-            parts.append(f"作者：{author}")
-        if publisher:
-            parts.append(f"出版社：{publisher}")
-        if year:
-            parts.append(f"年份：{year}")
-        if chapter:
-            parts.append(f"章节：{chapter}")
-        if url:
-            parts.append(f" 链接：{url}")
-
-        # 如果没有元数据，用文件路径
-        if not parts:
-            file_path = metadata.get("source", "未知来源")
-            parts.append(f" 来源：{file_path}")
-
-        return " | ".join(parts)
 
     async def call_llm(
         self,
@@ -235,6 +191,100 @@ class BaseAgent:
                     )
                     await asyncio.sleep(wait_time)
         raise RuntimeError(f"LLM 调用失败（已重试{max_retries}次）: {last_error}")
+
+    async def call_llm_with_tools(
+        self,
+        prompt: str,
+        tools: list,
+        label: str = "",
+        max_rounds: int | None = None,
+    ) -> str:
+        """带工具调用（tool-calling）的 LLM 调用，返回最终文本。
+
+        - MOCK_MODE 或 USE_AGENT_TOOLS 关闭时，直接回落到纯 prompt 的 call_llm（行为与现状一致）。
+        - 否则绑定工具并跑受限循环：模型请求工具 → 本地执行 → 回传结果 → 直到模型给出终答或达轮数上限。
+        - 每轮响应与工具执行写入 trace 埋点，便于观测。
+        """
+        settings = get_settings()
+        use_tools = bool(tools) and getattr(settings, "USE_AGENT_TOOLS", False) \
+            and not getattr(settings, "MOCK_MODE", False)
+
+        # 回落：与纯 prompt 流程完全等价
+        if not use_tools:
+            return await self.call_llm(prompt, label=label)
+
+        from langchain_core.messages import HumanMessage, ToolMessage
+
+        if max_rounds is None:
+            max_rounds = getattr(settings, "AGENT_TOOL_MAX_ROUNDS", 3)
+
+        tool_map = {t.name: t for t in tools}
+        try:
+            llm_with_tools = self.llm.bind_tools(tools)
+        except Exception as e:  # noqa: BLE001 — 绑定失败则退回纯 prompt，保证不打断主流程
+            logger.warning("[工具调用] bind_tools 失败，回落纯 prompt: %s", e)
+            return await self.call_llm(prompt, label=label)
+
+        messages = [HumanMessage(content=prompt)]
+        last_content = ""
+
+        for round_idx in range(max_rounds + 1):
+            start = time.time()
+            response = await llm_with_tools.ainvoke(messages)
+            elapsed_ms = round((time.time() - start) * 1000)
+            messages.append(response)
+
+            tool_calls = getattr(response, "tool_calls", None) or []
+            self._trace_calls.append({
+                "label": (label or "工具调用") + f"#{round_idx + 1}",
+                "prompt": prompt if round_idx == 0 else "[后续工具轮]",
+                "response": (response.content or "")[:8000],
+                "tool_calls": [
+                    {"name": tc.get("name"), "args": tc.get("args")} for tc in tool_calls
+                ],
+                "elapsed_ms": elapsed_ms,
+                "cache_hit": False,
+                "timestamp": datetime.now().isoformat(),
+            })
+            try:
+                from app.api.health import record_llm_call
+                record_llm_call(cache_hit=False)
+            except Exception:  # noqa: BLE001
+                pass
+
+            last_content = response.content or last_content
+
+            # 无工具请求 → 终答
+            if not tool_calls:
+                return response.content or ""
+
+            # 达到轮数上限：不再执行工具，逼模型基于已有信息给结论
+            if round_idx >= max_rounds:
+                break
+
+            # 执行工具并回传结果
+            for tc in tool_calls:
+                name = tc.get("name", "")
+                args = tc.get("args", {}) or {}
+                tool = tool_map.get(name)
+                if tool is None:
+                    result = f"[工具 {name} 不存在]"
+                else:
+                    try:
+                        result = tool.invoke(args)
+                    except Exception as e:  # noqa: BLE001
+                        result = f"[工具 {name} 执行失败: {e}]"
+                messages.append(ToolMessage(
+                    content=str(result),
+                    tool_call_id=tc.get("id", name),
+                ))
+
+        # 轮数耗尽仍未终答：再要一次纯文本结论
+        try:
+            final = await self.llm.ainvoke(messages)
+            return final.content or last_content
+        except Exception:  # noqa: BLE001
+            return last_content
 
     def collect_trace(self) -> list:
         """收集并清空当前 Agent 的 LLM 调用追踪记录"""

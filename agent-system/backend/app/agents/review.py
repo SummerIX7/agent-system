@@ -3,6 +3,7 @@ import re as _re
 from dataclasses import dataclass, field
 
 from app.agents.base import BaseAgent
+from app.agents.tools import REVIEW_TOOLS
 
 
 @dataclass
@@ -216,7 +217,7 @@ severity 取值同上。
 
         # 3. 正则提取第一个完整 JSON 对象或数组
         for pattern in [r'\{.*\}', r'\[.*\]']:
-            match = _re.search(pattern, cleaned, re.DOTALL)
+            match = _re.search(pattern, cleaned, _re.DOTALL)
             if match:
                 try:
                     return json.loads(match.group(0))
@@ -355,9 +356,9 @@ severity 取值：
 severity 取值同上。
 如无任何问题，输出空数组 []。"""
 
-        # 并行调用两个视角
-        response_a = await self.call_llm(prompt_a, label="学术审查")
-        response_b = await self.call_llm(prompt_b, label="工业审查")
+        # 并行调用两个视角（可按需调用 fact_check_lookup 核查具体断言）
+        response_a = await self.call_llm_with_tools(prompt_a, REVIEW_TOOLS, label="学术审查")
+        response_b = await self.call_llm_with_tools(prompt_b, REVIEW_TOOLS, label="工业审查")
 
         issues_a = self._parse_issues(response_a)
         issues_b = self._parse_issues(response_b)
