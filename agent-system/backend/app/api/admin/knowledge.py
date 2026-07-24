@@ -31,6 +31,10 @@ class FileItem(BaseModel):
 class RebuildResult(BaseModel):
     ok: bool
     total_chunks: int = 0
+    added: int = 0
+    updated: int = 0
+    skipped: int = 0
+    deleted: int = 0
     message: str = ""
 
 
@@ -168,10 +172,12 @@ async def delete_file(
 
 @router.post("/rebuild-index", response_model=RebuildResult)
 async def rebuild_index(
+    full: bool = Query(False, description="是否强制全量重建（默认增量同步）"),
     _admin=Depends(require_admin),
 ):
-    """重建向量索引（异步执行，会清空旧索引并重新构建）"""
+    """同步向量索引：默认增量（仅处理新增/变更/删除文件），full=true 时全量重建。"""
     import asyncio
+    from functools import partial
     from app.knowledge.retriever import KnowledgeRetriever
     from app.core.config import get_settings
 
@@ -183,14 +189,27 @@ async def rebuild_index(
 
         # 在线程池中执行同步的索引构建
         loop = asyncio.get_event_loop()
-        total = await loop.run_in_executor(
-            None, retriever.build_index_from_dirs, kb_dirs
+        stats = await loop.run_in_executor(
+            None, partial(retriever.build_index_from_dirs, kb_dirs, force=full)
         )
 
         # 重置全局单例，让下次检索使用新索引
         import app.knowledge.retriever as retriever_mod
         retriever_mod._retriever = None
 
-        return RebuildResult(ok=True, total_chunks=total, message=f"索引重建完成，共 {total} 个知识块")
+        mode = "全量重建" if full else "增量同步"
+        return RebuildResult(
+            ok=True,
+            total_chunks=stats["total_chunks"],
+            added=stats["added"],
+            updated=stats["updated"],
+            skipped=stats["skipped"],
+            deleted=stats["deleted"],
+            message=(
+                f"索引{mode}完成，共 {stats['total_chunks']} 个知识块"
+                f"（新增 {stats['added']} / 更新 {stats['updated']}"
+                f" / 跳过 {stats['skipped']} / 删除 {stats['deleted']}）"
+            ),
+        )
     except Exception as e:
         return RebuildResult(ok=False, message=f"索引重建失败: {str(e)}")

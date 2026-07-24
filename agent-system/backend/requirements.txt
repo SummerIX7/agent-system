@@ -23,6 +23,10 @@ openai
 # 向量数据库
 chromadb
 
+# 混合检索（BM25 关键词召回 + 中文分词）
+rank-bm25
+jieba
+
 # 嵌入模型
 sentence-transformers
 torch

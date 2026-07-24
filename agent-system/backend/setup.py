@@ -73,7 +73,8 @@ def build_index():
         print("  可跳过此步骤，稍后放入知识库文件后重新执行: python setup.py")
 
     retriever = KnowledgeRetriever()
-    total = retriever.build_index_from_dirs(kb_dirs)
+    stats = retriever.build_index_from_dirs(kb_dirs)
+    total = stats["total_chunks"]
 
     print(f"\n  [完成] 知识库索引构建完成，共 {total} 个知识块")
     print(f"         ChromaDB 存储: {settings.CHROMA_PERSIST_DIR}")

@@ -1,7 +1,9 @@
+import hashlib
 import re
 from pathlib import Path
 
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
@@ -19,6 +21,22 @@ def _parse_frontmatter(content: str) -> tuple[dict, str]:
                     metadata[key.strip()] = value.strip()
             return metadata, body
     return metadata, content
+
+
+def file_content_hash(path: str | Path) -> str:
+    """计算文件内容的 sha256，用于增量索引判断文件是否变化"""
+    data = Path(path).read_bytes()
+    return hashlib.sha256(data).hexdigest()
+
+
+def load_single_document(path: str | Path) -> Document:
+    """加载单个 Markdown 文件，解析 frontmatter，返回带 source 元数据的 Document"""
+    p = Path(path)
+    raw = p.read_text(encoding="utf-8")
+    frontmatter, body = _parse_frontmatter(raw)
+    metadata = {"source": str(p)}
+    metadata.update(frontmatter)
+    return Document(page_content=body, metadata=metadata)
 
 
 def load_documents(doc_dir: str) -> list:
