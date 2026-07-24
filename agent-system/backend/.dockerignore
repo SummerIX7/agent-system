@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+venv/
+.venv/
+
+# 本地环境与运行时产物（容器内重建/挂载）
+.env
+chroma_db/
+reports/
+test_e2e.db
+*.log
+
+# 测试
+tests/
+
+# 文档
+README.md
