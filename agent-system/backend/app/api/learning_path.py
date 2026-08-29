@@ -21,11 +21,7 @@ from app.services.kg_progress import empty_kg_progress
 from app.agents.diagnosis import DiagnosisAgent
 from app.api.profile import _level_from_score, _sanitize_score
 from app.utils.db_helpers import retry_on_deadlock
-try:
-    from app.graph.workflow import _broadcast
-except ImportError:
-    def _broadcast(session_id: str, agent: str, status: str, message: str, progress: float = 0):
-        pass
+from app.graph.workflow import _broadcast
 
 logger = logging.getLogger(__name__)
 
