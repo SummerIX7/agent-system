@@ -215,6 +215,24 @@ MOCK_MODE=true
 
 ---
 
+## 安全说明（演示默认 vs 生产部署）
+
+本项目为参赛演示定位，安全配置以「开箱即用」为优先，以下默认值仅限本地/演示环境：
+
+- 管理员初始账号 `admin / admin123`（README 已公开标注，便于评审登录；可通过 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 环境变量在初始化时覆盖）
+- JWT 密钥使用代码内默认值；启动时输出提醒日志
+- `.env.docker` 中的 `change-me-in-production-please` 为占位符，非真实密钥；各 API Key 留空并默认启用 `MOCK_MODE`
+
+若用于真实生产部署，请完成以下检查清单：
+
+1. 设置 `ENVIRONMENT=production` 并更换强随机 `JWT_SECRET_KEY`（未更换时系统将拒绝启动）
+2. 通过 `ADMIN_PASSWORD` 环境变量初始化管理员强密码
+3. 配置真实 `LLM_API_KEY` / `EMBEDDING_API_KEY`，关闭 `MOCK_MODE`
+4. 为 MySQL / Redis 设置强密码，收敛 `CORS_ORIGINS` 到实际域名，启用 HTTPS 反向代理
+5. 建议补充（演示场景未实现）：JWT 刷新/滑动过期、密码强度策略、管理员首登强制改密、限流阈值按业务调整
+
+---
+
 ## License
 
 MIT

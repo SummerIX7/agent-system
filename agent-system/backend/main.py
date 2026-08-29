@@ -19,7 +19,7 @@ setup_logging()
 
 from app.api import auth, career_tracks, domains, feedback, generation, health, knowledge_graph, learning_path, profile, questions, visualization, ws
 from app.api.admin.router import router as admin_router
-from app.core.config import get_settings
+from app.core.config import DEFAULT_JWT_SECRET, get_settings
 from app.core.store import check_redis_health
 from app.models.database import engine, Base
 # 导入所有模型，确保被 Base 注册
@@ -68,6 +68,13 @@ async def lifespan(app: FastAPI):
         )
     logger.info("启动配置已刷新")
 
+    # 3¾. 安全默认值提醒（ENVIRONMENT=production 时由 Settings 校验直接拒绝启动）
+    if settings.JWT_SECRET_KEY == DEFAULT_JWT_SECRET:
+        logger.warning(
+            "JWT_SECRET_KEY 仍为演示默认值 — 仅限本地/演示使用。"
+            "生产部署必须更换强随机密钥（ENVIRONMENT=production 将强制校验）。"
+        )
+
     # 4. 创建数据库表（如果不存在）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -88,13 +95,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS 中间件
+# CORS 中间件（来源白名单见 config.CORS_ORIGINS；方法/头显式收敛）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

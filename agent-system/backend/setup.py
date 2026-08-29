@@ -7,7 +7,8 @@
     python setup.py
 
 说明:
-    1. 创建默认管理员账号（admin / admin123）
+    1. 创建管理员账号（默认 admin / admin123，可通过 ADMIN_USERNAME /
+       ADMIN_PASSWORD 环境变量覆盖；使用演示默认密码时输出警示）
     2. 构建 ChromaDB 知识库向量索引
     3. 需要确保 .env 中配置了数据库连接和 EMBEDDING_API_KEY
 
@@ -15,11 +16,16 @@
 """
 
 import asyncio
+import os
 import sys
-from pathlib import Path    
+from pathlib import Path
 
 # 确保能导入 app 模块
 sys.path.insert(0, str(Path(__file__).parent))
+
+# 管理员初始凭据：演示默认 admin/admin123，生产部署通过环境变量覆盖
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 
 # ── 第 1 步：创建管理员账号 ──
@@ -39,17 +45,21 @@ async def create_admin():
             return
 
         user = User(
-            username="admin",
-            password_hash=hash_password("admin123"),
+            username=ADMIN_USERNAME,
+            password_hash=hash_password(ADMIN_PASSWORD),
             email="admin@example.com",
             role="admin",
         )
         db.add(user)
         await db.commit()
         print("  [完成] 管理员账号创建成功")
-        print("         用户名: admin")
-        print("         密码:   admin123")
-        print("         ⚠️  请登录后立即修改密码！")
+        print(f"         用户名: {ADMIN_USERNAME}")
+        print(f"         密码:   {ADMIN_PASSWORD}")
+        if ADMIN_PASSWORD == "admin123":
+            print("         ⚠️  当前为演示默认密码，仅限本地/演示环境；"
+                  "生产部署请通过 ADMIN_PASSWORD 环境变量指定强密码")
+        else:
+            print("         ⚠️  请登录后妥善保管密码")
 
 
 # ── 第 2 步：构建知识库索引 ──

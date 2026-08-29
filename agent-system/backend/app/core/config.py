@@ -1,7 +1,11 @@
 from functools import lru_cache
 from typing import List
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 演示/开发默认 JWT 密钥。ENVIRONMENT=production 时启动会强制要求更换。
+DEFAULT_JWT_SECRET = "agent-system-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -18,8 +22,11 @@ class Settings(BaseSettings):
     MYSQL_PASSWORD: str = ""
     MYSQL_DATABASE: str = "agent_system"
 
+    # 运行环境：development（默认）/ production（启动强制校验安全默认值）
+    ENVIRONMENT: str = "development"
+
     # JWT
-    JWT_SECRET_KEY: str = "agent-system-secret-key-change-in-production"
+    JWT_SECRET_KEY: str = DEFAULT_JWT_SECRET
 
     # Redis
     REDIS_HOST: str = "localhost"
@@ -84,6 +91,16 @@ class Settings(BaseSettings):
     def REDIS_URL(self) -> str:
         auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
         return f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+
+    @model_validator(mode="after")
+    def _check_production_secrets(self) -> "Settings":
+        """生产环境安全卡口：拒绝使用演示默认密钥启动（演示/开发不受影响）。"""
+        if self.ENVIRONMENT == "production" and self.JWT_SECRET_KEY == DEFAULT_JWT_SECRET:
+            raise ValueError(
+                "ENVIRONMENT=production 下必须更换 JWT_SECRET_KEY（当前仍为演示默认值）。"
+                "请在环境变量或 .env 中设置强随机密钥后重启。"
+            )
+        return self
 
 
 @lru_cache()
