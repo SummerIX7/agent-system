@@ -5,6 +5,7 @@
 ## 技术栈
 
 - **框架**: FastAPI + Uvicorn
+- **环境与依赖**: uv（自动管理 Python 3.11，版本由 uv.lock 锁定）
 - **数据库**: MySQL 8.0 + SQLAlchemy (async)
 - **缓存**: Redis 7.0（自动降级为内存存储）
 - **向量索引**: ChromaDB
@@ -14,26 +15,21 @@
 ## 快速开始
 
 ```bash
-# 1. 创建虚拟环境
-python -m venv venv
-source venv/bin/activate     # Linux / macOS
-venv\Scripts\activate        # Windows
+# 1. 安装依赖（自动创建 .venv）
+uv sync
 
-# 2. 安装依赖
-pip install -r requirements.txt
-
-# 3. 配置环境变量
+# 2. 配置环境变量
 cp .env.example .env
 # 编辑 .env，至少填入:
 #   LLM_API_KEY=sk-your-key
 #   EMBEDDING_API_KEY=sk-your-key
 # 可选：修改 LLM_BASE_URL 和 LLM_MODEL 切换其他模型平台
 
-# 4. 一键初始化（创建管理员 + 构建知识库索引）
-python setup.py
+# 3. 一键初始化（创建管理员 + 构建知识库索引）
+uv run python setup.py
 
-# 5. 启动
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# 4. 启动
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 启动后访问:
@@ -106,30 +102,26 @@ backend/
 │   │   └── question_persistence.py  # 试题持久化
 │   └── utils/               # 工具函数
 │       └── db_helpers.py    # 数据库辅助
-├── alembic/                 # 数据库迁移脚本
 ├── tests/                   # 单元测试
 ├── main.py                  # 应用入口
 ├── setup.py                 # 一键部署初始化
-├── requirements.txt
+├── pyproject.toml           # 依赖清单（uv 管理）
+├── uv.lock                  # 依赖锁定
 └── .env.example
 ```
 
 ## 初始化脚本
 
 ```bash
-python setup.py
+uv run python setup.py
 ```
 依次执行:
 1. 创建管理员账号 (`admin` / `admin123`)，已存在则跳过
 2. 构建 ChromaDB 知识库向量索引
 
-## 数据库迁移
+## 数据库建表
 
-应用启动时自动建表。也可手动执行：
-
-```bash
-alembic upgrade head
-```
+不使用迁移工具。应用启动时由 `main.py` lifespan 执行 `Base.metadata.create_all` 自动建表（e2e 测试同样走该路径，使用 SQLite）。修改模型后重启服务即可；如需重建开发库，删除数据库后重启。
 
 ## 环境变量
 
@@ -149,5 +141,5 @@ alembic upgrade head
 ## 测试
 
 ```bash
-python -m pytest tests/ -v
+uv run pytest tests/ -v
 ```

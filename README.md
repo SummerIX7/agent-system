@@ -39,8 +39,8 @@
 ## 环境要求
 
 | 软件 | 版本 | 说明 |
-|------|------|------|
-| Python | 3.11+ | 后端运行环境 |
+|------|------|----------|
+| uv | 0.12+ | Python 环境与依赖管理（自动提供 Python 3.11+，替代 conda/pip） |
 | Node.js | 18+ | 前端构建环境 |
 | pnpm | 8+ | 包管理器 |
 | MySQL | 8.0+ | 关系数据库 |
@@ -71,13 +71,8 @@ cd Agent
 ```bash
 cd agent-system/backend
 
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate     # Linux / macOS
-venv\Scripts\activate        # Windows
-
-# 安装依赖
-pip install -r requirements.txt
+# 安装依赖（自动创建 .venv，版本由 uv.lock 锁定）
+uv sync
 
 # 配置环境变量
 cp .env.example .env
@@ -85,10 +80,10 @@ cp .env.example .env
 # 可选：修改 LLM_BASE_URL 和 LLM_MODEL 切换其他模型平台
 
 # 一键初始化（创建管理员 + 构建知识库索引）
-python setup.py
+uv run python setup.py
 
 # 启动服务
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 访问 http://localhost:8000/docs 查看 API 文档。
@@ -129,11 +124,11 @@ agent-system/
 │   │   ├── models/              # SQLAlchemy 数据模型
 │   │   ├── core/                # 配置 / 认证 / 存储 / LLM
 │   │   └── utils/               # 工具函数
-│   ├── alembic/                 # 数据库迁移
 │   ├── tests/                   # 单元测试
 │   ├── main.py                  # 应用入口
 │   ├── setup.py                 # 一键部署初始化
-│   ├── requirements.txt
+│   ├── pyproject.toml           # 依赖清单（uv 管理）
+│   ├── uv.lock                  # 依赖锁定
 │   └── .env.example
 ├── frontend/                    # C 端 Nuxt 3 学习平台
 │   ├── pages/                   # 页面路由（含知识图谱、答题练习、学习报告等）
@@ -178,13 +173,13 @@ agent-system/
 cd agent-system/backend
 
 # 运行全部测试
-python -m pytest tests/ -v
+uv run pytest tests/ -v
 
 # 特定模块
-python -m pytest tests/test_agents.py -v
-python -m pytest tests/test_ablation.py -v
-python -m pytest tests/test_redis_store.py -v
-python -m pytest tests/test_main.py -v
+uv run pytest tests/test_agents.py -v
+uv run pytest tests/test_ablation.py -v
+uv run pytest tests/test_redis_store.py -v
+uv run pytest tests/test_main.py -v
 ```
 
 ---

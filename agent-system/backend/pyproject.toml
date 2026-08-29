@@ -1,0 +1,50 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "领域知识个性化生成系统后端（FastAPI 多智能体服务）"
+authors = [
+    { name = "折纸的夏天", email = "3340902291@qq.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    # Web 框架
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.4",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
+    # 数据库（建表由 main.py lifespan 的 create_all 负责，不使用迁移工具）
+    "sqlalchemy[asyncio]>=2.0.52",
+    "aiomysql>=0.3.2",
+    "aiosqlite>=0.22.1",
+    "pymysql>=1.1.0",
+    # 缓存/队列
+    "redis>=8.1.0",
+    # LLM
+    "langchain>=1.3.17",
+    "langchain-community>=0.4.2",
+    "langchain-openai>=1.6.0",
+    "langchain-text-splitters>=1.1.2",
+    "langgraph>=1.2.11",
+    "openai>=3.3.1",
+    # 认证（JWT + 密码哈希 + 表单解析）
+    "python-jose[cryptography]>=3.5.0",
+    "bcrypt>=5.0.0",
+    "python-multipart>=0.0.32",
+    # 向量数据库与混合检索（BM25 关键词召回 + 中文分词）
+    "chromadb>=1.5.9",
+    "rank-bm25>=0.2.2",
+    "jieba>=0.42.1",
+    # 工具
+    "python-dotenv>=1.2.3",
+    "httpx>=0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.uv]
+# 纯应用项目（从 backend 根目录直接运行 main:app），不作为包构建安装
+package = false
