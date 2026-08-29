@@ -190,12 +190,12 @@ async def submit_feedback(
                 # 回答正确时初始化知识图谱进度（如果尚未设置）
                 if is_correct and learner_id_int is not None:
                     try:
-                        from app.api.knowledge_graph import build_kg_progress_for_learner
+                        from app.services.kg_progress import empty_kg_progress
                         learner_stmt = select(Learner).where(Learner.id == learner_id_int)
                         lr = await db.execute(learner_stmt)
                         kg_learner = lr.scalar_one_or_none()
                         if kg_learner and kg_learner.kg_progress is None:
-                            kg_learner.kg_progress = build_kg_progress_for_learner("")
+                            kg_learner.kg_progress = empty_kg_progress()
                     except Exception as e:
                         logger.warning("知识图谱进度初始化失败: %s", e)
         except Exception as e:
@@ -356,12 +356,12 @@ async def submit_practical_feedback(
         plid = None
     if plid is not None:
         try:
-            from app.api.knowledge_graph import build_kg_progress_for_learner
+            from app.services.kg_progress import empty_kg_progress
             pl_stmt = select(Learner).where(Learner.id == plid)
             pl_result = await db.execute(pl_stmt)
             kg_learner = pl_result.scalar_one_or_none()
             if kg_learner and kg_learner.kg_progress is None:
-                kg_learner.kg_progress = build_kg_progress_for_learner("")
+                kg_learner.kg_progress = empty_kg_progress()
         except Exception:
             pass
 

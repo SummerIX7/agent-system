@@ -3,7 +3,7 @@
 
 业务逻辑已拆分到 ``app.services.kg_*``：
 - kg_tree：目录解析 / 树 / 叶子索引 / 主题匹配
-- kg_progress：掌握度评分 / 进度规范化 / 文件缓存 / DB 同步
+- kg_progress：掌握度评分 / 进度规范化 / DB 读写（单一真源）/ 旧文件只读导入
 - kg_events：学习事件触发的自动打点
 - kg_graph：力导向图数据构造
 
@@ -25,19 +25,16 @@ from app.models.database import get_db
 from app.models.learner import Learner
 from app.models.user import User
 from app.services.kg_events import (
-    auto_mark_completed,  # noqa: F401 (re-export for legacy imports)
-    mark_learning_event_by_learner_id,
+    mark_learning_event_by_learner_id,  # noqa: F401 (re-export for legacy imports)
 )
 from app.services.kg_graph import build_graph
 from app.services.kg_progress import (
     apply_score_update,
-    build_kg_progress_for_learner,
     clamp_score,
-    load_progress,
-    load_progress_from_db,
+    load_legacy_file_progress,
+    load_user_progress,
     normalize_progress,
     progress_stats,
-    save_progress,
     status_from_score,
     status_label,
     sync_progress_to_db,
@@ -138,7 +135,7 @@ async def mark_progress(
     标记/取消标记某知识点为"已学习"。同时同步进度到数据库。
     """
     user_id = current_user.id
-    progress = load_progress(user_id)
+    progress = await load_user_progress(user_id, db)
     target_score = req.score
     if target_score is None:
         target_score = 100 if req.completed else 0
@@ -150,7 +147,6 @@ async def mark_progress(
         source=req.source or "manual",
         action=action,
     )
-    save_progress(user_id, progress)
     await sync_progress_to_db(user_id, progress, db)
 
     tree = build_tree()
@@ -174,15 +170,10 @@ async def get_progress(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    获取当前用户的学习进度。
-    DB 优先（可信源），文件作为降级缓存。
+    获取当前用户的学习进度。DB 为单一真源。
     """
     user_id = current_user.id
-    db_progress = await load_progress_from_db(user_id, db)
-    if db_progress and (db_progress.get("completed_nodes") or db_progress.get("node_scores")):
-        progress = db_progress
-    else:
-        progress = load_progress(user_id)
+    progress = await load_user_progress(user_id, db)
 
     tree = build_tree()
     total_leaves = tree.get("total_leaves", 0)
@@ -205,15 +196,10 @@ async def get_graph_with_progress(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    获取带当前用户掌握度的力导向图数据。
-    DB 优先（可信源），文件作为降级缓存。
+    获取带当前用户掌握度的力导向图数据。DB 为单一真源。
     """
     user_id = current_user.id
-    db_progress = await load_progress_from_db(user_id, db)
-    if db_progress and (db_progress.get("completed_nodes") or db_progress.get("node_scores")):
-        progress = db_progress
-    else:
-        progress = load_progress(user_id)
+    progress = await load_user_progress(user_id, db)
     return build_graph(progress)
 
 
@@ -223,8 +209,7 @@ async def get_all_progress(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    管理员查看所有学员的学习进度。
-    优先从数据库读取 kg_progress，降级到文件读取。
+    管理员查看所有学员的学习进度。DB 为单一真源，DB 无记录的学员尝试读取旧版文件（只读展示）。
     """
     tree = build_tree()
     total_leaves = tree.get("total_leaves", 0)
@@ -244,7 +229,7 @@ async def get_all_progress(
         if kg_progress and isinstance(kg_progress, dict):
             kg = normalize_progress(kg_progress)
         else:
-            kg = load_progress(uid)
+            kg = load_legacy_file_progress(uid) or normalize_progress({})
 
         completed = kg.get("completed_nodes", [])
         stats = progress_stats(kg, total_leaves, leaf_ids)
@@ -273,18 +258,14 @@ async def get_tree_with_progress(
 ):
     """
     获取带当前用户学习进度标记的树状图数据。每个叶子节点附加 completed 字段。
-    DB 优先（可信源），文件作为降级缓存。
+    DB 为单一真源。
     """
     if not CATEGORY_LABELS:
         init_category_labels()
 
     tree = build_tree()
     user_id = current_user.id
-    db_progress = await load_progress_from_db(user_id, db)
-    if db_progress and (db_progress.get("completed_nodes") or db_progress.get("node_scores")):
-        progress = db_progress
-    else:
-        progress = load_progress(user_id)
+    progress = await load_user_progress(user_id, db)
     completed = set(progress.get("completed_nodes", []))
     node_scores = progress.get("node_scores", {})
 
@@ -312,10 +293,7 @@ async def sync_all_progress_to_db(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """管理员触发：将所有学员的本地进度文件同步到数据库。"""
-    tree = build_tree()
-    total_leaves = tree.get("total_leaves", 0)
-    leaf_ids = leaf_ids_from_tree(tree)
+    """管理员触发（一次性迁移）：将旧版本地进度文件导入数据库（只读文件，不写回）。"""
     synced = 0
     failed = 0
 
@@ -333,29 +311,18 @@ async def sync_all_progress_to_db(
                     continue
                 user_id = int(id_str)
 
-                data = json.loads(f.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    progress = normalize_progress(data)
-                    completed = progress.get("completed_nodes", [])
-                    stats = progress_stats(progress, total_leaves, leaf_ids)
+                progress = load_legacy_file_progress(user_id)
+                if progress is None:
+                    continue
 
-                    kg_data = {
-                        "completed_nodes": completed,
-                        "node_scores": progress.get("node_scores", {}),
-                        "history": progress.get("history", []),
-                        "percentage": stats["percentage"],
-                        "total": total_leaves,
-                        "stats": stats,
-                    }
-
-                    stmt = select(Learner).where(Learner.user_id == user_id)
-                    r = await db.execute(stmt)
-                    learner = r.scalar_one_or_none()
-                    if learner:
-                        learner.kg_progress = kg_data
-                        synced += 1
-                    else:
-                        failed += 1
+                stmt = select(Learner).where(Learner.user_id == user_id)
+                r = await db.execute(stmt)
+                learner = r.scalar_one_or_none()
+                if learner:
+                    learner.kg_progress = progress
+                    synced += 1
+                else:
+                    failed += 1
             except Exception as e:  # noqa: BLE001
                 logger.warning("同步进度失败 %s: %s", stem, e)
                 failed += 1
@@ -372,13 +339,10 @@ async def sync_all_progress_to_db(
 
 
 # ── 向后兼容 re-export ──
-# 保留旧路径 ``from app.api.knowledge_graph import build_kg_progress_for_learner``
-# 以及 ``from app.api.knowledge_graph import mark_learning_event_by_learner_id`` 可用。
+# 保留旧路径 ``from app.api.knowledge_graph import mark_learning_event_by_learner_id`` 可用。
 __all__ = [
     "router",
     "ProgressRequest",
     "ProgressResponse",
-    "build_kg_progress_for_learner",
     "mark_learning_event_by_learner_id",
-    "auto_mark_completed",
 ]

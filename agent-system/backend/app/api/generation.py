@@ -222,8 +222,8 @@ async def generate_resources(
 
             # 初始化知识图谱进度（如果尚未设置）
             if learner_record and learner_record.kg_progress is None:
-                from app.api.knowledge_graph import build_kg_progress_for_learner
-                learner_record.kg_progress = build_kg_progress_for_learner("")
+                from app.services.kg_progress import empty_kg_progress
+                learner_record.kg_progress = empty_kg_progress()
 
             saved_questions = await persist_session_question_cache(
                 db,

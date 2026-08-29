@@ -16,7 +16,8 @@ from app.models.database import get_db
 from app.models.learner import Learner
 from app.models.resource import Resource
 from app.models.user import User
-from app.api.knowledge_graph import build_kg_progress_for_learner, mark_learning_event_by_learner_id
+from app.services.kg_events import mark_learning_event_by_learner_id
+from app.services.kg_progress import empty_kg_progress
 from app.agents.diagnosis import DiagnosisAgent
 from app.api.profile import _level_from_score, _sanitize_score
 from app.utils.db_helpers import retry_on_deadlock
@@ -306,7 +307,7 @@ async def advance_node(
 
         # 节点推进成功后初始化知识图谱进度（如果尚未设置）
         try:
-            from app.api.knowledge_graph import build_kg_progress_for_learner
+            from app.services.kg_progress import empty_kg_progress
             if learner_id and learner_id != "unknown":
                 try:
                     lid = int(learner_id)
@@ -314,7 +315,7 @@ async def advance_node(
                     lr_result = await db.execute(lr_stmt)
                     kg_learner = lr_result.scalar_one_or_none()
                     if kg_learner and kg_learner.kg_progress is None:
-                        kg_learner.kg_progress = build_kg_progress_for_learner("")
+                        kg_learner.kg_progress = empty_kg_progress()
                 except (ValueError, TypeError):
                     pass
         except Exception as e:

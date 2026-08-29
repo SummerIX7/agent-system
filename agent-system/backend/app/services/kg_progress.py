@@ -1,11 +1,12 @@
 """知识图谱 —— 掌握度评分与进度持久化。
 
-包含：
+DB（learners.kg_progress）是唯一真源。包含：
 - 分数规范化与状态映射（``clamp_score``、``status_from_score``、``status_label``）
 - 进度结构统一（``normalize_progress``、``normalize_node_scores``）
 - 单节点评分更新（``apply_score_update``）
-- 文件缓存与 DB 同步（``load_progress``、``save_progress``、``sync_progress_to_db``、``load_progress_from_db``）
-- 构造可写入 ``learner.kg_progress`` 的字典（``build_kg_progress_for_learner``）
+- DB 加载/写入（``load_user_progress``、``load_progress_from_db``、``sync_progress_to_db``）
+- 旧版本地进度文件的只读导入（``load_legacy_file_progress``，仅迁移用，不再写入）
+- 空进度骨架（``empty_kg_progress``）
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ from __future__ import annotations
 import datetime
 import json
 import logging
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -218,43 +218,47 @@ def apply_score_update(
 
 
 # ═══════════════════════════════════════════
-# 文件缓存
+# 旧版本地文件的只读导入（迁移用，不再写入）
 # ═══════════════════════════════════════════
 
-def progress_file_path(user_id: int | str) -> Path:
-    """获取用户进度文件路径（按 user_id 索引，避免同用户名跨账户共享残留数据）。"""
-    PROGRESS_DIR.mkdir(parents=True, exist_ok=True)
+def load_legacy_file_progress(user_id: int | str) -> dict | None:
+    """只读加载旧版本地进度文件 data/progress/user_{id}.json。
+
+    DB 是唯一真源；该文件仅作为历史数据的一次性导入源，
+    任何路径都不再向其写入。文件不存在或损坏时返回 None。
+    """
     safe_id = "".join(c for c in str(user_id) if c.isalnum())
     if not safe_id:
-        safe_id = "anonymous"
-    return PROGRESS_DIR / f"user_{safe_id}.json"
+        return None
+    file_path = PROGRESS_DIR / f"user_{safe_id}.json"
+    if not file_path.exists():
+        return None
+    try:
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and (data.get("completed_nodes") or data.get("node_scores") or data.get("history")):
+            return normalize_progress(data)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("旧版进度文件读取失败: %s: %s", file_path, e)
+    return None
 
 
-def load_progress(user_id: int | str) -> dict:
-    """加载用户学习进度，返回 {completed_nodes, node_scores, history}。"""
-    file_path = progress_file_path(user_id)
-    if file_path.exists():
-        try:
-            data = json.loads(file_path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return normalize_progress(data)
-        except Exception:  # noqa: BLE001
-            logger.warning("进度文件损坏，重新创建: %s", file_path)
+# ═══════════════════════════════════════════
+# DB 读写（单一真源）
+# ═══════════════════════════════════════════
+
+async def load_user_progress(user_id: int | str, db: AsyncSession) -> dict:
+    """加载用户学习进度：DB 优先；若 DB 为空且存在旧版文件数据，自动导入 DB 后返回。"""
+    progress = await load_progress_from_db(user_id, db)
+    if progress and (progress.get("completed_nodes") or progress.get("node_scores")):
+        return progress
+
+    legacy = load_legacy_file_progress(user_id)
+    if legacy:
+        await sync_progress_to_db(user_id, legacy, db)
+        logger.info("[KG进度] 从旧版文件导入 DB: user_id=%s", user_id)
+        return legacy
     return normalize_progress({})
 
-
-def save_progress(user_id: int | str, progress: dict) -> None:
-    """保存用户学习进度到文件（仅作为 DB 降级缓存）。"""
-    file_path = progress_file_path(user_id)
-    file_path.write_text(
-        json.dumps(progress, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-
-# ═══════════════════════════════════════════
-# DB 同步
-# ═══════════════════════════════════════════
 
 async def sync_progress_to_db(user_id: int | str, progress: dict, db: AsyncSession) -> None:
     """将知识图谱进度同步到数据库 learners.kg_progress。"""
@@ -304,21 +308,19 @@ async def load_progress_from_db(user_id: int | str, db: AsyncSession) -> dict | 
     return None
 
 
-def build_kg_progress_for_learner(user_id: int | str = "") -> dict:
+def empty_kg_progress() -> dict:
     """
-    构建可写入 learner.kg_progress 的知识图谱进度字典。
+    构建知识图谱进度的空骨架（用于 learner.kg_progress 初始化）。
     纯同步函数，不依赖 DB session，可安全地在任何上下文中调用。
-    user_id 为空时返回空进度（用于初始化）。
     """
     tree = build_tree()
     total_leaves = tree.get("total_leaves", 0)
     leaf_ids = leaf_ids_from_tree(tree)
-    progress = load_progress(user_id) if user_id != "" else normalize_progress({})
-    stats = progress_stats(progress, total_leaves, leaf_ids)
+    stats = progress_stats({}, total_leaves, leaf_ids)
     return {
-        "completed_nodes": progress.get("completed_nodes", []),
-        "node_scores": progress.get("node_scores", {}),
-        "history": progress.get("history", []),
+        "completed_nodes": [],
+        "node_scores": {},
+        "history": [],
         "percentage": stats["percentage"],
         "total": total_leaves,
         "stats": stats,
