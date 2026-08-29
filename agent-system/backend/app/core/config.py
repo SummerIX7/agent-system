@@ -66,7 +66,6 @@ class Settings(BaseSettings):
 
     # 测试数据库 URL（非空时覆盖 DATABASE_URL property，用于 e2e 测试的 SQLite 内存库）
     TEST_DATABASE_URL: str = ""
-    TEST_DATABASE_URL_SYNC: str = ""
 
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
@@ -77,17 +76,6 @@ class Settings(BaseSettings):
             return self.TEST_DATABASE_URL
         return (
             f"mysql+aiomysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
-            f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
-            f"?charset=utf8mb4"
-        )
-
-    @property
-    def DATABASE_URL_SYNC(self) -> str:
-        """同步 URL，供 Alembic 迁移使用"""
-        if self.TEST_DATABASE_URL_SYNC:
-            return self.TEST_DATABASE_URL_SYNC
-        return (
-            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
             f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
             f"?charset=utf8mb4"
         )

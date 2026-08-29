@@ -26,14 +26,8 @@ else:
     raise SystemExit("[entrypoint] 等待 MySQL 超时")
 PY
 
-echo "[entrypoint] 执行数据库迁移 alembic upgrade head ..."
-alembic upgrade head
-
-# 可选：构建知识库索引 + 创建管理员（真实模式且需要初始化时设 RUN_SETUP=true）
-if [ "${RUN_SETUP}" = "true" ]; then
-    echo "[entrypoint] RUN_SETUP=true，执行 setup.py（建管理员 + 建索引）..."
-    python setup.py || echo "[entrypoint] setup.py 执行失败（忽略，继续启动）"
-fi
+# 建表由应用启动生命周期（main.py lifespan: Base.metadata.create_all）负责，
+# 与当前整型模型保持一致；不使用 alembic 迁移（历史迁移与现模型已脱节）。
 
 echo "[entrypoint] 启动服务: $*"
 exec "$@"

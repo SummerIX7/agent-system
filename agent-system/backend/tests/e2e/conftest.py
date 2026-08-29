@@ -16,7 +16,6 @@ import os
 # ══════════════════════════════════════════════════════════════
 os.environ["MOCK_MODE"] = "true"
 os.environ["TEST_DATABASE_URL"] = "sqlite+aiosqlite:///./test_e2e.db"
-os.environ["TEST_DATABASE_URL_SYNC"] = "sqlite:///./test_e2e.db"
 os.environ["ENABLE_KNOWLEDGE_BASE"] = "false"
 
 import pytest
