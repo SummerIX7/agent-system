@@ -376,7 +376,7 @@ M30
 
 # ══════════════════════════════════════════════════════════════════
 # 审核纠偏 Agent — 学术审查 [label: "学术审查"]
-#   （同时用于 debate_verify 和 corrective_review）
+#   （corrective_review 双视角审查使用）
 # ══════════════════════════════════════════════════════════════════
 
 def _mock_empty_issues() -> str:
@@ -385,7 +385,7 @@ def _mock_empty_issues() -> str:
 
 
 def _mock_minor_issues() -> str:
-    """学术审查：发现次要问题（用于 debate_verify.verify）"""
+    """学术审查：发现次要问题（corrective_review 使用）"""
     return _j([
         {"issue": "建议补充 G01 进给速度单位的详细说明（车床 G99 与铣床 G94 的区别）", "severity": "suggestion"},
         {"issue": "圆弧插补部分缺少 I/J/K 圆心增量方式的参数说明", "severity": "minor"},

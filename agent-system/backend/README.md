@@ -47,8 +47,6 @@ backend/
 │   │   ├── path_planner.py  # 路径规划
 │   │   ├── generation.py    # 知识生成
 │   │   ├── review.py        # 审核纠偏（双视角审查 + 修正）
-│   │   ├── debate.py        # 辩论管理器（备用）
-│   │   ├── judge.py         # 独立裁判 Agent（备用）
 │   │   ├── question_generator.py  # 试题生成
 │   │   └── orchestrator.py  # 决策调度
 │   ├── graph/               # LangGraph 工作流

@@ -1,13 +1,13 @@
 """
 核心 Agent 单元测试
-覆盖：DiagnosisAgent、JudgeAgent、DecisionOrchestrator
+覆盖：DiagnosisAgent、ReviewAgent（corrective_review 主审核路径）、DecisionOrchestrator
 """
 import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.agents.diagnosis import DiagnosisAgent
-from app.agents.judge import JudgeAgent
+from app.agents.review import ReviewAgent
 from app.agents.orchestrator import DecisionOrchestrator
 
 
@@ -115,169 +115,119 @@ class TestDiagnosisAgent:
         assert "五轴加工" in result["blind_spots"]
 
 
-class TestJudgeAgent:
-    """裁判 Agent 测试"""
+class TestReviewAgent:
+    """审核纠偏 Agent 测试（corrective_review —— 主工作流现用审核路径）"""
 
     @pytest.fixture
-    def agent(self):
-        """创建 JudgeAgent 实例，mock LLM 调用"""
-        agent = JudgeAgent()
+    def agent(self, monkeypatch):
+        """创建 ReviewAgent 实例，mock LLM 与知识库检索
+
+        强制关闭 tool-calling，使 corrective_review 走纯 prompt 路径，
+        与本地 .env 中 USE_AGENT_TOOLS 的取值无关。
+        """
+        from app.core.config import get_settings
+        monkeypatch.setattr(get_settings(), "USE_AGENT_TOOLS", False, raising=False)
+        agent = ReviewAgent()
         agent.llm = MagicMock()
+        agent.retrieve_context = MagicMock(return_value="参考资料：G00 是快速定位，G01 是直线插补。")
         return agent
 
-    @pytest.mark.asyncio
-    async def test_judge_passed_defender(self, agent):
-        """测试裁判通过辩护方的案例"""
-        mock_response = json.dumps({
-            "passed": True,
-            "adopted_side": "defender",
-            "reason": "辩护方的回应有理有据，修正后的内容准确",
-            "quality_score": 0.9,
-            "effective_issues": [],
-            "overruled_issues": ["问题1", "问题2"]
-        })
-        agent.llm.ainvoke = AsyncMock(return_value=MagicMock(content=mock_response))
-
-        result = await agent.judge(
-            original_content="G00是快速定位指令",
-            topic="G代码基础",
-            content_type="lecture",
-            challenge_issues=["问题1", "问题2"],
-            defend_responses=["回应1：G00确实是快速定位指令", "回应2：有知识库依据"],
-            revised_content="G00是快速定位指令（修正后）"
-        )
-
-        assert result["passed"] is True
-        assert result["adopted_side"] == "defender"
-        assert result["quality_score"] >= 0.8
+    @staticmethod
+    def _issues(*severities):
+        return [{"issue": f"问题-{sev}-{i}", "severity": sev}
+                for i, sev in enumerate(severities)]
 
     @pytest.mark.asyncio
-    async def test_judge_passed_challenger(self, agent):
-        """测试裁判支持审核方的案例"""
-        mock_response = json.dumps({
-            "passed": False,
-            "adopted_side": "challenger",
-            "reason": "辩护方未能有效回应实质性问题",
-            "quality_score": 0.3,
-            "effective_issues": ["G01是直线插补不是圆弧插补"],
-            "overruled_issues": []
-        })
-        agent.llm.ainvoke = AsyncMock(return_value=MagicMock(content=mock_response))
-
-        result = await agent.judge(
-            original_content="G01是圆弧插补指令",
-            topic="G代码基础",
-            content_type="lecture",
-            challenge_issues=["G01是直线插补不是圆弧插补"],
-            defend_responses=["我认为G01是圆弧插补"],
-            revised_content="G01是圆弧插补指令"
-        )
-
-        assert result["passed"] is False
-        assert result["adopted_side"] == "challenger"
-        assert len(result["effective_issues"]) > 0
-
-    @pytest.mark.asyncio
-    async def test_judge_json_parse_failure_defaults_to_not_passed(self, agent):
-        """测试 JSON 解析失败时默认不通过（增强容错后仍保留安全默认值）"""
-        # Mock LLM 返回无效 JSON
-        agent.llm.ainvoke = AsyncMock(return_value=MagicMock(content="这不是有效的JSON响应，没有passed字段"))
-
-        result = await agent.judge(
-            original_content="测试内容",
-            topic="测试主题",
-            content_type="lecture",
-            challenge_issues=["问题1"],
-            defend_responses=["回应1"],
-            revised_content="修正后内容"
-        )
-
-        # JSON 解析失败且无法从文本推断时，应默认不通过
-        assert result["passed"] is False
-        assert result["adopted_side"] == "challenger"
-        assert "无法" in result["reason"]  # 包含降级说明
-        assert result["quality_score"] == 0
-
-    @pytest.mark.asyncio
-    async def test_judge_regression_check_passes(self, agent):
-        """测试 P1-2: 回归验证通过的情况"""
-        # 第一次 LLM 调用：裁判判决通过
-        judge_response = json.dumps({
-            "passed": True,
-            "adopted_side": "defender",
-            "reason": "辩护方的回应有理有据，修正后的内容准确",
-            "quality_score": 0.9,
-            "effective_issues": ["问题1：G01是直线插补不是圆弧插补"],
-            "overruled_issues": []
-        })
-
-        # 第二次 LLM 调用：回归验证通过
-        regression_response = json.dumps({
-            "verified": True,
-            "checks": [
-                {"issue": "问题1：G01是直线插补不是圆弧插补", "fixed": True, "reason": "修正后内容正确描述了G01是直线插补"}
-            ],
-            "reason": "所有问题已正确修复"
-        })
-
+    async def test_corrective_review_passes_without_issues(self, agent):
+        """双视角均无问题 → 直接通过，不触发修正"""
         agent.llm.ainvoke = AsyncMock(side_effect=[
-            MagicMock(content=judge_response),
-            MagicMock(content=regression_response)
+            MagicMock(content="[]"),   # 学术审查
+            MagicMock(content="[]"),   # 工业审查
         ])
 
-        result = await agent.judge(
-            original_content="G01是圆弧插补指令",
-            topic="G代码基础",
-            content_type="lecture",
-            challenge_issues=["问题1：G01是直线插补不是圆弧插补"],
-            defend_responses=["回应1：你说得对，G01确实是直线插补"],
-            revised_content="G01是直线插补指令（已修正）"
-        )
+        content = "G00 是快速定位指令。"
+        result = await agent.corrective_review(content, "G 代码基础")
 
         assert result["passed"] is True
-        assert result["adopted_side"] == "defender"
-        assert "regression_failure" not in result
+        assert result["score"] == 1.0
+        assert result["correction_applied"] is False
+        assert result["final_content"] == content
+        # 无修正路径只调用两次 LLM（双视角）
+        assert agent.llm.ainvoke.await_count == 2
 
     @pytest.mark.asyncio
-    async def test_judge_regression_check_fails(self, agent):
-        """测试 P1-2: 回归验证失败的情况"""
-        # 第一次 LLM 调用：裁判判决通过
-        judge_response = json.dumps({
-            "passed": True,
-            "adopted_side": "defender",
-            "reason": "辩护方的回应有理有据，修正后的内容准确",
-            "quality_score": 0.9,
-            "effective_issues": ["问题1：G01是直线插补不是圆弧插补"],
-            "overruled_issues": []
-        })
-
-        # 第二次 LLM 调用：回归验证失败（修正后仍有错误）
-        regression_response = json.dumps({
-            "verified": False,
-            "checks": [
-                {"issue": "问题1：G01是直线插补不是圆弧插补", "fixed": False, "reason": "修正后内容仍错误描述G01为圆弧插补"}
-            ],
-            "reason": "修正未解决问题，仍有事实错误"
-        })
-
+    async def test_corrective_review_correction_verified(self, agent):
+        """评分低于阈值 → 触发修正，回归验证 resolved → 采纳修正内容"""
+        # 3 个 critical：评分 1.0 - 0.45 = 0.55 < 0.70
         agent.llm.ainvoke = AsyncMock(side_effect=[
-            MagicMock(content=judge_response),
-            MagicMock(content=regression_response)
+            MagicMock(content=json.dumps(self._issues("critical", "critical", "critical"))),  # 学术审查
+            MagicMock(content="[]"),                                                          # 工业审查
+            MagicMock(content="G01 是直线插补指令（已修正）"),                                    # 修正生成
+            MagicMock(content=json.dumps({"verdict": "resolved", "reason": "已逐条修复"})),      # 修正验证
         ])
 
-        result = await agent.judge(
-            original_content="G01是圆弧插补指令",
-            topic="G代码基础",
-            content_type="lecture",
-            challenge_issues=["问题1：G01是直线插补不是圆弧插补"],
-            defend_responses=["回应1：我修正了"],
-            revised_content="G01是圆弧插补指令（修正版）"  # 修正后仍有错误
-        )
+        original = "G01 是圆弧插补指令"
+        result = await agent.corrective_review(original, "G 代码基础")
 
-        # 回归验证失败后，判决应改为不通过
+        assert result["correction_applied"] is True
+        assert result["passed"] is True
+        assert result["final_content"] == "G01 是直线插补指令（已修正）"
+        assert result["original_score"] == pytest.approx(0.55)
+        assert len(result["issues"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_corrective_review_fix_rejected_falls_back(self, agent):
+        """修正后回归验证 unresolved → 不通过，final_content 回退为原始内容"""
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(self._issues("critical", "critical", "critical"))),
+            MagicMock(content="[]"),
+            MagicMock(content="表面修改后的内容"),
+            MagicMock(content=json.dumps({"verdict": "unresolved", "reason": "核心问题仍在"})),
+        ])
+
+        original = "G01 是圆弧插补指令"
+        result = await agent.corrective_review(original, "G 代码基础")
+
         assert result["passed"] is False
-        assert "regression_failure" in result
-        assert "修正回归验证未通过" in result["reason"]
+        assert result["correction_applied"] is True
+        assert result["final_content"] == original
+        assert any("修正验证未通过" in issue for issue in result["issues"])
+
+    def test_severity_weighted_score_boundaries(self, agent):
+        """严重度加权评分：阈值边界（2 critical = 0.70 恰好通过，3 critical 不通过）"""
+        score = agent._severity_weighted_score
+        assert score([]) == 1.0
+        assert score([{"severity": "critical"}]) == pytest.approx(0.85)
+        assert score([{"severity": "critical"}] * 2) == pytest.approx(0.70)
+        assert score([{"severity": "critical"}] * 3) == pytest.approx(0.55)
+        assert score([{"severity": "suggestion"}] * 10) == pytest.approx(0.80)
+        # 下限钳制为 0
+        assert score([{"severity": "critical"}] * 10) == 0.0
+
+    def test_parse_issues_formats(self, agent):
+        """问题解析：标准/包裹/旧格式/无 JSON/正则提取"""
+        parse = agent._parse_issues
+        # 标准 JSON 数组
+        assert parse('[{"issue": "a", "severity": "critical"}]') == [
+            {"issue": "a", "severity": "critical"}]
+        # markdown 代码块包裹
+        assert parse('```json\n[{"issue": "b", "severity": "minor"}]\n```')[0]["issue"] == "b"
+        # 旧格式：纯字符串 → 降级为 minor
+        assert parse('["旧格式问题"]') == [{"issue": "旧格式问题", "severity": "minor"}]
+        # 前后有说明文字时正则提取
+        assert parse('审查结果如下：[{"issue": "c", "severity": "suggestion"}] 请参考')[0]["issue"] == "c"
+        # 完全无 JSON → 空列表（安全默认）
+        assert parse("这不是 JSON") == []
+
+    def test_merge_issues_dedup_keeps_highest_severity(self, agent):
+        """合并去重：同一问题保留最高严重度"""
+        long_issue = "同" * 200  # 前 200 字符作为去重键
+        merged = agent._merge_issues(
+            [{"issue": long_issue, "severity": "minor"}],
+            [{"issue": long_issue + "（差异后缀不计入键）", "severity": "critical"}],
+        )
+        assert len(merged) == 1
+        assert merged[0]["severity"] == "critical"
 
 
 class TestDecisionOrchestrator:
