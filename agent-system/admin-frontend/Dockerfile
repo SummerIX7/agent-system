@@ -2,7 +2,8 @@
 # 构建时以 /admin/ 为 base，便于统一网关按 /admin/ 前缀托管
 FROM node:20-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# 固定 pnpm 到 v10（匹配项目 pnpm-workspace.yaml 的 pnpm10 配置格式；兼容 Node 20，默认最新版需 Node 22+）
+RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
 
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile || pnpm install
