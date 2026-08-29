@@ -34,6 +34,7 @@ dist/
 # AI Assistant
 .claude/
 .workbuddy/
+.qoder/
 
 # Build output
 **/.output/
