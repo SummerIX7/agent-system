@@ -1,0 +1,140 @@
+// === 学习者画像 ===
+
+export interface LearnerProfileInput {
+  education_background: string
+  major: string
+  work_experience_years: number
+  career_track?: string
+  current_level?: string
+  self_assessment: Record<string, string>
+  learning_style: string
+  goals: string[]
+  domain?: string
+}
+
+export interface KnowledgePoint {
+  name: string
+  score: number
+  level: string
+  confidence?: number
+}
+
+export interface LearnerProfile {
+  id: number
+  session_id?: string
+  education_background: string
+  major: string
+  work_experience_years: number
+  career_track?: string
+  current_level?: string
+  self_assessment: Record<string, string>
+  learning_style: string
+  goals: string[]
+  knowledge_points: KnowledgePoint[]
+  blind_spots: string[]
+  overall_level: string
+  recommended_difficulty: string
+  learning_path?: any
+  machine_approval_status?: string
+}
+
+// === 资源生成 ===
+
+export interface GenerateRequest {
+  session_id: string
+  topic: string
+  resource_types?: string[]
+}
+
+export interface ResourceOutput {
+  type: string
+  content: string | any[]
+  topic: string
+  difficulty: string
+  sources?: any[]
+}
+
+// === 反馈 ===
+
+export interface FeedbackInput {
+  session_id: string
+  topic: string
+  question: string
+  user_answer: string
+  correct_answer: string
+  round?: number
+  heuristic_context?: string
+}
+
+export interface FeedbackResponse {
+  is_correct: boolean
+  correct_answer: string
+  heuristic_question: string | null
+  topic: string
+  correctness: number
+  round?: number
+  reveal_answer?: boolean
+}
+
+// === 实操题批改 ===
+
+export interface PracticalFeedbackInput {
+  session_id: string
+  topic: string
+  question: string
+  user_answer: string
+  correct_answer: string
+  explanation?: string
+}
+
+export interface PracticalFeedbackResponse {
+  score: number
+  is_correct: boolean
+  feedback: string
+  key_points: string[]
+  reference_answer: string
+}
+
+// === 可视化 ===
+
+export interface VisualizationData {
+  knowledge_points: KnowledgePoint[]
+  blind_spots: { name: string; severity: number }[]
+  learning_path: { title: string; completed: boolean; score?: number }[]
+  match_curve: any | null
+  agent_logs: any[]
+  metrics?: {
+    hallucination_rate: number | null
+    difficulty_match_rate: number | null
+    knowledge_coverage_rate: number | null
+  }
+  learning_path_meta?: {
+    total_estimated_hours: number
+    current_stage: number
+    recommended_order: string
+  } | null
+}
+
+// === Agent 状态 ===
+
+export interface AgentStatus {
+  name: string
+  status: 'idle' | 'running' | 'completed' | 'error'
+  message: string
+  progress: number
+}
+
+// === 职业方向配置 ===
+
+export interface CareerTrackConfig {
+  code: string
+  name: string
+  description: string
+  order: number
+  difficulty_levels: string[]
+  self_assessment_skills: string[]
+  prerequisite_knowledge: string
+}
+
+// 兼容别名
+export type DomainConfig = CareerTrackConfig
