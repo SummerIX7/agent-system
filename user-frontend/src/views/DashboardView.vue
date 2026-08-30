@@ -116,6 +116,7 @@
 </template>
 
 <script setup lang="ts">
+import type { KnowledgePoint } from '@/types/api'
 import { LEVEL_MAP } from '@/utils/labels'
 import { useApi } from '@/composables/useApi'
 import { useSession } from '@/composables/useSession'
@@ -123,8 +124,8 @@ import KnowledgeRadar from '@/components/dashboard/KnowledgeRadar.vue'
 const api = useApi()
 const { sessionId, profile } = useSession()
 
-const knowledgePoints = ref<any[]>([])
-const blindSpots = ref<any[]>([])
+const knowledgePoints = ref<KnowledgePoint[]>([])
+const blindSpots = ref<{ name: string; severity: number }[]>([])
 const radarKey = ref(0)
 
 // 计算总体掌握度
@@ -160,17 +161,17 @@ const levelDesc = computed(() => {
   return '入门 · 基础学习'
 })
 
-const sanitizeKnowledgePoints = (kps: any[]): any[] => {
+const sanitizeKnowledgePoints = (kps: unknown[]): KnowledgePoint[] => {
   if (!Array.isArray(kps)) return []
   return kps
-    .filter((kp) => kp && typeof kp === 'object' && kp.name)
+    .filter((kp): kp is Record<string, unknown> => !!kp && typeof kp === 'object' && 'name' in kp)
     .map((kp) => {
-      let score = typeof kp.score === 'number' && !Number.isNaN(kp.score) ? kp.score : Number(kp.score)
-      if (Number.isNaN(score) || score === null || score === undefined) score = 0
+      const parsed = Number(kp.score)
+      const score = Number.isNaN(parsed) ? 0 : parsed
       return {
         name: String(kp.name),
         score: Math.max(0, Math.min(100, score)),
-        level: kp.level || 'beginner',
+        level: (typeof kp.level === 'string' && kp.level) || 'beginner',
       }
     })
 }
@@ -193,7 +194,7 @@ onMounted(async () => {
   // 先从全局 profile 加载
   if (profile.value?.knowledge_points?.length) {
     knowledgePoints.value = sanitizeKnowledgePoints(profile.value.knowledge_points)
-    blindSpots.value = (profile.value.blind_spots || []).map((bs: any) => {
+    blindSpots.value = (profile.value.blind_spots || []).map((bs) => {
       if (typeof bs === 'string') return { name: bs, severity: 0.7 }
       return { name: bs.name || '未知', severity: bs.severity || 0.7 }
     })
@@ -209,7 +210,7 @@ onMounted(async () => {
         radarKey.value++
       }
       if (viz.blind_spots?.length) {
-        blindSpots.value = viz.blind_spots.map((bs: any) => ({
+        blindSpots.value = viz.blind_spots.map((bs) => ({
           name: bs.name || '未知',
           severity: typeof bs.severity === 'number' ? bs.severity : 0.7,
         }))

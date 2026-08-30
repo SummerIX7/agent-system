@@ -3,11 +3,12 @@
  * 管理节点状态、当前节点、考核状态等，供 report/resources/practice 页面共享
  */
 import { computed, ref } from 'vue'
+import type { LearningPathNode } from '@/types/api'
 import { useApi } from './useApi'
 import { useSession } from './useSession'
 
 // 模块级单例
-const nodes = ref<any[]>([])
+const nodes = ref<LearningPathNode[]>([])
 const currentStage = ref(1)
 const allCompleted = ref(false)
 
@@ -31,7 +32,7 @@ export function useLearningPath() {
   }
 
   // 推进到下一节点
-  const advanceNode = async (basicScore: number, advancedScore: number, testFeedback: any[] = []) => {
+  const advanceNode = async (basicScore: number, advancedScore: number, testFeedback: unknown[] = []) => {
     if (!sessionId.value) return null
     try {
       const result = await api.advanceNode(sessionId.value, {

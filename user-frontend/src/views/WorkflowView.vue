@@ -226,7 +226,7 @@ const startGenerate = async () => {
       status: 'completed' as const,
       progress: 100,
     }))
-    const resourceCount = result.filter((r: any) => ['lecture', 'guide', 'project'].includes(r.type)).length
+    const resourceCount = result.filter((r) => ['lecture', 'guide', 'project'].includes(r.type)).length
     currentMessage.value = `已生成 ${resourceCount} 个资源（覆盖 5 个学习节点）`
     hasExistingResources.value = true
   } catch (err: any) {

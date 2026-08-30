@@ -3,6 +3,7 @@
  * sessionId 持久化到 localStorage，确保刷新/重登后数据不丢失
  */
 import { ref } from 'vue'
+import type { LearnerProfile } from '@/types/api'
 
 const STORAGE_KEY = 'agent_session_id'
 const LEARNER_KEY = 'agent_learner_id'
@@ -10,7 +11,7 @@ const LEARNER_KEY = 'agent_learner_id'
 // 模块级单例：初始化时从 localStorage 恢复
 const sessionId = ref(localStorage.getItem(STORAGE_KEY) || '')
 const learnerId = ref(localStorage.getItem(LEARNER_KEY) || '')
-const profile = ref<any>(null)
+const profile = ref<LearnerProfile | null>(null)
 
 export function useSession() {
   const setSession = (sid: string, lid: string) => {
@@ -20,7 +21,7 @@ export function useSession() {
     localStorage.setItem(LEARNER_KEY, lid)
   }
 
-  const setProfile = (p: any) => {
+  const setProfile = (p: LearnerProfile | null) => {
     profile.value = p
   }
 

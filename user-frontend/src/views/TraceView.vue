@@ -20,7 +20,7 @@
 
     <!-- 时间线 -->
     <div v-if="traceData && traceData.nodes" class="timeline">
-      <div v-for="(node, i) in (traceData.nodes as any[])" :key="i" class="tl-node">
+      <div v-for="(node, i) in traceData.nodes" :key="i" class="tl-node">
         <!-- 连线 -->
         <div v-if="i > 0" class="tl-connector">
           <div class="tl-line" :class="{ 'tl-line--retry': isRetryEdge(i) }"></div>
@@ -65,7 +65,7 @@
                  LLM 调用 ×{{ node.llm_calls.length }} {{ openSections[i]?.llm ? '▼' : '▶' }}
               </div>
               <div v-if="openSections[i]?.llm">
-                <div v-for="(call, ci) in (node.llm_calls as any[])" :key="ci" class="tl-llm">
+                <div v-for="(call, ci) in node.llm_calls" :key="ci" class="tl-llm">
                   <div class="tl-llm__head" @click="toggleLlmCall(i, ci)">
                     <span class="badge badge--accent">{{ call.label }}</span>
                     <span class="t2" style="font-size:11px">{{ call.elapsed_ms }}ms</span>
@@ -104,9 +104,10 @@
 </template>
 
 <script setup lang="ts">
+import type { TraceData, TraceNode } from '@/types/api'
 import { useApi } from '@/composables/useApi'
 const inputSid = ref('')
-const traceData = ref<any>(null)
+const traceData = ref<TraceData | null>(null)
 const loading = ref(false)
 const openNodes = ref<Record<number, boolean>>({})
 const openSections = ref<Record<number, Record<string, boolean>>>({})
@@ -164,7 +165,7 @@ const toggleLlmCall = (i: number, ci: number) => {
   openLlmCalls.value[key] = !openLlmCalls.value[key]
 }
 
-const fmtJson = (obj: any) => {
+const fmtJson = (obj: unknown) => {
   try {
     return JSON.stringify(obj, null, 2)
   } catch {
@@ -178,7 +179,7 @@ const truncate = (text: string, max: number) => {
   return text.slice(0, half) + `\n\n... [省略 ${text.length - max} 字符] ...\n\n` + text.slice(-half)
 }
 
-const nodeNum = (node: any, i: number) => {
+const nodeNum = (node: TraceNode, i: number) => {
   const map: Record<string, string> = {
     analyze: '①', plan_path: '②', generate: '③',
     review_correct: '③½', gen_questions: '④',
@@ -193,21 +194,21 @@ const isRetryEdge = (i: number) => {
   return prev?.node === 'review_correct' && curr?.node === 'generate'
 }
 
-const nodeStatusClass = (node: any) => {
+const nodeStatusClass = (node: TraceNode) => {
   if (node.output?.has_degraded) return 'tl-card--degraded'
   if (node.output?.all_passed === false) return 'tl-card--failed'
   if (node.output?.all_passed === true) return 'tl-card--passed'
   return ''
 }
 
-const nodeBadge = (node: any) => {
+const nodeBadge = (node: TraceNode) => {
   if (node.output?.has_degraded) return 'badge--err'
   if (node.output?.all_passed === false) return 'badge--err'
   if (node.output?.all_passed === true) return 'badge--ok'
   return 'badge--mute'
 }
 
-const nodeStatusLabel = (node: any) => {
+const nodeStatusLabel = (node: TraceNode) => {
   if (node.output?.has_degraded) return '已降级'
   if (node.output?.all_passed === false) return '未通过'
   if (node.output?.all_passed === true) return '已通过'

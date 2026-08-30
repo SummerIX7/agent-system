@@ -64,13 +64,14 @@
 </template>
 
 <script setup lang="ts">
+import type { HistoryItem } from '@/types/api'
 import { useApi } from '@/composables/useApi'
 import { useSession } from '@/composables/useSession'
 const api = useApi()
 const { learnerId } = useSession()
 
 const loading = ref(true)
-const historyRecords = ref<any[]>([])
+const historyRecords = ref<HistoryItem[]>([])
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalRecords = ref(0)

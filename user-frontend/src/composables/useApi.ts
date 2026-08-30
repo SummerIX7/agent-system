@@ -10,6 +10,18 @@ import type {
   PracticalFeedbackResponse,
   VisualizationData,
   CareerTrackConfig,
+  HistoryResponse,
+  LearningPathData,
+  LearningPathNode,
+  PracticeQuestion,
+  PracticeQuestionSaveState,
+  PracticeQuestionState,
+  PracticeResultRecord,
+  PracticeStateData,
+  TieredQuestionSet,
+  TraceData,
+  KgProgress,
+  GraphPayload,
 } from '@/types/api'
 import { useAuth } from './useAuth'
 
@@ -67,7 +79,7 @@ export function useApi() {
       get<LearnerProfile>('/api/profile/me'),
 
     // 资源生成
-    generateResources: (sessionId: string, topic: string, resourceTypes?: string[], profile?: any) =>
+    generateResources: (sessionId: string, topic: string, resourceTypes?: string[], profile?: unknown) =>
       post<ResourceOutput[]>('/api/generate', {
         session_id: sessionId,
         topic,
@@ -92,18 +104,18 @@ export function useApi() {
 
     // 历史
     getHistory: (learnerId: number | string, page: number = 1, pageSize: number = 20) =>
-      get<{ items: any[]; total: number; page: number; page_size: number; total_pages: number }>(
+      get<HistoryResponse>(
         `/api/history/${learnerId}?page=${page}&page_size=${pageSize}`,
       ),
 
     // 试题
     getQuestions: (sessionId: string) =>
-      get<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/${sessionId}`),
+      get<{ topic: string; difficulty: string; questions: PracticeQuestion[] }>(`/api/questions/${sessionId}`),
 
     // 答题进度持久化
     savePracticeState: (
       sessionId: string,
-      data: { current_index: number; questions: any[]; level?: string | null; stage?: number | null },
+      data: Pick<PracticeStateData, 'current_index' | 'level' | 'stage'> & { questions: PracticeQuestionSaveState[] },
     ) => post<{ ok: boolean }>(`/api/questions/practice/state/${sessionId}`, data),
 
     getPracticeState: (sessionId: string, level?: string | null, stage?: number | null) => {
@@ -111,29 +123,21 @@ export function useApi() {
       if (level) query.set('level', level)
       if (stage !== undefined && stage !== null) query.set('stage', String(stage))
       const suffix = query.toString() ? `?${query.toString()}` : ''
-      return get<{ current_index: number; questions: any[]; level?: string | null; stage?: number | null }>(
+      return get<PracticeStateData>(
         `/api/questions/practice/state/${sessionId}${suffix}`,
       )
     },
 
     // 重新生成试题
     regenerateQuestions: (sessionId: string) =>
-      post<{ topic: string; difficulty: string; questions: any[] }>(`/api/questions/practice/regenerate/${sessionId}`),
+      post<{ topic: string; difficulty: string; questions: PracticeQuestion[] }>(`/api/questions/practice/regenerate/${sessionId}`),
 
     // 节点练习
     generateTieredQuestions: (sessionId: string) =>
-      post<{ node_title: string; node: any }>(`/api/questions/generate/${sessionId}`),
+      post<{ node_title: string; node: TieredQuestionSet }>(`/api/questions/generate/${sessionId}`),
 
     getTieredQuestions: (sessionId: string, level: 'node' | 'comprehensive', stage?: number) =>
-      get<{
-        level: string
-        label: string
-        topic: string
-        difficulty: string
-        format_version?: string
-        scenario?: Record<string, any>
-        questions: any[]
-      }>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
+      get<TieredQuestionSet>(`/api/questions/set/${sessionId}/${level}${stage !== undefined ? `?stage=${stage}` : ''}`),
 
     savePracticeResult: (
       sessionId: string,
@@ -144,29 +148,30 @@ export function useApi() {
         correct_count: number
         wrong_count: number
         question_count: number
-        questions: any[]
+        questions: Array<{
+          topic: string
+          question: string
+          question_type: string
+          is_correct: boolean
+          user_answer: string
+          correct_answer: string
+        }>
       },
     ) => post<{ ok: boolean; total: number }>(`/api/questions/practice/result/${sessionId}`, data),
 
     getPracticeResults: (sessionId: string) =>
-      get<{ results: any[] }>(`/api/questions/practice/results/${sessionId}`),
+      get<{ results: PracticeResultRecord[] }>(`/api/questions/practice/results/${sessionId}`),
 
     // 学习路径管理
     getLearningPath: (sessionId: string) =>
-      get<{
-        nodes: any[]
-        total_estimated_hours: number
-        current_stage: number
-        recommended_order: string
-        all_completed: boolean
-      }>(`/api/learning-path/${sessionId}`),
+      get<LearningPathData>(`/api/learning-path/${sessionId}`),
 
     getCurrentNode: (sessionId: string) =>
-      get<{ current_node: any; total_nodes: number; all_completed: boolean }>(
+      get<{ current_node: LearningPathNode | null; total_nodes: number; all_completed: boolean }>(
         `/api/learning-path/${sessionId}/current-node`,
       ),
 
-    advanceNode: (sessionId: string, data: { basic_score: number; advanced_score: number; test_feedback: any[] }) =>
+    advanceNode: (sessionId: string, data: { basic_score: number; advanced_score: number; test_feedback: unknown[] }) =>
       post<{
         advanced_passed: boolean
         current_stage: number
@@ -203,33 +208,19 @@ export function useApi() {
     getDomains: () => get<CareerTrackConfig[]>('/api/domains'),
 
     // 知识图谱
-    getKnowledgeGraph: () => get<any>('/api/knowledge-graph'),
+    getKnowledgeGraph: () => get<unknown>('/api/knowledge-graph'),
 
     getKnowledgeGraphGraph: (withProgress: boolean = true) =>
-      get<any>(withProgress ? '/api/knowledge-graph/progress/graph' : '/api/knowledge-graph/graph'),
+      get<GraphPayload>(withProgress ? '/api/knowledge-graph/progress/graph' : '/api/knowledge-graph/graph'),
 
     getKnowledgeGraphProgress: () =>
-      get<{
-        username: string
-        completed_nodes: string[]
-        node_scores?: Record<string, any>
-        total: number
-        percentage: number
-        stats?: any
-      }>('/api/knowledge-graph/progress'),
+      get<KgProgress>('/api/knowledge-graph/progress'),
 
     getKnowledgeGraphTreeWithProgress: () =>
-      get<any>('/api/knowledge-graph/progress/tree'),
+      get<unknown>('/api/knowledge-graph/progress/tree'),
 
     markKnowledgeNode: (nodeId: string, completed: boolean, score?: number) =>
-      post<{
-        username: string
-        completed_nodes: string[]
-        node_scores?: Record<string, any>
-        total: number
-        percentage: number
-        stats?: any
-      }>('/api/knowledge-graph/progress', { node_id: nodeId, completed, score }),
+      post<KgProgress>('/api/knowledge-graph/progress', { node_id: nodeId, completed, score }),
 
     // 机台使用申请
     applyMachine: () =>
@@ -241,6 +232,6 @@ export function useApi() {
 
     // 追踪（调试）
     getTrace: (sessionId: string) =>
-      get<any>(`/api/trace/${sessionId}`),
+      get<TraceData>(`/api/trace/${sessionId}`),
   }
 }

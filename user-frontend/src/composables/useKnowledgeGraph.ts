@@ -11,70 +11,16 @@ import { TooltipComponent } from 'echarts/components'
 
 use([GraphChart, CanvasRenderer, TooltipComponent])
 
+import type {
+  GraphNode,
+  GraphLink,
+  GraphStats,
+  GraphCategoryStat as CategoryStat,
+  GraphLegendItem as LegendItem,
+  GraphPayload,
+} from '@/types/api'
 import { useAuth } from './useAuth'
 import { useApi } from './useApi'
-
-interface GraphNode {
-  id: string
-  name: string
-  type: 'root' | 'category' | 'knowledge'
-  category: string
-  category_label: string
-  score: number
-  status: string
-  status_label: string
-  is_leaf: boolean
-  file?: string
-  source_type?: string
-  source_name?: string
-  author?: string
-  year?: string
-  chapter?: string
-}
-
-interface GraphLink {
-  source: string
-  target: string
-  relation?: string
-}
-
-interface GraphStats {
-  total: number
-  mastered: number
-  learning: number
-  weak: number
-  recommended: number
-  to_improve: number
-  average_score: number
-  percentage: number
-}
-
-interface CategoryStat {
-  key: string
-  name: string
-  total: number
-  mastered: number
-  to_improve: number
-  average_score: number
-  percentage: number
-  items?: GraphNode[]
-}
-
-interface LegendItem {
-  status: string
-  label: string
-  color: string
-}
-
-interface GraphPayload {
-  domain: string
-  domain_name: string
-  nodes: GraphNode[]
-  links: GraphLink[]
-  stats: GraphStats
-  categories: CategoryStat[]
-  legend: LegendItem[]
-}
 
 const emptyStats: GraphStats = {
   total: 0,
@@ -222,7 +168,7 @@ export function useKnowledgeGraph() {
         trigger: 'item',
         borderWidth: 0,
         padding: 12,
-        formatter: (params: any) => {
+        formatter: (params: { data?: { raw?: GraphNode } }) => {
           const node = params.data?.raw as GraphNode | undefined
           if (!node) return ''
           const file = node.file ? `<br/>文件：${node.file}` : ''
@@ -261,8 +207,8 @@ export function useKnowledgeGraph() {
     }
   })
 
-  function handleChartClick(params: any) {
-    const node = params?.data?.raw as GraphNode | undefined
+  function handleChartClick(params: unknown) {
+    const node = (params as { data?: { raw?: GraphNode } })?.data?.raw
     if (node) {
       selectedNodeId.value = node.id
     }

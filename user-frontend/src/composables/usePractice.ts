@@ -7,6 +7,13 @@
 import { useApi } from './useApi'
 import { useAuth } from './useAuth'
 import { useLearningPath } from './useLearningPath'
+import type {
+  ComprehensiveScenario,
+  PracticeQuestion,
+  PracticeQuestionState,
+  PracticalFeedbackResponse,
+  TieredQuestionSet,
+} from '@/types/api'
 import { useSession } from './useSession'
 
 export function usePractice() {
@@ -45,8 +52,8 @@ export function usePractice() {
   // === 状态 ===
   const loading = ref(true)
   const loadError = ref('')
-  const questions = ref<any[]>([])
-  const comprehensiveScenario = ref<any>(null)
+  const questions = ref<PracticeQuestionState[]>([])
+  const comprehensiveScenario = ref<ComprehensiveScenario | null>(null)
   const selectedStage = ref(Number(route.query.stage) || 1)
   const currentIndex = ref(0)
   const answered = ref(false)
@@ -64,7 +71,7 @@ export function usePractice() {
   const practicalAnswer = ref('')
   const practicalGrading = ref(false)
   const practicalGraded = ref(false)
-  const practicalResult = ref<any>(null)
+  const practicalResult = ref<PracticalFeedbackResponse | null>(null)
 
   const resultSaving = ref(false)
   const resultSaved = ref(false)
@@ -96,10 +103,10 @@ export function usePractice() {
       ['装夹/坐标系', [s.clamping, s.work_coordinate].filter(Boolean).join(' / ')],
     ].filter(row => row[1]) as string[][]
     const requirements = Array.isArray(s.drawing_requirements)
-      ? s.drawing_requirements.map((item: any) => [item.item, item.requirement])
+      ? s.drawing_requirements.map((item) => [item.item, item.requirement])
       : []
     const results = Array.isArray(s.first_article_results)
-      ? s.first_article_results.map((item: any) => [item.item, item.requirement, item.measured])
+      ? s.first_article_results.map((item) => [item.item, item.requirement, item.measured ?? ''])
       : []
     return [
       '## 生产任务资料',
@@ -140,7 +147,7 @@ export function usePractice() {
 
   // === 辅助 ===
   const stripOptionPrefix = (o: string) => o.replace(/^[A-Da-d][.\s、]+/, '')
-  const resolveCorrectIndex = (q: any): number => {
+  const resolveCorrectIndex = (q: PracticeQuestion): number => {
     const answer = q.correct_answer || ''
     if (/^[A-D]$/.test(answer)) return answer.charCodeAt(0) - 65
     const stripped = answer.replace(/^[A-Da-d][.\s、]+/, '')
@@ -149,7 +156,7 @@ export function usePractice() {
 
   const resolveSelectedStage = () => {
     let stage = Number(route.query.stage) || selectedStage.value || 1
-    if (nodes.value.length > 0 && !nodes.value.some((n: any) => Number(n.stage) === stage)) {
+    if (nodes.value.length > 0 && !nodes.value.some((n) => Number(n.stage) === stage)) {
       stage = Number(nodes.value[0].stage) || 1
     }
     selectedStage.value = stage
@@ -174,7 +181,7 @@ export function usePractice() {
         testLevel.value = resolvedLevel
         const result = await api.getTieredQuestions(sessionId.value, resolvedLevel)
         if (!result?.questions?.length) {
-          loadError.value = (result as any)?.error || '综合练习暂不可用'
+          loadError.value = (result as { error?: string })?.error || '综合练习暂不可用'
           loading.value = false
           return
         }
@@ -184,7 +191,7 @@ export function usePractice() {
 
       comprehensiveScenario.value = null
       const stage = resolveSelectedStage()
-      const node = nodes.value.find((n: any) => Number(n.stage) === stage)
+      const node = nodes.value.find((n) => Number(n.stage) === stage)
       if (!node) {
         loadError.value = '暂未找到学习节点，请先完成 Agent 协同生成'
         loading.value = false
@@ -206,9 +213,9 @@ export function usePractice() {
     } finally { loading.value = false }
   }
 
-  const applyQuestions = (result: any) => {
+  const applyQuestions = (result: TieredQuestionSet) => {
     comprehensiveScenario.value = testLevel.value === 'comprehensive' ? (result.scenario || null) : null
-    questions.value = (result.questions || []).map((q: any) => ({
+    questions.value = (result.questions || []).map((q) => ({
       ...q,
       correctIndex: resolveCorrectIndex(q),
       selectedIndex: -1, answered: false, finalCorrect: null,
@@ -226,8 +233,8 @@ export function usePractice() {
       ).then(saved => {
         if (saved?.questions?.length) {
           let matched = 0
-          questions.value = questions.value.map((q: any) => {
-            const match = saved.questions.find((s: any) => s.question === q.question)
+          questions.value = questions.value.map((q) => {
+            const match = saved.questions.find((s) => s.question === q.question)
             if (match) matched += 1
             return match ? { ...q, selectedIndex: match.selectedIndex ?? -1, answered: match.answered ?? false, finalCorrect: match.finalCorrect ?? null, practicalAnswer: match.practicalAnswer || '', practicalGraded: match.practicalGraded ?? false, practicalResult: match.practicalResult || null } : q
           })
@@ -326,7 +333,7 @@ export function usePractice() {
       current_index: currentIndex.value,
       level: testLevel.value || null,
       stage: testLevel.value === 'comprehensive' ? null : selectedStage.value,
-      questions: questions.value.map((q: any) => ({ question: q.question, selectedIndex: q.selectedIndex, answered: q.answered, finalCorrect: q.finalCorrect, practicalAnswer: q.practicalAnswer, practicalGraded: q.practicalGraded, practicalResult: q.practicalResult })),
+      questions: questions.value.map((q) => ({ question: q.question, selectedIndex: q.selectedIndex, answered: q.answered, finalCorrect: q.finalCorrect, practicalAnswer: q.practicalAnswer, practicalGraded: q.practicalGraded, practicalResult: q.practicalResult })),
     }).catch(() => {})
   }
 
@@ -342,7 +349,7 @@ export function usePractice() {
         correct_count: correctCount.value,
         wrong_count: wrongCount.value,
         question_count: questions.value.length,
-        questions: questions.value.map((q: any) => ({
+        questions: questions.value.map((q) => ({
           topic: q.topic || '',
           question: q.question,
           question_type: q.question_type,
@@ -376,12 +383,12 @@ export function usePractice() {
   const goReport = () => router.push('/report')
 
   const hasNextStage = computed(() => {
-    const idx = nodes.value.findIndex((n: any) => Number(n.stage) === selectedStage.value)
+    const idx = nodes.value.findIndex((n) => Number(n.stage) === selectedStage.value)
     return idx >= 0 && idx < nodes.value.length - 1
   })
 
   const goNextStage = () => {
-    const idx = nodes.value.findIndex((n: any) => Number(n.stage) === selectedStage.value)
+    const idx = nodes.value.findIndex((n) => Number(n.stage) === selectedStage.value)
     if (idx >= 0 && idx < nodes.value.length - 1) {
       switchStage(Number(nodes.value[idx + 1].stage))
     }

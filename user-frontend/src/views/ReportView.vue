@@ -50,9 +50,9 @@
           <div v-if="latestResults.length" class="practice-list">
             <div v-for="item in latestResults" :key="item.created_at" class="practice-item">
               <div>
-                <div class="practice-item__title">{{ levelName(item.level) }}</div>
+                <div class="practice-item__title">{{ levelName(item.level ?? 'node') }}</div>
                 <div class="practice-item__meta">
-                  {{ item.stage ? `节点 ${item.stage}` : '最终综合' }} · {{ formatDate(item.created_at) }}
+                  {{ item.stage ? `节点 ${item.stage}` : '最终综合' }} · {{ formatDate(item.created_at ?? '') }}
                 </div>
               </div>
               <div class="practice-item__score" :class="{ ok: item.score >= 70, warn: item.score < 70 }">{{ item.score }}%</div>
@@ -183,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import type { PracticeResultRecord } from '@/types/api'
 import { useApi } from '@/composables/useApi'
 
 const router = useRouter()
@@ -194,14 +195,14 @@ const { sessionId, setProfile } = useSession()
 const { nodes, currentStage, allCompleted } = useLearningPath()
 
 const loading = ref(true)
-const practiceResults = ref<any[]>([])
+const practiceResults = ref<PracticeResultRecord[]>([])
 const machineStatus = ref<string>('none')
 const applyingMachine = ref(false)
 const reassessing = ref(false)
 
 const matchCurveData = ref({
   learnerLevel: 2.5,
-  resources: [] as any[],
+  resources: [] as { name: string; difficulty: number; match: number }[],
 })
 
 const metrics = ref({
@@ -230,7 +231,7 @@ const comprehensiveHint = computed(() => {
 const weakItems = computed(() => {
   const counter = new Map<string, number>()
   practiceResults.value.forEach(item => {
-    ;(item.questions || []).forEach((q: any) => {
+    ;(item.questions || []).forEach((q) => {
       if (q.is_correct === false && q.question) {
         counter.set(q.question, (counter.get(q.question) || 0) + 1)
       }
@@ -321,7 +322,7 @@ async function loadReportData() {
 
   try {
     const profile = await api.getMyProfile()
-    machineStatus.value = (profile as any).machine_approval_status || 'none'
+    machineStatus.value = profile.machine_approval_status || 'none'
   } catch {
     // 用户尚未建档时忽略
   }

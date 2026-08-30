@@ -117,8 +117,8 @@
 
         <!-- 选择题/判断题选项 -->
         <template v-if="currentQuestion.question_type !== 'practical'">
-          <div v-for="(opt, idx) in (currentQuestion.options as any[])" :key="idx" class="opt-big" :class="optionClass(idx)" @click="selectOption(idx)">
-            <div class="opt-big__key" :class="optionClass(idx)">{{ String.fromCharCode(65 + Number(idx)) }}</div>
+          <div v-for="(opt, idx) in currentQuestion.options" :key="idx" class="opt-big" :class="optionClass(idx)" @click="selectOption(idx)">
+            <div class="opt-big__key" :class="optionClass(idx)">{{ String.fromCharCode(65 + idx) }}</div>
             <div style="font-size: 14px">{{ stripOptionPrefix(opt) }}</div>
           </div>
         </template>

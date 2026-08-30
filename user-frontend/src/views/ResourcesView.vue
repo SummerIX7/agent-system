@@ -143,6 +143,8 @@
 </template>
 
 <script setup lang="ts">
+import type { LearningPathNode } from '@/types/api'
+import type { ResourceOutput } from '@/types/api'
 import { useApi } from '@/composables/useApi'
 import { useSession } from '@/composables/useSession'
 import { useLearningPath } from '@/composables/useLearningPath'
@@ -154,7 +156,7 @@ const { sessionId } = useSession()
 const { nodes, fetchLearningPath } = useLearningPath()
 
 const loading = ref(true)
-const resources = ref<any[]>([])
+const resources = ref<ResourceOutput[]>([])
 const activeTab = ref('lecture')
 const selectedStage = ref(Number(route.query.stage) || 1)
 
@@ -162,7 +164,7 @@ const lectureContent = ref('')
 const guideContent = ref('')
 const projectContent = ref('')
 
-const currentNode = ref<any>(null)
+const currentNode = ref<LearningPathNode | null>(null)
 
 interface SourceInfo {
   icon: string; type: string; name: string; author: string
@@ -236,11 +238,11 @@ const loadResources = async () => {
   try {
     await fetchLearningPath()
     let stage = Number(route.query.stage) || selectedStage.value || 1
-    if (nodes.value.length > 0 && !nodes.value.some((n: any) => Number(n.stage) === stage)) {
+    if (nodes.value.length > 0 && !nodes.value.some((n) => Number(n.stage) === stage)) {
       stage = Number(nodes.value[0].stage) || 1
     }
     selectedStage.value = stage
-    currentNode.value = (nodes.value || []).find((n: any) => Number(n.stage) === stage) || null
+    currentNode.value = (nodes.value || []).find((n) => Number(n.stage) === stage) || null
     if (!currentNode.value && nodes.value.length > 0) currentNode.value = nodes.value[0]
   } catch { /* 降级：无节点信息也可正常使用 */ }
 

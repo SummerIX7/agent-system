@@ -1,9 +1,4 @@
-export interface AgentStatus {
-  name: string
-  status: 'idle' | 'running' | 'completed' | 'error'
-  message: string
-  progress: number
-}
+import type { AgentStatus } from '@/types/api'
 
 export function useAgentWebSocket(sessionId: string) {
   const agents = ref<AgentStatus[]>([])
