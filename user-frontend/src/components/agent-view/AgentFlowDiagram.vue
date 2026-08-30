@@ -131,13 +131,14 @@ const { sessionId } = useSession()
 const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
 
 // Agent ID 映射（与后端 WebSocket 广播名称对应）
+// 值与后端 WebSocket 实际广播的 agent 名称一一对应（见 graph/nodes/_common.py 的 _broadcast 调用）
 const AGENT_MAP: Record<string, string> = {
-  dispatcher: 'decision_dispatcher',
-  analyzer: 'learning_analysis',
-  planner: 'path_planning',
-  generator: 'knowledge_generation',
-  reviewer: 'review_correction',
-  quiz: 'question_generation',
+  dispatcher: '决策调度 Agent',
+  analyzer: '学情分析 Agent',
+  planner: '路径规划 Agent',
+  generator: '知识生成 Agent',
+  reviewer: '审核纠偏 Agent',
+  quiz: '试题生成 Agent',
 }
 
 // ========== 状态计算函数 ==========
@@ -150,7 +151,7 @@ const getAgentStatus = (agentId: string): string => {
 
 const getAgentProgress = (agentId: string): number => {
   const realId = AGENT_MAP[agentId]
-  const agent = agents.value.find(a => a.id === realId)
+  const agent = agents.value.find(a => a.name === realId)
   return agent?.progress || 0
 }
 
@@ -197,7 +198,7 @@ const getAgentDotColor = (agentId: string): string => {
 const getAgentDescription = (agentId: string): string => {
   const status = getAgentStatus(agentId)
   const realId = AGENT_MAP[agentId]
-  const agent = agents.value.find(a => a.id === realId)
+  const agent = agents.value.find(a => a.name === realId)
 
   const defaultDesc: Record<string, string> = {
     dispatcher: '调度中枢 · 任务编排',

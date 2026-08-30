@@ -1,5 +1,4 @@
 export interface AgentStatus {
-  id?: string
   name: string
   status: 'idle' | 'running' | 'completed' | 'error'
   message: string
