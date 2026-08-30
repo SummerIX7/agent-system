@@ -16,7 +16,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    C 端学习平台 (Nuxt 3)               │
+│              C 端学习平台 (Vue 3 + Vite SPA)           │
 │  首页 │ 学情画像 │ Agent协同 │ 学习报告 │ 答题考核      │
 ├─────────────────────────────────────────────────────┤
 │                  B 端管理后台 (Vue 3 + Naive UI)        │
@@ -91,9 +91,9 @@ uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ### 3. C 端（学员端）部署
 
 ```bash
-cd frontend
+cd user-frontend
 pnpm install
-pnpm dev          # http://localhost:3000
+pnpm dev          # http://localhost:3000，/api 与 /ws 由 vite 代理到 8000
 ```
 
 ### 4. B 端（管理后台）部署
@@ -130,12 +130,13 @@ Agent/
 │   ├── pyproject.toml           # 依赖清单（uv 管理）
 │   ├── uv.lock                  # 依赖锁定
 │   └── .env.example
-├── frontend/                    # C 端 Nuxt 3 学习平台
-│   ├── pages/                   # 页面路由（含知识图谱、答题练习、学习报告等）
-│   ├── components/              # Vue 组件（Agent 可视化、雷达图、报告图表等）
-│   ├── composables/             # 组合式函数（API / 认证 / WebSocket / 学习路径）
-│   ├── utils/                   # 工具函数
-│   └── nuxt.config.ts
+├── user-frontend/               # C 端 Vue 3 + Vite SPA 学习平台
+│   ├── src/views/               # 页面路由（含知识图谱、答题练习、学习报告等）
+│   ├── src/components/          # Vue 组件（Agent 可视化、雷达图、报告图表等）
+│   ├── src/composables/         # 组合式函数（API / 认证 / WebSocket / 学习路径）
+│   ├── src/utils/               # 工具函数
+│   ├── Dockerfile               # 静态产物 → nginx（SPA history 回退）
+│   └── vite.config.ts
 ├── admin-frontend/              # B 端 Vue 3 管理后台
 │   ├── src/
 │   │   ├── views/               # 页面视图（含知识图谱进度）
