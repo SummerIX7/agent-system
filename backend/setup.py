@@ -3,7 +3,7 @@
 一键部署初始化脚本
 
 用法:
-    cd agent-system/backend
+    cd backend
     python setup.py
 
 说明:

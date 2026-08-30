@@ -69,7 +69,7 @@ cd Agent
 ### 2. 后端部署
 
 ```bash
-cd agent-system/backend
+cd backend
 
 # 安装依赖（自动创建 .venv，版本由 uv.lock 锁定）
 uv sync
@@ -91,7 +91,7 @@ uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ### 3. C 端（学员端）部署
 
 ```bash
-cd agent-system/frontend
+cd frontend
 pnpm install
 pnpm dev          # http://localhost:3000
 ```
@@ -99,7 +99,7 @@ pnpm dev          # http://localhost:3000
 ### 4. B 端（管理后台）部署
 
 ```bash
-cd agent-system/admin-frontend
+cd admin-frontend
 pnpm install
 pnpm dev          # http://localhost:5173
 ```
@@ -111,7 +111,7 @@ pnpm dev          # http://localhost:5173
 ## 项目结构
 
 ```
-agent-system/
+Agent/
 ├── backend/                     # 后端 FastAPI 服务
 │   ├── app/
 │   │   ├── agents/              # 6 个 AI Agent（学情诊断 / 路径规划 / 知识生成 / 审核纠偏 / 试题生成 / 决策调度）
@@ -170,7 +170,7 @@ agent-system/
 ## 测试
 
 ```bash
-cd agent-system/backend
+cd backend
 
 # 运行全部测试
 uv run pytest tests/ -v
