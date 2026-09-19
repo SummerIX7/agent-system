@@ -140,20 +140,20 @@
       <div class="metric-grid">
         <div class="metric-cell">
           <div class="metric-cell__label">知识谬误率</div>
-          <div class="metric-cell__value" :style="{ color: metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? 'var(--ok)' : 'var(--err)' }">
+          <div class="metric-cell__value" :style="{ color: hallucinationStatus.color }">
             {{ metrics.hallucination_rate !== null ? metrics.hallucination_rate : '--' }}<span>%</span>
           </div>
-          <div class="metric-cell__hint">目标 &lt; 5% · {{ metrics.hallucination_rate !== null && metrics.hallucination_rate < 5 ? '已达标' : '待优化' }}</div>
+          <div class="metric-cell__hint">目标 &lt; 5% · {{ hallucinationStatus.text }}</div>
         </div>
         <div class="metric-cell">
           <div class="metric-cell__label">难度匹配准确率</div>
           <div class="metric-cell__value accent">{{ metrics.difficulty_match_rate !== null ? metrics.difficulty_match_rate : '--' }}<span>%</span></div>
-          <div class="metric-cell__hint">目标 ≥ 85% · {{ metrics.difficulty_match_rate !== null && metrics.difficulty_match_rate >= 85 ? '已达标' : '待优化' }}</div>
+          <div class="metric-cell__hint">目标 ≥ 85% · {{ difficultyStatus.text }}</div>
         </div>
         <div class="metric-cell">
           <div class="metric-cell__label">知识点覆盖率</div>
           <div class="metric-cell__value accent">{{ metrics.knowledge_coverage_rate !== null ? metrics.knowledge_coverage_rate : '--' }}<span>%</span></div>
-          <div class="metric-cell__hint">目标 ≥ 90% · {{ metrics.knowledge_coverage_rate !== null && metrics.knowledge_coverage_rate >= 90 ? '已达标' : '待优化' }}</div>
+          <div class="metric-cell__hint">目标 ≥ 90% · {{ coverageStatus.text }}</div>
         </div>
       </div>
 
@@ -210,6 +210,26 @@ const metrics = ref({
   difficulty_match_rate: null as number | null,
   knowledge_coverage_rate: null as number | null,
 })
+
+/**
+ * 指标达标判定。
+ * 注意 "无数据"（null）必须与 "未达标" 区分开：后端在无内容/无知识点时返回 null，
+ * 早期实现把 null 一并落进 else 分支，导致页面显示红色 "待优化"，把"暂无数据"误报成"质量差"。
+ */
+function metricStatus(value: number | null, target: number, higherIsBetter = true) {
+  if (value === null || value === undefined) {
+    return { text: '暂无数据', color: 'var(--text-3)' }
+  }
+  const passed = higherIsBetter ? value >= target : value < target
+  return {
+    text: passed ? '已达标' : '待优化',
+    color: passed ? 'var(--ok)' : 'var(--err)',
+  }
+}
+
+const hallucinationStatus = computed(() => metricStatus(metrics.value.hallucination_rate, 5, false))
+const difficultyStatus = computed(() => metricStatus(metrics.value.difficulty_match_rate, 85))
+const coverageStatus = computed(() => metricStatus(metrics.value.knowledge_coverage_rate, 90))
 
 const completedCount = computed(() =>
   nodes.value.filter(n => n.completed || n.advanced_test_passed).length

@@ -78,7 +78,12 @@ const totalRecords = ref(0)
 const PAGE_SIZE = 20
 
 const fetchHistory = async (page: number = 1) => {
-  if (!learnerId.value) return
+  // 必须先收掉 loading 再考虑早退：learnerId 为空（未登录 / 只建了画像但没跑过
+  // Agent 协同）时直接 return，会让 loading 永远停在初始 true，页面永久显示"加载中"。
+  if (!learnerId.value) {
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     const data = await api.getHistory(learnerId.value, page, PAGE_SIZE)

@@ -25,11 +25,22 @@ async function loadPendingList() {
     const result = await approvalApi.getPending(pendingPage.value, 20)
     pendingList.value = result.items
     pendingTotal.value = result.total
+    // 审批/拒绝后当前页可能已空（例如第 2 页只剩 1 条且被处理掉），回退一页避免看到空列表
+    const maxPage = Math.max(1, Math.ceil(result.total / 20))
+    if (pendingPage.value > maxPage) {
+      pendingPage.value = maxPage
+      await loadPendingList()
+    }
   } catch (err: any) {
     message.error(err.message || '加载失败')
   } finally {
     loading.value = false
   }
+}
+
+function handlePageChange(page: number) {
+  pendingPage.value = page
+  loadPendingList()
 }
 
 async function selectLearner(id: number) {
@@ -124,6 +135,17 @@ onMounted(() => loadPendingList())
               </div>
             </div>
           </NSpin>
+
+          <!-- 待审批超过一页时必须给出翻页入口，否则第 21 条之后的学员无法处理 -->
+          <div v-if="pendingTotal > 20" style="display: flex; justify-content: center; margin-top: 16px">
+            <NPagination
+              :page="pendingPage"
+              :page-size="20"
+              :item-count="pendingTotal"
+              size="small"
+              @update:page="handlePageChange"
+            />
+          </div>
         </NCard>
       </NGi>
 

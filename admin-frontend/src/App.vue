@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NConfigProvider, zhCN, dateZhCN, NMessageProvider } from 'naive-ui'
+import { NConfigProvider, zhCN, dateZhCN, NMessageProvider, NDialogProvider } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
 
 const themeOverrides: GlobalThemeOverrides = {
@@ -56,7 +56,11 @@ const themeOverrides: GlobalThemeOverrides = {
 <template>
   <NConfigProvider :locale="zhCN" :date-locale="dateZhCN" :theme-overrides="themeOverrides">
     <NMessageProvider>
-      <RouterView />
+      <!-- NDialogProvider 必须存在：SettingsView 使用 useDialog() 做删除确认，
+           naive-ui 在缺少 Provider 时会直接 throwError，导致删除按钮点了没反应。 -->
+      <NDialogProvider>
+        <RouterView />
+      </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>
 </template>

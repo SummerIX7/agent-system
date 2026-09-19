@@ -4,6 +4,11 @@ export function useAgentWebSocket(sessionId: string) {
   const agents = ref<AgentStatus[]>([])
   const isConnected = ref(false)
   let ws: WebSocket | null = null
+  // 主动关闭 / 组件已卸载时置位，用于阻止 onclose 里的自动重连。
+  // 缺少这个标志会导致：unmounted → disconnect() → ws.close() → onclose 触发
+  // → 3 秒后重新建连，组件虽已销毁但连接永久存在（每次进出页面泄漏一条长连接）。
+  let closedByUser = false
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   const connect = () => {
     // Bug#10 修复：空 sessionId 不建立连接，避免路由歧义和无效 WebSocket 连接
@@ -11,6 +16,7 @@ export function useAgentWebSocket(sessionId: string) {
       console.warn('[WebSocket] 未提供 sessionId，跳过连接')
       return
     }
+    if (closedByUser) return
     try {
       // 相对地址：dev 由 vite /ws 代理（ws:true）转发，生产由 nginx 网关同源转发
       const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
@@ -53,9 +59,10 @@ export function useAgentWebSocket(sessionId: string) {
 
       ws.onclose = () => {
         isConnected.value = false
-        // 自动重连
-        setTimeout(() => {
-          if (!isConnected.value) {
+        if (closedByUser) return
+        // 自动重连（仅在非主动关闭时）
+        reconnectTimer = setTimeout(() => {
+          if (!closedByUser && !isConnected.value) {
             connect()
           }
         }, 3000)
@@ -67,10 +74,18 @@ export function useAgentWebSocket(sessionId: string) {
   }
 
   const disconnect = () => {
+    // 先置位再 close，确保 onclose 不会再次排定重连
+    closedByUser = true
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
     if (ws) {
+      ws.onclose = null
       ws.close()
       ws = null
     }
+    isConnected.value = false
   }
 
   // 组件挂载时连接

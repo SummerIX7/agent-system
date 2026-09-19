@@ -41,7 +41,10 @@ async def build_report_cache(
             result = await compute_hallucination_rate(combined, topic)
             hallucination_rate = result.get("hallucination_rate_percent", None)
             if hallucination_rate is not None:
-                hallucination_rate = min(max(hallucination_rate, 0), 10.0)
+                # 仅做下界保护（百分比不应为负）；上界**不封顶**。
+                # 早期版本此处为 min(..., 10.0)，会把谬误率钉死在 10% 以内，
+                # 使 "< 5%" 的目标失去意义 —— 指标必须能反映真实的差结果。
+                hallucination_rate = max(hallucination_rate, 0.0)
         except Exception as e:
             logger.warning(f"谬误率计算失败: {e}")
     cache["hallucination_rate"] = hallucination_rate

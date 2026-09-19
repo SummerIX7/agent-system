@@ -5,7 +5,12 @@
 - _MATCHERS：按 prompt 子串匹配的 (substring, response_fn) 元组列表（14 个未标记调用）
 """
 
+import inspect
 import json
+import os
+import re
+
+from app.core.career_tracks import CAREER_TRACKS
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -17,28 +22,90 @@ def _j(obj) -> str:
     return json.dumps(obj, ensure_ascii=False)
 
 
+# 由 prompt 文案反查职业方向代码（prompt 里只出现中文 track.name）
+_TRACK_NAME_TO_CODE = {cfg.name: code for code, cfg in CAREER_TRACKS.items()}
+
+
+def _prompt_field(prompt: str, label: str, default: str = "") -> str:
+    """从形如 '- 工作经验: 5 年' 的 prompt 行中抽取字段值。"""
+    m = re.search(rf"-\s*{re.escape(label)}\s*[:：]\s*([^\n]+)", prompt)
+    return m.group(1).strip() if m else default
+
+
+def _detect_track_code(prompt: str) -> str:
+    """从诊断 prompt 中识别职业方向；识别不到时回退 operator。"""
+    m = re.search(r"职业方向\s*[:：]\s*([^\s（(]+)", prompt)
+    if m:
+        code = _TRACK_NAME_TO_CODE.get(m.group(1).strip())
+        if code:
+            return code
+    return "operator"
+
+
+def _detect_level(prompt: str) -> str:
+    """按工作经验 + 技能自评推断难度等级，使 mock 画像随输入分化。"""
+    years = 0
+    m = re.search(r"(\d+)", _prompt_field(prompt, "工作经验", "0"))
+    if m:
+        years = int(m.group(1))
+    proficient = len(re.findall(r"[:：]\s*(熟练|精通)", prompt))
+
+    if years >= 5 or proficient >= 3:
+        return "advanced"
+    if years >= 2 or proficient >= 1:
+        return "intermediate"
+    return "beginner"
+
+
+_LEVEL_META = {
+    "beginner":     {"band": (12, 38), "confidence": 0.55,
+                     "style": "零基础起步：建议先用实物与图示建立坐标系和刀具运动概念，再进入 G 代码识读。"},
+    "intermediate": {"band": (45, 68), "confidence": 0.72,
+                     "style": "已有一定基础：建议以对刀、刀补与参数调整为主线，用首件检验串联各知识点。"},
+    "advanced":     {"band": (72, 90), "confidence": 0.85,
+                     "style": "经验较丰富：建议直接从工艺设计与程序优化切入，重点补多轴与宏程序。"},
+}
+
+
 # ══════════════════════════════════════════════════════════════════
 # ① 学情诊断 Agent — build_profile()
 # ══════════════════════════════════════════════════════════════════
 
-def _mock_build_profile() -> str:
+def _mock_build_profile(prompt: str = "") -> str:
+    """构建学习者画像。
+
+    随 prompt 中的职业方向 / 工作经验 / 技能自评分化 —— 否则 mock 模式下任何输入
+    都得到同一份画像（含 career_track="operator"），学习路径恒定不变，"个性化"无法演示。
+    """
+    track = CAREER_TRACKS.get(_detect_track_code(prompt)) or CAREER_TRACKS["operator"]
+    level = _detect_level(prompt)
+    meta = _LEVEL_META[level]
+    lo, hi = meta["band"]
+
+    # 雷达图维度必须与所选职业方向的技能自评项严格一致（真实 prompt 有同名硬约束）
+    skills = list(track.self_assessment_skills)
+    span = max(1, len(skills) - 1)
+    knowledge_points = [
+        {
+            "name": name,
+            "level": level,
+            "score": round(hi - (hi - lo) * idx / span),
+            "confidence": meta["confidence"],
+        }
+        for idx, name in enumerate(skills)
+    ]
+
+    # 盲区取分最低的三项，保证与画像自洽
+    weakest = sorted(knowledge_points, key=lambda k: k["score"])[:3]
+
     return _j({
-        "knowledge_points": [
-            {"name": "G 代码基础指令", "level": "beginner", "score": 20, "confidence": 0.6},
-            {"name": "数控车床编程", "level": "beginner", "score": 15, "confidence": 0.5},
-            {"name": "数控铣床编程", "level": "beginner", "score": 10, "confidence": 0.4},
-            {"name": "刀具选择与管理", "level": "beginner", "score": 25, "confidence": 0.6},
-            {"name": "切削参数选择", "level": "beginner", "score": 30, "confidence": 0.7},
-            {"name": "公差与配合", "level": "intermediate", "score": 50, "confidence": 0.8},
-            {"name": "机械制图基础", "level": "intermediate", "score": 65, "confidence": 0.85},
-            {"name": "CAM 软件应用", "level": "beginner", "score": 5, "confidence": 0.3},
-        ],
-        "blind_spots": ["G 代码编程", "CAM 软件应用", "数控铣床编程", "切削参数优化"],
-        "overall_level": "beginner",
-        "learning_style_analysis": "该学习者有机械制图基础，但 CNC 编程经验为零。建议从 G 代码基础入手，结合机械制图优势快速建立坐标系概念，通过大量实操练习巩固编程技能。",
-        "recommended_difficulty": "beginner",
-        "career_track": "operator",
-    "career_track_name": "操机工",
+        "knowledge_points": knowledge_points,
+        "blind_spots": [k["name"] for k in weakest],
+        "overall_level": level,
+        "learning_style_analysis": meta["style"],
+        "recommended_difficulty": level,
+        "career_track": track.code,
+        "career_track_name": track.name,
     })
 
 
@@ -392,6 +459,20 @@ def _mock_minor_issues() -> str:
     ])
 
 
+def _mock_critical_issues() -> str:
+    """学术审查：发现 critical 级问题。
+
+    严重度加权评分中 critical 每条 -0.15，3 条即 0.55 < 0.70 通过线，
+    因此该响应会让 corrective_review 真正走进"生成修正 → 验证"分支
+    （而 suggestion/minor 合计只 -0.07，仍会判通过）。
+    """
+    return _j([
+        {"issue": "G02 被描述为逆时针圆弧插补，与标准定义相反（应为顺时针）", "severity": "critical"},
+        {"issue": "G00 快速定位段落称其可用于切削进给，属概念性错误", "severity": "critical"},
+        {"issue": "切削速度给出的数值范围与附录参数表互相矛盾", "severity": "critical"},
+    ])
+
+
 # ══════════════════════════════════════════════════════════════════
 # 审核纠偏 Agent — 修正生成 [label: "修正生成"]
 # ══════════════════════════════════════════════════════════════════
@@ -667,18 +748,70 @@ def _mock_grade_practical() -> str:
 
 
 # ══════════════════════════════════════════════════════════════════
+# 严苛审核模式（可选，仅影响 MOCK_MODE）
+#
+# 默认情况下 mock 的"学术审查/工业审查"恒返回空数组、"修正验证"恒返回 resolved，
+# 于是 review_correct 节点永远一次通过 ——「审核不通过 → 打回重生成 → 纠偏」
+# 这条核心回环在 mock 下永远走不到，演示时无法展示。
+#
+# 设置 MOCK_STRICT_REVIEW=true 后：
+#   - 审查视角正常报出问题（否则不会进入修正流程）
+#   - 首次"修正验证"返回 unresolved，强制打回重生成一轮
+#   - 第二次起返回 resolved，最终正常通过
+# 既能演示重试回环，又不会把流程推到"降级完成"的失败态。
+# ══════════════════════════════════════════════════════════════════
+
+def strict_review_enabled() -> bool:
+    return os.getenv("MOCK_STRICT_REVIEW", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+_CALL_COUNTS: dict[str, int] = {}
+
+
+def _bump(key: str) -> int:
+    """记录某类 mock 响应的调用次数（进程内计数，供重试语义使用）。"""
+    _CALL_COUNTS[key] = _CALL_COUNTS.get(key, 0) + 1
+    return _CALL_COUNTS[key]
+
+
+def reset_mock_call_counts() -> None:
+    """清空调用计数（测试用：让每个用例都从"首次调用"开始）。"""
+    _CALL_COUNTS.clear()
+
+
+def _review_issues(prompt: str = "") -> str:
+    """审查视角：严苛模式下报出 critical 级问题，否则无问题通过。"""
+    if strict_review_enabled():
+        return _mock_critical_issues()
+    return _mock_empty_issues()
+
+
+def _review_verification(prompt: str = "") -> str:
+    """修正验证：严苛模式下首次判 unresolved 以触发重试，之后判 resolved。"""
+    if strict_review_enabled() and _bump("修正验证") == 1:
+        return _j({
+            "verdict": "unresolved",
+            "reason": "修正仅覆盖了部分问题，关键参数说明仍不完整（严苛审核模式 MOCK_STRICT_REVIEW 模拟）",
+        })
+    return _mock_verification_passed()
+
+
+# ══════════════════════════════════════════════════════════════════
 # 按 label 键索引的响应字典
 # ══════════════════════════════════════════════════════════════════
 
-MOCK_RESPONSES_BY_LABEL: dict[str, str] = {
+MOCK_RESPONSES_BY_LABEL: dict = {
     "生成讲义": _mock_lecture_notes(),
     "生成实验指导": _mock_practical_guide(),
     "生成项目案例": _mock_project_case(),
     "内容审核": _mock_content_review(),
-    "学术审查": _mock_empty_issues(),
-    "工业审查": _mock_empty_issues(),
+    # 可调用项：以原始 prompt 求值，从而受 MOCK_STRICT_REVIEW 影响
+    "学术审查": _review_issues,
+    "工业审查": _review_issues,
     "修正生成": _mock_corrected_content(),
-    "修正验证": _mock_verification_passed(),
+    "修正验证": _review_verification,
+    # 可调用项：以原始 prompt 求值，使画像随职业方向 / 经验 / 自评分化
+    "构建画像": _mock_build_profile,
 }
 
 
@@ -721,9 +854,18 @@ _MATCHERS: list[tuple[str, callable]] = [
 
 
 def match_response_by_prompt(prompt: str) -> str:
-    """按 prompt 内容匹配 mock 响应。遍历 _MATCHERS，返回第一个匹配的结果。"""
+    """按 prompt 内容匹配 mock 响应。遍历 _MATCHERS，返回第一个匹配的结果。
+
+    响应函数可声明一个可选参数以接收原始 prompt（用于生成随输入变化的响应）；
+    未声明参数的零参函数照旧无参调用 —— 用签名判断而非 try/except TypeError，
+    否则函数内部的 TypeError 会被误判成"零参函数"而掩盖真实错误。
+    """
     for substring, fn in _MATCHERS:
         if substring in prompt:
-            return fn()
+            try:
+                takes_prompt = bool(inspect.signature(fn).parameters)
+            except (TypeError, ValueError):  # 内建函数等无法取签名 -> 按零参处理
+                takes_prompt = False
+            return fn(prompt) if takes_prompt else fn()
     # 兜底：返回通过的空 JSON
     return '{"passed": true, "score": 0.9, "message": "mock fallback"}'

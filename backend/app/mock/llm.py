@@ -41,13 +41,15 @@ class MockLLM:
 
     def _resolve(self, prompt: str, label: str) -> str:
         """按优先级解析响应：
-        1. label 匹配（9 个标记调用）
-        2. prompt 子串匹配（14 个未标记调用）
+        1. label 匹配（静态响应直接用，可调用项以 prompt 求值）
+        2. prompt 子串匹配（未标记调用）
         3. 兜底 JSON
         """
         # Priority 1: label-keyed dispatch
         if label and label in MOCK_RESPONSES_BY_LABEL:
-            return MOCK_RESPONSES_BY_LABEL[label]
+            entry = MOCK_RESPONSES_BY_LABEL[label]
+            # 需要读取输入的响应（如随画像分化的 build_profile）注册为 callable
+            return entry(prompt) if callable(entry) else entry
 
         # Priority 2: prompt pattern matching
         return match_response_by_prompt(prompt)

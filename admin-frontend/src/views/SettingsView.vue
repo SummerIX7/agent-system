@@ -9,6 +9,8 @@ import {
 import type { TreeOption, DataTableColumns } from 'naive-ui'
 
 const message = useMessage()
+// 在 setup 顶层调用：naive-ui 的 inject 语义要求在此处取用，且需外层存在 <NDialogProvider>
+const dialog = useDialog()
 
 const loading = ref(false)
 const files = ref<KbFileItem[]>([])
@@ -154,8 +156,7 @@ async function handleCreateFile() {
 
 // 删除文件
 function handleDelete(file: KbFileItem) {
-  const dlg = useDialog()
-  dlg.warning({
+  dialog.warning({
     title: '确认删除',
     content: `确定要删除 "${file.title}" 吗？此操作不可撤销。`,
     positiveText: '删除',

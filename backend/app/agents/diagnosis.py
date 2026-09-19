@@ -193,7 +193,7 @@ knowledge_points 数组的 name 字段必须且只能从以下列表中取值，
 
 只输出 JSON，不要其他文字。"""
 
-        response = await self.call_llm(prompt)
+        response = await self.call_llm(prompt, label="构建画像")
         try:
             profile = json.loads(response.strip().strip("```json").strip("```"))
             # 确保必要字段被设置
