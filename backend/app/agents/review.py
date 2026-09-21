@@ -1,5 +1,6 @@
 import json
 import re as _re
+from typing import Callable
 
 from app.agents.base import BaseAgent
 from app.agents.tools import REVIEW_TOOLS
@@ -167,7 +168,194 @@ class ReviewAgent(BaseAgent):
             "reason": result.get("reason", ""),
         }
 
-    async def corrective_review(self, content: str, topic: str) -> dict:
+    # ── 对抗辩论：辩护者 Defender / 质疑者 Critic / 裁决者 Judge ──
+
+    async def _defend(self, content: str, context: str, issues: list, round_idx: int) -> list:
+        """辩护者：逐条回应质疑——反驳（rebut，需引用参考资料举证）或承认（concede）。"""
+        issues_text = "\n".join([
+            f"{idx}. [{item['severity']}] {item['issue']}"
+            for idx, item in enumerate(issues, 1)
+        ])
+        prompt = f"""你是一位内容辩护者，熟悉数控加工领域。审核方对以下内容提出了质疑，请逐条回应：
+- 若质疑不成立，给出反驳并**引用参考资料举证**（stance="rebut"）
+- 若质疑确实成立，坦然承认（stance="concede"），不要强行辩护
+
+[参考资料]
+{context if context else "（无可用参考资料）"}
+
+[被审核内容]
+{content[:3000]}
+
+[质疑清单（第{round_idx + 1}轮）]
+{issues_text}
+
+输出 JSON 数组（与质疑清单一一对应）：
+[
+  {{{{"issue": "原质疑", "stance": "rebut", "argument": "反驳理由（附参考资料依据）"}}}},
+  {{{{"issue": "原质疑", "stance": "concede", "argument": "承认说明"}}}}
+]
+
+只输出 JSON，不要其他文字。"""
+
+        response = await self.call_llm(prompt, label="辩护反驳")
+        parsed = self._robust_json_parse(response, [])
+        if not isinstance(parsed, list) or not parsed:
+            # 解析失败：保守视为全部承认（不抹杀任何质疑）
+            return [{"issue": i["issue"], "stance": "concede", "argument": "辩护响应解析失败"} for i in issues]
+        return [
+            {
+                "issue": str(d.get("issue", ""))[:300],
+                "stance": d.get("stance") if d.get("stance") in ("rebut", "concede") else "concede",
+                "argument": str(d.get("argument", ""))[:500],
+            }
+            for d in parsed if isinstance(d, dict)
+        ]
+
+    async def _critic_respond(self, context: str, defenses: list, round_idx: int) -> list:
+        """质疑者回应：对辩护逐条裁定维持（maintain）或撤回（withdraw）。"""
+        pairs_text = "\n".join([
+            f"{idx}. 质疑：{d['issue']}\n   辩护[{d['stance']}]: {d['argument']}"
+            for idx, d in enumerate(defenses, 1)
+        ])
+        prompt = f"""你是一位严格的质疑者。针对你提出的质疑，辩护方给出了回应。请**对照参考资料**逐条裁定：
+- 辩护未能有效驳倒质疑 → 维持（verdict="maintain"）
+- 辩护已用充分证据证明质疑不成立 → 撤回（verdict="withdraw"）
+
+[参考资料]
+{context if context else "（无可用参考资料）"}
+
+[质疑与辩护（第{round_idx + 1}轮）]
+{pairs_text}
+
+输出 JSON 数组：
+[
+  {{{{"issue": "原质疑", "verdict": "maintain", "reason": "维持理由"}}}},
+  {{{{"issue": "原质疑", "verdict": "withdraw", "reason": "撤回理由"}}}}
+]
+
+只输出 JSON，不要其他文字。"""
+
+        response = await self.call_llm(prompt, label="质疑回应")
+        parsed = self._robust_json_parse(response, [])
+        if not isinstance(parsed, list) or not parsed:
+            # 解析失败：保守全部维持
+            return [{"issue": d["issue"], "verdict": "maintain", "reason": "质疑回应解析失败"} for d in defenses]
+        return [
+            {
+                "issue": str(v.get("issue", ""))[:300],
+                "verdict": v.get("verdict") if v.get("verdict") in ("maintain", "withdraw") else "maintain",
+                "reason": str(v.get("reason", ""))[:300],
+            }
+            for v in parsed if isinstance(v, dict)
+        ]
+
+    async def _judge(self, content: str, context: str, issues: list, transcript: list) -> list | None:
+        """裁决者：读取完整辩论记录，对每条质疑给出最终严重度（invalid 表示质疑不成立）。
+
+        解析失败返回 None，调用方保守回落为"原质疑全部成立"。
+        """
+        lines = []
+        for entry in transcript:
+            if entry.get("type") == "round":
+                for d in entry.get("defenses", []):
+                    lines.append(f"质疑：{d['issue']}")
+                    lines.append(f"  辩护[{d['stance']}]: {d['argument']}")
+                for v in entry.get("critic_verdicts", []):
+                    lines.append(f"  质疑者[{v['verdict']}]: {v['reason']}")
+        transcript_text = "\n".join(lines)[:4000]
+
+        prompt = f"""你是独立裁决者。以下是内容审核中质疑方与辩护方的完整辩论记录，请**对照参考资料**对每条质疑做出最终裁决。
+
+[参考资料]
+{context[:2000] if context else "（无参考资料）"}
+
+[辩论记录]
+{transcript_text}
+
+对每条原始质疑输出最终严重度：
+- "critical" / "minor" / "suggestion"：质疑成立，按严重度定级
+- "invalid"：质疑不成立（辩护方已用证据驳倒）
+
+输出 JSON 数组：
+[
+  {{{{"issue": "原质疑", "final_severity": "critical", "reason": "裁决理由"}}}},
+  {{{{"issue": "原质疑", "final_severity": "invalid", "reason": "裁决理由"}}}}
+]
+
+只输出 JSON，不要其他文字。"""
+
+        response = await self.call_llm(prompt, label="辩论裁决")
+        parsed = self._robust_json_parse(response, [])
+        if not isinstance(parsed, list) or not parsed:
+            return None
+
+        valid_severities = ("critical", "minor", "suggestion", "invalid")
+        rulings = []
+        for r in parsed:
+            if not isinstance(r, dict):
+                continue
+            sev = r.get("final_severity")
+            rulings.append({
+                "issue": str(r.get("issue", ""))[:300],
+                "final_severity": sev if sev in valid_severities else "minor",
+                "reason": str(r.get("reason", ""))[:300],
+            })
+        return rulings or None
+
+    async def _debate(self, content: str, context: str, issues: list,
+                      on_event: Callable[[str], None] | None = None) -> tuple[list, list]:
+        """对抗辩论：辩护 ↔ 质疑多轮交锋 → 裁决者终审。
+
+        返回 (final_issues, transcript)：
+        - final_issues 与初审格式一致（[{"issue", "severity"}]），已剔除被裁决为不成立的质疑；
+        - 任何环节解析失败都保守处理（质疑视为成立），宁多修不漏修。
+        """
+        from app.core.config import get_settings
+        max_rounds = max(1, getattr(get_settings(), "DEBATE_MAX_ROUNDS", 2))
+
+        transcript: list[dict] = []
+        current_issues = issues
+
+        for round_idx in range(max_rounds):
+            if on_event:
+                on_event(f"辩论第{round_idx + 1}轮：辩护者回应 {len(current_issues)} 项质疑...")
+            defenses = await self._defend(content, context, current_issues, round_idx)
+
+            entry: dict = {"type": "round", "round": round_idx + 1, "defenses": defenses, "critic_verdicts": []}
+
+            if round_idx < max_rounds - 1:
+                if on_event:
+                    on_event("辩论：质疑者回应辩护...")
+                verdicts = await self._critic_respond(context, defenses, round_idx)
+                entry["critic_verdicts"] = verdicts
+                maintained = [v["issue"] for v in verdicts if v["verdict"] == "maintain"]
+                transcript.append(entry)
+                if not maintained:
+                    break  # 质疑全部撤回，提前终局
+                sev_map = {i["issue"][:300]: i.get("severity", "minor") for i in issues}
+                current_issues = [
+                    {"issue": m, "severity": sev_map.get(m[:300], "minor")} for m in maintained
+                ]
+            else:
+                transcript.append(entry)
+
+        if on_event:
+            on_event("辩论结束，裁决者终审...")
+        rulings = await self._judge(content, context, issues, transcript)
+        if rulings is None:
+            # 裁决解析失败：保守视为原质疑全部成立
+            transcript.append({"type": "judge", "fallback": True, "reason": "裁决响应解析失败"})
+            return issues, transcript
+
+        transcript.append({"type": "judge", "rulings": rulings})
+        final_issues = [
+            {"issue": r["issue"], "severity": r["final_severity"]}
+            for r in rulings if r["final_severity"] != "invalid"
+        ]
+        return final_issues, transcript
+
+    async def corrective_review(self, content: str, topic: str,
+                                on_event: Callable[[str], None] | None = None) -> dict:
         """
         合并审查+修正：双视角审查 → 评分 → 必要时修正 → 返回最终结果
 
@@ -234,8 +422,25 @@ severity 取值同上。
         issues_b = self._parse_issues(response_b)
         all_issues = self._merge_issues(issues_a, issues_b)
 
+        # ── 1½. 对抗辩论（issues 非空时：辩护 ↔ 质疑多轮 → 裁决终审）──
+        from app.core.config import get_settings
+        settings = get_settings()
+        debate_transcript: list = []
+        debate_enabled = getattr(settings, "DEBATE_ENABLED", True) \
+            and getattr(settings, "DEBATE_MAX_ROUNDS", 0) > 0
+        if all_issues and debate_enabled:
+            if on_event:
+                on_event(f"质疑者提出 {len(all_issues)} 项质疑，进入对抗辩论...")
+            all_issues, debate_transcript = await self._debate(content, context, all_issues, on_event)
+            if on_event:
+                overruled = len([e for e in debate_transcript if e.get("type") == "judge"
+                                 for r in e.get("rulings", []) if r.get("final_severity") == "invalid"])
+                on_event(f"裁决完成：{len(all_issues)} 项质疑成立" + (f"，{overruled} 项被驳回" if overruled else ""))
+
         # ── 2. severity-weighted 评分 ──
         score = self._severity_weighted_score(all_issues)
+
+        debate_rounds = len([e for e in debate_transcript if e.get("type") == "round"])
 
         # ── 3. 如果通过，直接返回原始内容 ──
         if score >= 0.70:
@@ -246,6 +451,8 @@ severity 取值同上。
                 "suggestions": [f"({i['severity']}): {i['issue']}" for i in all_issues],
                 "final_content": content,
                 "correction_applied": False,
+                "debate_rounds": debate_rounds,
+                "debate_transcript": debate_transcript,
             }
 
         # ── 4. 不通过 → 生成修正内容 ──
@@ -270,5 +477,7 @@ severity 取值同上。
             "final_content": corrected if fix_result["passed"] else content,
             "correction_applied": True,
             "original_score": score,
+            "debate_rounds": debate_rounds,
+            "debate_transcript": debate_transcript,
         }
 

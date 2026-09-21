@@ -122,11 +122,12 @@ class TestReviewAgent:
     def agent(self, monkeypatch):
         """创建 ReviewAgent 实例，mock LLM 与知识库检索
 
-        强制关闭 tool-calling，使 corrective_review 走纯 prompt 路径，
-        与本地 .env 中 USE_AGENT_TOOLS 的取值无关。
+        强制关闭 tool-calling 与对抗辩论，使 corrective_review 走纯 prompt
+        单轮审查路径（与引入辩论前的行为一致），与本地 .env 配置无关。
         """
         from app.core.config import get_settings
         monkeypatch.setattr(get_settings(), "USE_AGENT_TOOLS", False, raising=False)
+        monkeypatch.setattr(get_settings(), "DEBATE_MAX_ROUNDS", 0, raising=False)
         agent = ReviewAgent()
         agent.llm = MagicMock()
         agent.retrieve_context = MagicMock(return_value="参考资料：G00 是快速定位，G01 是直线插补。")
@@ -228,6 +229,108 @@ class TestReviewAgent:
         )
         assert len(merged) == 1
         assert merged[0]["severity"] == "critical"
+
+
+class TestReviewAgentDebate:
+    """对抗辩论测试（Critic 初审 → Defender/Critic 交锋 → Judge 裁决）"""
+
+    @pytest.fixture
+    def agent(self, monkeypatch):
+        """开启辩论的 ReviewAgent：DEBATE_MAX_ROUNDS=2，关闭 tool-calling"""
+        from app.core.config import get_settings
+        monkeypatch.setattr(get_settings(), "USE_AGENT_TOOLS", False, raising=False)
+        monkeypatch.setattr(get_settings(), "DEBATE_ENABLED", True, raising=False)
+        monkeypatch.setattr(get_settings(), "DEBATE_MAX_ROUNDS", 2, raising=False)
+        agent = ReviewAgent()
+        agent.llm = MagicMock()
+        agent.retrieve_context = MagicMock(return_value="参考资料：G02 是顺时针圆弧插补。")
+        return agent
+
+    @staticmethod
+    def _issues(*severities):
+        return [{"issue": f"问题-{sev}-{i}", "severity": sev}
+                for i, sev in enumerate(severities)]
+
+    @pytest.mark.asyncio
+    async def test_debate_triggers_only_when_issues_exist(self, agent):
+        """初审无问题 → 不触发辩论，仅 2 次 LLM 调用（双视角）"""
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content="[]"),
+            MagicMock(content="[]"),
+        ])
+
+        result = await agent.corrective_review("G00 是快速定位指令。", "G 代码基础")
+
+        assert result["passed"] is True
+        assert result["debate_rounds"] == 0
+        assert agent.llm.ainvoke.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_debate_full_flow_judge_overrules(self, agent):
+        """完整辩论：辩护 → 质疑者回应 → 裁决驳回全部质疑 → 评分 1.0 直接通过"""
+        # 1 critical 初审（评分 0.85 本可通过，但辩论先行；裁决 invalid 后 issues 清空）
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(self._issues("critical"))),   # 学术审查
+            MagicMock(content="[]"),                                    # 工业审查
+            MagicMock(content=json.dumps([                             # 辩护反驳（第1轮）
+                {"issue": "问题-critical-0", "stance": "rebut", "argument": "原文与参考资料一致"}])),
+            MagicMock(content=json.dumps([                             # 质疑回应（第1轮）
+                {"issue": "问题-critical-0", "verdict": "maintain", "reason": "需裁决核实"}])),
+            MagicMock(content=json.dumps([                             # 辩护反驳（第2轮）
+                {"issue": "问题-critical-0", "stance": "rebut", "argument": "再次举证"}])),
+            MagicMock(content=json.dumps([                             # 辩论裁决
+                {"issue": "问题-critical-0", "final_severity": "invalid", "reason": "辩护方已驳倒"}])),
+        ])
+
+        result = await agent.corrective_review("G02 是顺时针圆弧插补。", "G 代码基础")
+
+        assert result["passed"] is True
+        assert result["score"] == 1.0
+        assert result["issues"] == []
+        assert result["debate_rounds"] == 2
+        assert result["correction_applied"] is False
+        assert agent.llm.ainvoke.await_count == 6
+
+    @pytest.mark.asyncio
+    async def test_debate_early_exit_when_all_withdrawn(self, agent):
+        """质疑者全部撤回 → 提前终局，不再进入第 2 轮"""
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(self._issues("minor"))),
+            MagicMock(content="[]"),
+            MagicMock(content=json.dumps([
+                {"issue": "问题-minor-0", "stance": "rebut", "argument": "举证充分"}])),
+            MagicMock(content=json.dumps([
+                {"issue": "问题-minor-0", "verdict": "withdraw", "reason": "辩护成立"}])),
+            MagicMock(content=json.dumps([
+                {"issue": "问题-minor-0", "final_severity": "invalid", "reason": "质疑已撤回"}])),
+        ])
+
+        result = await agent.corrective_review("内容", "主题")
+
+        assert result["debate_rounds"] == 1
+        assert agent.llm.ainvoke.await_count == 5
+
+    @pytest.mark.asyncio
+    async def test_debate_judge_parse_failure_conservative(self, agent):
+        """裁决解析失败 → 保守视为原质疑全部成立，评分按原 severity 计算"""
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(self._issues("critical", "critical", "critical"))),
+            MagicMock(content="[]"),
+            MagicMock(content="这不是 JSON"),        # 辩护解析失败 → 全部 concede
+            MagicMock(content="这也不是 JSON"),      # 质疑回应解析失败 → 全部维持
+            MagicMock(content="依然不是 JSON"),      # 第2轮辩护解析失败
+            MagicMock(content="裁决也解析失败"),      # 裁决解析失败 → 回落原 issues
+            MagicMock(content="修正后的内容"),
+            MagicMock(content=json.dumps({"verdict": "resolved", "reason": "已修复"})),
+        ])
+
+        result = await agent.corrective_review("G01 是圆弧插补指令", "G 代码基础")
+
+        assert result["score"] == pytest.approx(0.55)
+        assert result["correction_applied"] is True
+        assert result["passed"] is True
+        # 裁决失败标记已写入 transcript
+        assert any(e.get("fallback") for e in result["debate_transcript"] if e.get("type") == "judge")
 
 
 class TestDecisionOrchestrator:

@@ -55,7 +55,11 @@ async def review_correct_node(state: AgentState) -> dict:
                    f"审核+纠偏: {content_type}...", progress)
 
         try:
-            result = await review_agent.corrective_review(content, topic)
+            result = await review_agent.corrective_review(
+                content, topic,
+                on_event=lambda msg, p=progress: _broadcast(
+                    session_id, "审核纠偏 Agent", "running", f"[{content_type}] {msg}", p),
+            )
             review_results[content_type] = result
         except Exception as e:  # noqa: BLE001
             review_results[content_type] = {
@@ -82,7 +86,8 @@ async def review_correct_node(state: AgentState) -> dict:
         score = r.get("score", 0)
         issue_count = len(r.get("issues", []))
         corrected = "已修正" if r.get("correction_applied") else "未修正"
-        debug_lines.append(f"  {ct}: {status} | 评分={score:.2f} | 问题数={issue_count} | {corrected}")
+        debate_info = f" | 辩论={r.get('debate_rounds', 0)}轮" if r.get("debate_rounds") else ""
+        debug_lines.append(f"  {ct}: {status} | 评分={score:.2f} | 问题数={issue_count} | {corrected}{debate_info}")
     debug_log = f"③½ 审核纠偏 第{new_retry}次 | {'全部通过' if all_passed else '需重试'}\n" + "\n".join(debug_lines)
 
     # 广播
@@ -121,7 +126,8 @@ async def review_correct_node(state: AgentState) -> dict:
                      {"all_passed": all_passed, "has_degraded": has_degraded, "new_retry": new_retry,
                       "results_summary": {ct: {"passed": r.get("passed"), "score": r.get("score"),
                                                "issues": len(r.get("issues", [])),
-                                               "corrected": r.get("correction_applied")}
+                                               "corrected": r.get("correction_applied"),
+                                               "debate_rounds": r.get("debate_rounds", 0)}
                                           for ct, r in review_results.items()}},
                      review_agent.collect_trace(), start)
     return output

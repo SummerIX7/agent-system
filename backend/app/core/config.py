@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     USE_AGENT_TOOLS: bool = False
     AGENT_TOOL_MAX_ROUNDS: int = 3
 
+    # 多智能体对抗辩论（审核纠偏节点内：质疑者 Critic / 辩护者 Defender / 裁决者 Judge）
+    # DEBATE_MAX_ROUNDS=0 时完全退化为单轮双视角审查（行为与引入辩论前一致，可作消融对照）。
+    DEBATE_ENABLED: bool = True
+    DEBATE_MAX_ROUNDS: int = 2
+
+    # Mock 严苛审核模式（仅 MOCK_MODE 下生效）：审查恒报 critical 问题、首次修正验证判
+    # unresolved，强制走一轮"打回重生成"，用于演示审核回环与对抗辩论。
+    MOCK_STRICT_REVIEW: bool = False
+
     # 嵌入模型 API（OpenAI 兼容接口）
     EMBEDDING_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     EMBEDDING_API_KEY: str = ""  # 阿里云 DashScope API Key

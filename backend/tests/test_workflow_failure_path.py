@@ -45,7 +45,7 @@ def _learner_input() -> dict:
     }
 
 
-async def _fail_review(content: str, topic: str) -> dict:
+async def _fail_review(content: str, topic: str, on_event=None) -> dict:
     return {
         "passed": False, "score": 0.55,
         "issues": ["测试注入：事实性错误示例"],
@@ -55,7 +55,7 @@ async def _fail_review(content: str, topic: str) -> dict:
     }
 
 
-async def _pass_review(content: str, topic: str) -> dict:
+async def _pass_review(content: str, topic: str, on_event=None) -> dict:
     return {
         "passed": True, "score": 0.93,
         "issues": [],
@@ -111,7 +111,7 @@ async def test_review_failure_then_pass_completes_without_degrade(monkeypatch):
 
     calls = {"n": 0}
 
-    async def fail_then_pass(content: str, topic: str) -> dict:
+    async def fail_then_pass(content: str, topic: str, on_event=None) -> dict:
         calls["n"] += 1
         # 第 1 轮 3 类内容不通过，第 2 轮起通过
         return await (_fail_review(content, topic) if calls["n"] <= 3 else _pass_review(content, topic))

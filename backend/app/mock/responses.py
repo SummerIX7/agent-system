@@ -7,7 +7,6 @@
 
 import inspect
 import json
-import os
 import re
 
 from app.core.career_tracks import CAREER_TRACKS
@@ -762,7 +761,9 @@ def _mock_grade_practical() -> str:
 # ══════════════════════════════════════════════════════════════════
 
 def strict_review_enabled() -> bool:
-    return os.getenv("MOCK_STRICT_REVIEW", "").strip().lower() in ("1", "true", "yes", "on")
+    """严苛审核开关：统一走 Settings（环境变量 MOCK_STRICT_REVIEW 由 pydantic-settings 读取）。"""
+    from app.core.config import get_settings
+    return bool(getattr(get_settings(), "MOCK_STRICT_REVIEW", False))
 
 
 _CALL_COUNTS: dict[str, int] = {}
@@ -797,6 +798,57 @@ def _review_verification(prompt: str = "") -> str:
 
 
 # ══════════════════════════════════════════════════════════════════
+# 对抗辩论 — 辩护反驳 / 质疑回应 / 辩论裁决
+#
+# 仅在审查发现问题时触发（默认模式下审查恒返回空数组，不会进入辩论），
+# 因此这里的响应主要服务 MOCK_STRICT_REVIEW=true 的演示路径：
+# 裁决结果为 2 critical + 1 minor（评分 0.65 < 0.70），保证严苛模式原有的
+# "修正 → 首次验证 unresolved → 打回重生成"演示链路不被改变。
+# ══════════════════════════════════════════════════════════════════
+
+def _mock_debate_defense(prompt: str = "") -> str:
+    """辩护反驳：对严苛模式的 3 条 critical 质疑逐条反驳。"""
+    return _j([
+        {"issue": "G02 被描述为逆时针圆弧插补，与标准定义相反（应为顺时针）",
+         "stance": "rebut",
+         "argument": "原文第3节明确写明 G02 为顺时针圆弧插补，与《数控编程与操作》第3章一致，质疑不成立"},
+        {"issue": "G00 快速定位段落称其可用于切削进给，属概念性错误",
+         "stance": "concede",
+         "argument": "原文表述确有歧义，G00 仅用于非切削快速定位，承认该问题"},
+        {"issue": "切削速度给出的数值范围与附录参数表互相矛盾",
+         "stance": "rebut",
+         "argument": "数值范围分别对应不同刀具材料（高速钢/硬质合金），附录表已注明，并非矛盾"},
+    ])
+
+
+def _mock_debate_critic_response(prompt: str = "") -> str:
+    """质疑回应：维持全部质疑（推动进入裁决环节）。"""
+    return _j([
+        {"issue": "G02 被描述为逆时针圆弧插补，与标准定义相反（应为顺时针）",
+         "verdict": "maintain", "reason": "辩护引用的章节位置与原文表述仍需裁决者核实"},
+        {"issue": "G00 快速定位段落称其可用于切削进给，属概念性错误",
+         "verdict": "maintain", "reason": "辩护方已承认，质疑成立"},
+        {"issue": "切削速度给出的数值范围与附录参数表互相矛盾",
+         "verdict": "maintain", "reason": "不同刀具材料的区分在正文中未明确说明，维持质疑"},
+    ])
+
+
+def _mock_debate_judge(prompt: str = "") -> str:
+    """辩论裁决：2 条 critical 成立 + 1 条降级为 minor（评分 0.65，仍触发修正流程）。"""
+    return _j([
+        {"issue": "G02 被描述为逆时针圆弧插补，与标准定义相反（应为顺时针）",
+         "final_severity": "minor",
+         "reason": "辩护方举证原文表述与标准一致，但相关段落易引起歧义，降级为表述问题"},
+        {"issue": "G00 快速定位段落称其可用于切削进给，属概念性错误",
+         "final_severity": "critical",
+         "reason": "辩护方已承认，概念性错误成立，必须修正"},
+        {"issue": "切削速度给出的数值范围与附录参数表互相矛盾",
+         "final_severity": "critical",
+         "reason": "正文未注明刀具材料前提，对初学者构成误导，维持 critical"},
+    ])
+
+
+# ══════════════════════════════════════════════════════════════════
 # 按 label 键索引的响应字典
 # ══════════════════════════════════════════════════════════════════
 
@@ -810,6 +862,10 @@ MOCK_RESPONSES_BY_LABEL: dict = {
     "工业审查": _review_issues,
     "修正生成": _mock_corrected_content(),
     "修正验证": _review_verification,
+    # 对抗辩论（仅审查发现问题时触发，即严苛模式演示路径）
+    "辩护反驳": _mock_debate_defense,
+    "质疑回应": _mock_debate_critic_response,
+    "辩论裁决": _mock_debate_judge,
     # 可调用项：以原始 prompt 求值，使画像随职业方向 / 经验 / 自评分化
     "构建画像": _mock_build_profile,
 }
