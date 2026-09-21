@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from app.agents.base import BaseAgent
 from app.agents.tools import GENERATION_TOOLS
@@ -27,7 +27,8 @@ class GenerationAgent(BaseAgent):
 
     async def generate_lecture_notes(self, topic: str, profile: dict,
                                      track: Optional[CareerTrackConfig] = None,
-                                     retry_context: str = "") -> str:
+                                     retry_context: str = "",
+                                     on_token: Optional[Callable[[str], None]] = None) -> str:
         """生成定制化讲义（含知识溯源）"""
         track = track or get_default_career_track()
         context = self.retrieve_context(f"{track.name} {topic}")
@@ -90,11 +91,12 @@ class GenerationAgent(BaseAgent):
 
 请开始生成讲义："""
 
-        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成讲义")
+        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成讲义", on_token=on_token)
 
     async def generate_practical_guide(self, topic: str, profile: dict,
                                        track: Optional[CareerTrackConfig] = None,
-                                       retry_context: str = "") -> str:
+                                       retry_context: str = "",
+                                       on_token: Optional[Callable[[str], None]] = None) -> str:
         """生成实验指导（含知识溯源）"""
         track = track or get_default_career_track()
         context = self.retrieve_context(f"{track.name} {topic} 实践操作")
@@ -143,11 +145,12 @@ class GenerationAgent(BaseAgent):
 
 请开始生成实验指导："""
 
-        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成实验指导")
+        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成实验指导", on_token=on_token)
 
     async def generate_project_case(self, topic: str, profile: dict,
                                     track: Optional[CareerTrackConfig] = None,
-                                    retry_context: str = "") -> str:
+                                    retry_context: str = "",
+                                    on_token: Optional[Callable[[str], None]] = None) -> str:
         """生成项目案例（含知识溯源）"""
         track = track or get_default_career_track()
         context = self.retrieve_context(f"{track.name} {topic} 项目案例 实战")
@@ -199,7 +202,7 @@ class GenerationAgent(BaseAgent):
 
 请开始生成项目案例："""
 
-        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成项目案例")
+        return await self.call_llm_with_tools(prompt, GENERATION_TOOLS, label="生成项目案例", on_token=on_token)
 
     async def run(self, topic: str = "", profile: dict = None,
                   resource_types: List[str] = None,

@@ -1,7 +1,8 @@
 """Mock LLM：替换 ChatOpenAI，根据 prompt 内容返回预设响应，不调用外部 API。"""
 
+import asyncio
 import contextvars
-from typing import Any
+from typing import Any, AsyncIterator
 
 from app.mock.responses import MOCK_RESPONSES_BY_LABEL, match_response_by_prompt
 
@@ -38,6 +39,15 @@ class MockLLM:
         label = _mock_label.get()
         content = self._resolve(prompt, label)
         return MockLLMResponse(content)
+
+    async def astream(self, prompt: str, **kwargs) -> AsyncIterator[MockLLMResponse]:
+        """流式入口：把预设响应切片 yield，模拟打字机效果（供 call_llm_stream 演示）。"""
+        label = _mock_label.get()
+        content = self._resolve(prompt, label)
+        chunk_size = 24
+        for i in range(0, len(content), chunk_size):
+            await asyncio.sleep(0.01)
+            yield MockLLMResponse(content[i:i + chunk_size])
 
     def _resolve(self, prompt: str, label: str) -> str:
         """按优先级解析响应：

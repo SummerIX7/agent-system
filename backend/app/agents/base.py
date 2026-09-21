@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 from contextvars import ContextVar
 from datetime import datetime
 import logging
@@ -192,25 +192,132 @@ class BaseAgent:
                     await asyncio.sleep(wait_time)
         raise RuntimeError(f"LLM 调用失败（已重试{max_retries}次）: {last_error}")
 
+    async def call_llm_stream(
+        self,
+        prompt: str,
+        label: str = "",
+        on_token: Callable[[str], None] | None = None,
+        use_cache: bool | None = None,
+    ) -> str:
+        """流式调用 LLM：逐 token 回调 on_token，返回完整文本。
+
+        - 流式不做中途重试（避免重复吐 token）；流式失败后整体回落 call_llm() 的重试逻辑。
+        - 缓存命中时将缓存内容一次性回调并返回，行为与非流式一致。
+        - trace 埋点 / 监控计数 / 缓存写与 call_llm() 对齐（每次调用仅一条 trace）。
+        """
+        # Mock 模式：通过 contextvars 将 label 传递给 MockLLM
+        try:
+            from app.mock.llm import _mock_label
+            _mock_label.set(label)
+        except ImportError:
+            pass
+
+        settings = get_settings()
+        if use_cache is None:
+            use_cache = _should_use_llm_cache(label)
+        if use_cache and getattr(settings, "MOCK_MODE", False):
+            use_cache = False
+
+        model_name = (
+            getattr(self.llm, "model_name", "")
+            or getattr(self.llm, "model", "")
+            or ""
+        )
+
+        # ── 缓存读 ──
+        if use_cache:
+            try:
+                from app.core.store import get_llm_cache
+                cached = get_llm_cache(prompt, topic=str(model_name))
+            except Exception as cache_err:  # noqa: BLE001
+                cached = None
+                logger.warning("[LLM缓存] 读取失败，退回真实调用: %s", cache_err)
+            if cached is not None:
+                if on_token:
+                    on_token(cached)
+                self._trace_calls.append({
+                    "label": (label or "LLM调用") + " [cache-hit]",
+                    "prompt": prompt,
+                    "response": cached[:8000],
+                    "elapsed_ms": 0,
+                    "cache_hit": True,
+                    "timestamp": datetime.now().isoformat(),
+                })
+                try:
+                    from app.api.health import record_llm_call
+                    record_llm_call(cache_hit=True)
+                except Exception:  # noqa: BLE001
+                    pass
+                return cached
+
+        # ── 流式调用（失败回落 call_llm 重试链路）──
+        start = time.time()
+        parts: list[str] = []
+        try:
+            async for chunk in self.llm.astream(prompt):
+                delta = getattr(chunk, "content", "") or ""
+                if not delta:
+                    continue
+                parts.append(delta)
+                if on_token:
+                    try:
+                        on_token(delta)
+                    except Exception:  # noqa: BLE001 — 回调（如 WS 广播）异常不中断生成
+                        logger.debug("[流式] on_token 回调异常，已忽略", exc_info=True)
+        except Exception as e:
+            logger.warning("[流式] astream 失败，回落非流式重试: %s", e)
+            return await self.call_llm(prompt, label=label, use_cache=use_cache)
+
+        full = "".join(parts)
+        elapsed_ms = round((time.time() - start) * 1000)
+        self._trace_calls.append({
+            "label": label or "LLM流式调用",
+            "prompt": prompt,
+            "response": full[:8000],
+            "elapsed_ms": elapsed_ms,
+            "cache_hit": False,
+            "timestamp": datetime.now().isoformat(),
+        })
+
+        if use_cache:
+            try:
+                from app.core.store import set_llm_cache
+                set_llm_cache(prompt, full, topic=str(model_name))
+            except Exception as cache_err:  # noqa: BLE001
+                logger.warning("[LLM缓存] 写入失败: %s", cache_err)
+
+        try:
+            from app.api.health import record_llm_call
+            record_llm_call(cache_hit=False)
+        except Exception:  # noqa: BLE001
+            pass
+
+        return full
+
     async def call_llm_with_tools(
         self,
         prompt: str,
         tools: list,
         label: str = "",
         max_rounds: int | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> str:
         """带工具调用（tool-calling）的 LLM 调用，返回最终文本。
 
-        - MOCK_MODE 或 USE_AGENT_TOOLS 关闭时，直接回落到纯 prompt 的 call_llm（行为与现状一致）。
+        - MOCK_MODE 或 USE_AGENT_TOOLS 关闭时，回落纯 prompt 调用；
+          此时若传入 on_token 则走 call_llm_stream() 流式回调。
         - 否则绑定工具并跑受限循环：模型请求工具 → 本地执行 → 回传结果 → 直到模型给出终答或达轮数上限。
+          （工具模式暂不支持流式，on_token 被忽略。）
         - 每轮响应与工具执行写入 trace 埋点，便于观测。
         """
         settings = get_settings()
         use_tools = bool(tools) and getattr(settings, "USE_AGENT_TOOLS", False) \
             and not getattr(settings, "MOCK_MODE", False)
 
-        # 回落：与纯 prompt 流程完全等价
+        # 回落：与纯 prompt 流程完全等价（有 on_token 时流式）
         if not use_tools:
+            if on_token is not None:
+                return await self.call_llm_stream(prompt, label=label, on_token=on_token)
             return await self.call_llm(prompt, label=label)
 
         from langchain_core.messages import HumanMessage, ToolMessage

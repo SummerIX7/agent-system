@@ -3,6 +3,9 @@ import type { AgentStatus } from '@/types/api'
 export function useAgentWebSocket(sessionId: string) {
   const agents = ref<AgentStatus[]>([])
   const isConnected = ref(false)
+  // 流式 token 累积：key 为后端 stream 标识（如 "1:lecture"），值为已收到的增量文本
+  const streams = ref<Record<string, string>>({})
+  const lastStreamKey = ref('')
   let ws: WebSocket | null = null
   // 主动关闭 / 组件已卸载时置位，用于阻止 onclose 里的自动重连。
   // 缺少这个标志会导致：unmounted → disconnect() → ws.close() → onclose 触发
@@ -29,6 +32,14 @@ export function useAgentWebSocket(sessionId: string) {
       ws.onmessage = (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data)
+          // token 流式消息：增量累积到对应 stream，不进 agent 状态列表
+          if (data.type === 'token') {
+            if (typeof data.stream === 'string' && typeof data.delta === 'string') {
+              streams.value[data.stream] = (streams.value[data.stream] || '') + data.delta
+              lastStreamKey.value = data.stream
+            }
+            return
+          }
           // 忽略系统消息（连接确认等），只处理 Agent 状态
           if (data.agent === '系统') return
           const idx = agents.value.findIndex((a) => a.name === data.agent)
@@ -98,9 +109,17 @@ export function useAgentWebSocket(sessionId: string) {
     disconnect()
   })
 
+  const clearStreams = () => {
+    streams.value = {}
+    lastStreamKey.value = ''
+  }
+
   return {
     agents,
     isConnected,
+    streams,
+    lastStreamKey,
+    clearStreams,
     disconnect,
   }
 }

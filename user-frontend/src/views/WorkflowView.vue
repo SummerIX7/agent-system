@@ -36,6 +36,18 @@
       <div style="font-size: 22px; font-weight: 600; font-family: var(--mono); color: var(--accent)">{{ Math.round(currentProgress) }}%</div>
     </div>
 
+    <!-- 生成实时预览（token 流式） -->
+    <div v-if="generating && previewContent" class="stream-box">
+      <div class="stream-box__head">
+        <span class="dot dot--ok" style="width: 8px; height: 8px"></span>
+        <span style="font-size: 13px; font-weight: 600">{{ previewTitle }}</span>
+        <span class="stream-cursor"></span>
+      </div>
+      <div ref="streamBodyRef" class="stream-box__body">
+        <MarkdownRenderer :content="previewContent" />
+      </div>
+    </div>
+
     <!-- Agent 状态列表 -->
     <div class="agent-grid">
       <div
@@ -82,6 +94,7 @@ defineOptions({ name: 'WorkflowView' })
 import { useApi } from '@/composables/useApi'
 import { useSession } from '@/composables/useSession'
 import { useAgentWebSocket } from '@/composables/useAgentWebSocket'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 // 保持页面状态：避免每次切换都重新初始化 agent 并触发 WS 重连
 const { sessionId, profile } = useSession()
 const api = useApi()
@@ -91,6 +104,7 @@ const currentMessage = ref('准备中...')
 const generating = ref(false)
 const hasExistingResources = ref(false)
 const checkingResources = ref(true)
+const streamBodyRef = ref<HTMLElement | null>(null)
 
 // 资源已生成但仍在保存的窗口期：
 // WebSocket 推送 progress=100 后，HTTP 还在跑 build_report_cache/持久化，尚未返回。
@@ -99,7 +113,28 @@ const savingResources = computed(() =>
   generating.value && currentProgress.value >= 100 && !hasExistingResources.value
 )
 
-const { agents, isConnected } = useAgentWebSocket(sessionId.value || 'demo')
+const { agents, isConnected, streams, lastStreamKey, clearStreams } = useAgentWebSocket(sessionId.value || 'demo')
+
+// 流式实时预览：跟随最近活跃的 stream（如 "1:lecture"），完成后的完整内容以 /resources 页为准
+const STREAM_TYPE_LABELS: Record<string, string> = {
+  lecture: '讲义',
+  guide: '实验指导',
+  project: '项目案例',
+}
+const previewContent = computed(() =>
+  lastStreamKey.value ? streams.value[lastStreamKey.value] || '' : ''
+)
+const previewTitle = computed(() => {
+  const [stage, ct] = (lastStreamKey.value || ':').split(':')
+  return `节点${stage} · ${STREAM_TYPE_LABELS[ct] || ct} 生成中`
+})
+
+// 新 token 到达时滚动到底部，保持最新内容可见
+watch(previewContent, async () => {
+  await nextTick()
+  const el = streamBodyRef.value
+  if (el) el.scrollTop = el.scrollHeight
+})
 
 function initAgents() {
   agents.value = [
@@ -204,6 +239,7 @@ const startGenerate = async () => {
   currentProgress.value = 0
   currentMessage.value = '启动工作流...'
   hasExistingResources.value = false
+  clearStreams()
 
   // 重置 agent 状态
   initAgents()
@@ -229,6 +265,7 @@ const startGenerate = async () => {
     const resourceCount = result.filter((r) => ['lecture', 'guide', 'project'].includes(r.type)).length
     currentMessage.value = `已生成 ${resourceCount} 个资源（覆盖 5 个学习节点）`
     hasExistingResources.value = true
+    clearStreams()
   } catch (err: any) {
     currentMessage.value = `生成失败: ${err.message || '未知错误'}`
     console.error('生成失败:', err)
@@ -276,6 +313,36 @@ const startGenerate = async () => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+}
+.stream-box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.stream-box__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--line);
+}
+.stream-box__body {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+.stream-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
 }
 .agent-card {
   display: flex;

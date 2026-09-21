@@ -10,6 +10,7 @@ from app.graph.nodes._common import (
     _save_node_trace,
     _stage_learning_topic,
     generation_agent,
+    make_token_broadcaster,
 )
 from app.graph.state import AgentState
 
@@ -47,17 +48,32 @@ async def generate_node(state: AgentState) -> dict:
 
     _broadcast(session_id, "知识生成 Agent", "running",
                "正在重新生成讲义（已注入审核反馈）..." if retry_context else "正在生成讲义...", 35)
-    generated["lecture"] = await generation_agent.generate_lecture_notes(topic, profile, track, retry_context)
+    feed, flush = make_token_broadcaster(session_id, "知识生成 Agent", "1:lecture")
+    try:
+        generated["lecture"] = await generation_agent.generate_lecture_notes(
+            topic, profile, track, retry_context, on_token=feed)
+    finally:
+        flush()
     logs.append("讲义生成完成")
 
     _broadcast(session_id, "知识生成 Agent", "running",
                "正在重新生成实验指导..." if retry_context else "正在生成实验指导...", 45)
-    generated["guide"] = await generation_agent.generate_practical_guide(topic, profile, track, retry_context)
+    feed, flush = make_token_broadcaster(session_id, "知识生成 Agent", "1:guide")
+    try:
+        generated["guide"] = await generation_agent.generate_practical_guide(
+            topic, profile, track, retry_context, on_token=feed)
+    finally:
+        flush()
     logs.append("实验指导生成完成")
 
     _broadcast(session_id, "知识生成 Agent", "running",
                "正在重新生成项目案例..." if retry_context else "正在生成项目案例...", 55)
-    generated["project"] = await generation_agent.generate_project_case(topic, profile, track, retry_context)
+    feed, flush = make_token_broadcaster(session_id, "知识生成 Agent", "1:project")
+    try:
+        generated["project"] = await generation_agent.generate_project_case(
+            topic, profile, track, retry_context, on_token=feed)
+    finally:
+        flush()
     logs.append("项目案例生成完成")
 
     _broadcast(session_id, "知识生成 Agent", "running", "内容已生成，等待审核验证...", 58)

@@ -43,6 +43,46 @@ def _broadcast(session_id: str, agent: str, status: str, message: str, progress:
             pass
 
 
+def make_token_broadcaster(session_id: str, agent: str, stream: str, min_chars: int = 120):
+    """创建一个节流 token 广播器，供 call_llm_stream 的 on_token 回调使用。
+
+    - 攒够 min_chars 才推一条 WS 消息（type="token"），避免消息风暴；
+    - 返回 (feed, flush)：feed 给 on_token，flush 在生成结束后调用发送残余；
+    - token 消息只 publish 不写积压 List（persist=False），断线重连由最终全量内容兜底。
+    """
+    buf: list[str] = []
+    seq = {"n": 0}
+
+    def _send():
+        if not buf or not session_id:
+            buf.clear()
+            return
+        try:
+            from app.core.store import push_ws_message
+            push_ws_message(session_id, {
+                "type": "token",
+                "agent": agent,
+                "stream": stream,
+                "delta": "".join(buf),
+                "seq": seq["n"],
+            }, persist=False)
+            seq["n"] += 1
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            buf.clear()
+
+    def feed(delta: str):
+        buf.append(delta)
+        if sum(len(p) for p in buf) >= min_chars:
+            _send()
+
+    def flush():
+        _send()
+
+    return feed, flush
+
+
 def _save_node_trace(session_id: str, node: str, agent_name: str,
                      input_data: dict, output_data: dict,
                      llm_calls: list, start_time: float):

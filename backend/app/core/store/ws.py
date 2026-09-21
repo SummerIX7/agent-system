@@ -17,12 +17,15 @@ from app.core.store._client import (
 logger = logging.getLogger(__name__)
 
 
-def push_ws_message(session_id: str, message: dict) -> None:
+def push_ws_message(session_id: str, message: dict, persist: bool = True) -> None:
     """向会话的 WebSocket 队列推送消息。
 
     双轨道策略（兼容旧轮询与新 Pub/Sub）：
     - rpush 到 List：作为"历史积压"，保障 WS 未连接时途中产生的消息可被后连接方 pop 取回。
     - publish 到 pub/sub：已连接的 WS 处理器可实时收到，免去 500ms 轮询。
+
+    persist=False（如高频 token 流式消息）：跳过 List 积压，只做实时分发；
+    Redis 不可用时仍写入内存队列（降级模式下它是唯一通道）。
     """
     r = _get_redis()
 
@@ -32,10 +35,12 @@ def push_ws_message(session_id: str, message: dict) -> None:
         _fallback_ws_queues[session_id].append(message)
         return
 
-    key = f"{KEY_WS}:{session_id}"
     payload = json.dumps(message, ensure_ascii=False)
-    r.rpush(key, payload)
-    r.expire(key, SESSION_TTL)
+
+    if persist:
+        key = f"{KEY_WS}:{session_id}"
+        r.rpush(key, payload)
+        r.expire(key, SESSION_TTL)
 
     # Pub/Sub 实时分发
     try:

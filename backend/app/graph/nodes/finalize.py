@@ -8,6 +8,7 @@ from app.graph.nodes._common import (
     _broadcast,
     _prepare_stage_states,
     _stage_learning_topic,
+    make_token_broadcaster,
 )
 from app.graph.state import AgentState
 
@@ -202,12 +203,16 @@ async def generate_resources_for_stage(
 
     for ct in ("lecture", "guide", "project"):
         try:
-            if ct == "lecture":
-                content = await gen_agent.generate_lecture_notes(full_topic, profile, track)
-            elif ct == "guide":
-                content = await gen_agent.generate_practical_guide(full_topic, profile, track)
-            else:
-                content = await gen_agent.generate_project_case(full_topic, profile, track)
+            feed, flush = make_token_broadcaster(session_id, "知识生成 Agent", f"{stage}:{ct}")
+            try:
+                if ct == "lecture":
+                    content = await gen_agent.generate_lecture_notes(full_topic, profile, track, on_token=feed)
+                elif ct == "guide":
+                    content = await gen_agent.generate_practical_guide(full_topic, profile, track, on_token=feed)
+                else:
+                    content = await gen_agent.generate_project_case(full_topic, profile, track, on_token=feed)
+            finally:
+                flush()
 
             try:
                 review = await review_agent_inst.corrective_review(content, full_topic)
