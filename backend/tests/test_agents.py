@@ -127,6 +127,7 @@ class TestReviewAgent:
         """
         from app.core.config import get_settings
         monkeypatch.setattr(get_settings(), "USE_AGENT_TOOLS", False, raising=False)
+        monkeypatch.setattr(get_settings(), "MOCK_MODE", False, raising=False)
         monkeypatch.setattr(get_settings(), "DEBATE_MAX_ROUNDS", 0, raising=False)
         agent = ReviewAgent()
         agent.llm = MagicMock()
@@ -239,6 +240,7 @@ class TestReviewAgentDebate:
         """开启辩论的 ReviewAgent：DEBATE_MAX_ROUNDS=2，关闭 tool-calling"""
         from app.core.config import get_settings
         monkeypatch.setattr(get_settings(), "USE_AGENT_TOOLS", False, raising=False)
+        monkeypatch.setattr(get_settings(), "MOCK_MODE", False, raising=False)
         monkeypatch.setattr(get_settings(), "DEBATE_ENABLED", True, raising=False)
         monkeypatch.setattr(get_settings(), "DEBATE_MAX_ROUNDS", 2, raising=False)
         agent = ReviewAgent()

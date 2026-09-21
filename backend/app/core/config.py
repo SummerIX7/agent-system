@@ -48,10 +48,10 @@ class Settings(BaseSettings):
     VERIFIER_LLM_MODEL: str = ""
 
     # Agent 工具调用（tool-calling）开关
-    # 默认关闭：Generation/Review 走现有纯 prompt 流程，行为与当前一致。
-    # 开启后：Generation 可用 retrieve_knowledge 按需补充检索，Review 可用 fact_check_lookup 核查断言。
-    # MOCK_MODE=true 时工具路径自动回落纯 prompt（MockLLM 不支持 tool-calling）。
-    USE_AGENT_TOOLS: bool = False
+    # 默认开启：Generation 可用检索/计算器/标准查询/图谱查询，Review 可核查断言与标准条款。
+    # MOCK_MODE=true 时同样走工具循环（MockLLM 返回预设 tool_call，工具本地真实执行）。
+    # 置 false 后全面回落纯 prompt 流程。
+    USE_AGENT_TOOLS: bool = True
     AGENT_TOOL_MAX_ROUNDS: int = 3
 
     # 多智能体对抗辩论（审核纠偏节点内：质疑者 Critic / 辩护者 Defender / 裁决者 Judge）

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from app.agents.base import BaseAgent
+from app.agents.tools import QUESTION_TOOLS
 from app.agents.prompts import (
     build_basic_prompt,
     build_comprehensive_prompt,
@@ -59,7 +60,7 @@ class QuestionGeneratorAgent(BaseAgent):
             avoid_text=format_avoid_questions(avoid_questions),
             count=count,
         )
-        response = await self.call_llm(prompt)
+        response = await self.call_llm_with_tools(prompt, QUESTION_TOOLS, label="试题生成")
         result = parse_json_result(
             response,
             {"topic": topic, "difficulty": difficulty, "track": track.code, "questions": []},
@@ -98,7 +99,7 @@ class QuestionGeneratorAgent(BaseAgent):
             count=count,
         )
 
-        response = await self.call_llm(prompt)
+        response = await self.call_llm_with_tools(prompt, QUESTION_TOOLS, label="节点练习生成")
         result = parse_json_result(
             response,
             {"topic": topic_text, "difficulty": difficulty, "track": track.code, "questions": []},
@@ -136,7 +137,7 @@ class QuestionGeneratorAgent(BaseAgent):
             avoid_text=format_avoid_questions(avoid_questions),
         )
 
-        response = await self.call_llm(prompt)
+        response = await self.call_llm_with_tools(prompt, QUESTION_TOOLS, label="综合练习生成")
         fallback = fallback_comprehensive_case(difficulty, track.code)
         result = parse_json_result(response, fallback)
         return normalize_comprehensive_case(result, difficulty, track.code)

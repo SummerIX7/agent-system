@@ -168,7 +168,12 @@ class TestCareerTrackAwareQuestions:
     """职业方向感知的试题生成测试"""
 
     @pytest.fixture
-    def agent(self):
+    def agent(self, monkeypatch):
+        # 钉住工具/Mock 开关走纯 prompt 路径：本类只关心职业方向 prompt 与解析逻辑，
+        # 且全量运行时其他测试文件会把套件级 MOCK_MODE 置为 true
+        from app.core.config import get_settings
+        monkeypatch.setattr(get_settings(), "USE_AGENT_TOOLS", False, raising=False)
+        monkeypatch.setattr(get_settings(), "MOCK_MODE", False, raising=False)
         from app.agents.question_generator import QuestionGeneratorAgent
         agent = QuestionGeneratorAgent()
         agent.llm = MagicMock()

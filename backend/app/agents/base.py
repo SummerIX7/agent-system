@@ -304,15 +304,26 @@ class BaseAgent:
     ) -> str:
         """带工具调用（tool-calling）的 LLM 调用，返回最终文本。
 
-        - MOCK_MODE 或 USE_AGENT_TOOLS 关闭时，回落纯 prompt 调用；
+        - USE_AGENT_TOOLS 关闭时，回落纯 prompt 调用；
           此时若传入 on_token 则走 call_llm_stream() 流式回调。
+        - MOCK_MODE 下也走工具循环：MockLLM.bind_tools() 返回预设 tool_call，
+          工具在本地真实执行，使演示可见完整 tool-calling 轨迹。
         - 否则绑定工具并跑受限循环：模型请求工具 → 本地执行 → 回传结果 → 直到模型给出终答或达轮数上限。
           （工具模式暂不支持流式，on_token 被忽略。）
         - 每轮响应与工具执行写入 trace 埋点，便于观测。
         """
+        # Mock 模式：通过 contextvars 将 label 传递给 MockLLM
+        try:
+            from app.mock.llm import _mock_label
+            _mock_label.set(label)
+        except ImportError:
+            pass
+
         settings = get_settings()
-        use_tools = bool(tools) and getattr(settings, "USE_AGENT_TOOLS", False) \
-            and not getattr(settings, "MOCK_MODE", False)
+        use_tools = bool(tools) and (
+            getattr(settings, "USE_AGENT_TOOLS", False)
+            or getattr(settings, "MOCK_MODE", False)
+        )
 
         # 回落：与纯 prompt 流程完全等价（有 on_token 时流式）
         if not use_tools:
@@ -381,8 +392,12 @@ class BaseAgent:
                         result = tool.invoke(args)
                     except Exception as e:  # noqa: BLE001
                         result = f"[工具 {name} 执行失败: {e}]"
+                # 截断超长工具结果，防止上下文膨胀
+                result_text = str(result)
+                if len(result_text) > 3000:
+                    result_text = result_text[:3000] + "\n[结果过长已截断]"
                 messages.append(ToolMessage(
-                    content=str(result),
+                    content=result_text,
                     tool_call_id=tc.get("id", name),
                 ))
 
