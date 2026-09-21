@@ -40,6 +40,7 @@ from app.core.store._client import (
 from app.core.store.session import (
     _update_field,
     add_agent_log,
+    add_conversation_message,
     add_feedback,
     add_resource,
     append_practice_result,
@@ -48,6 +49,7 @@ from app.core.store.session import (
     get_all_sessions,
     get_cached_questions,
     get_comprehensive_questions,
+    get_conversation_history,
     get_practice_results,
     get_practice_state,
     get_session,
@@ -92,6 +94,7 @@ __all__ = [
     "redis_is_available", "check_redis_health",
     # 会话
     "get_session", "update_session", "add_agent_log", "add_feedback", "add_resource",
+    "add_conversation_message", "get_conversation_history",
     "save_practice_state", "get_practice_state",
     "save_cached_questions", "get_cached_questions", "clear_cached_questions",
     "save_tiered_questions", "get_tiered_questions", "get_tier_questions",

@@ -15,6 +15,7 @@ import type {
   TieredQuestionSet,
 } from '@/types/api'
 import { useSession } from './useSession'
+import type { ConversationMessage } from '@/types/api'
 
 export function usePractice() {
   const router = useRouter()
@@ -66,6 +67,19 @@ export function usePractice() {
   const socraticHistory = ref<{ round: number; hint: string }[]>([])
   const revealAnswer = ref(false)
   const socraticLoading = ref(false)
+
+  // 会话级教学对话记忆（跨题目、刷新后仍在，后端持久化）
+  const conversation = ref<ConversationMessage[]>([])
+  const conversationOpen = ref(false)
+  const loadConversation = async () => {
+    if (!sessionId.value) return
+    try {
+      const result = await api.getConversation(sessionId.value)
+      conversation.value = result.messages || []
+    } catch {
+      // 历史加载失败不影响答题
+    }
+  }
 
   // 简答题
   const practicalAnswer = ref('')
@@ -261,6 +275,7 @@ export function usePractice() {
       socraticRound.value = round; revealAnswer.value = result.reveal_answer || false
       if (result.heuristic_question) socraticHistory.value.push({ round, hint: result.heuristic_question })
       if (result.reveal_answer) lockQuestion(false)
+      loadConversation()
     } catch {
       socraticHistory.value.push({ round, hint: `提示：正确答案是 ${currentQuestion.value.correctAnswer}，看看解析吧。` })
       socraticRound.value = round; revealAnswer.value = true; lockQuestion(false)
@@ -419,7 +434,7 @@ export function usePractice() {
 
   // === 初始化 ===
   onMounted(() => {
-    if (isLoggedIn.value && sessionId.value) initQuestions()
+    if (isLoggedIn.value && sessionId.value) { initQuestions(); loadConversation() }
     else if (!isLoggedIn.value) { loading.value = false; loadError.value = '请先登录' }
     else { loading.value = false; loadError.value = '请先完成学情诊断' }
   })
@@ -472,6 +487,9 @@ export function usePractice() {
     socraticHistory,
     socraticLoading,
     revealAnswer,
+    // 教学对话记忆
+    conversation,
+    conversationOpen,
     // 简答题
     practicalAnswer,
     practicalGrading,

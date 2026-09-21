@@ -725,7 +725,17 @@ def _mock_verify_assertion() -> str:
 # 交互反馈 — generate_heuristic_question() [feedback.py 直接调用]
 # ══════════════════════════════════════════════════════════════════
 
-def _mock_heuristic_question() -> str:
+def _mock_heuristic_question(prompt: str = "") -> str:
+    """启发式追问：按轮次分化，并在带对话历史时体现出"承接上文"。"""
+    round_match = re.search(r"第\s*(\d+)\s*轮", prompt)
+    round_num = int(round_match.group(1)) if round_match else 1
+    has_history = "[本会话此前的教学对话]" in prompt
+
+    if round_num >= 3:
+        return "直接提示：关键区别在于 F 指令——G01 的切削进给速度由 F 指定，而 G00 的快移速度由机床参数决定，想想你的答案里把哪个用错了。"
+    if round_num == 2:
+        prefix = "接着刚才的思路再想想：" if has_history else ""
+        return prefix + "打个比方，G00 像开车空挡滑行到目的地，G01 像匀速巡航——回忆一下我们之前聊过的进给速度，现在能分清了吗？"
     return "可以想一想，G00 和 G01 指令最大的区别是什么？提示：考虑加工时是否有切屑产生，以及进给速度由谁控制。"
 
 

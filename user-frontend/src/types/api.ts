@@ -80,6 +80,12 @@ export interface FeedbackResponse {
   reveal_answer?: boolean
 }
 
+export interface ConversationMessage {
+  role: 'learner' | 'agent'
+  content: string
+  ts?: string
+}
+
 // === 实操题批改 ===
 
 export interface PracticalFeedbackInput {

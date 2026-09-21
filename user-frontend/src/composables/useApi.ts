@@ -6,6 +6,7 @@ import type {
   ResourceOutput,
   FeedbackInput,
   FeedbackResponse,
+  ConversationMessage,
   PracticalFeedbackInput,
   PracticalFeedbackResponse,
   VisualizationData,
@@ -93,6 +94,10 @@ export function useApi() {
     // 反馈
     submitFeedback: (data: FeedbackInput) =>
       post<FeedbackResponse>('/api/feedback/', data),
+
+    // 苏格拉底追问对话历史（会话级记忆）
+    getConversation: (sessionId: string) =>
+      get<{ session_id: string; messages: ConversationMessage[] }>(`/api/feedback/conversation/${sessionId}`),
 
     // 实操题批改
     submitPracticalFeedback: (data: PracticalFeedbackInput) =>

@@ -109,6 +109,37 @@ def add_agent_log(session_id: str, log: dict) -> None:
 
 
 # ═══════════════════════════════════════════
+# 对话记忆（苏格拉底追问多轮上下文）
+# ═══════════════════════════════════════════
+
+CONVERSATION_HISTORY_MAX = 20  # 每会话最多保留的对话条数（超出截断最旧）
+
+
+def add_conversation_message(session_id: str, role: str, content: str) -> None:
+    """追加一条对话消息（role: learner / agent），超出上限时截断最旧记录。"""
+    if not content:
+        return
+    session = get_session(session_id)
+    history = session.get("conversation_history", [])
+    if not isinstance(history, list):
+        history = []
+    history.append({
+        "role": role,
+        "content": content[:2000],
+        "ts": datetime.now().isoformat(),
+    })
+    _update_field(session_id, "conversation_history", history[-CONVERSATION_HISTORY_MAX:])
+
+
+def get_conversation_history(session_id: str, limit: int = 0) -> list[dict]:
+    """读取对话历史（按时间正序）；limit>0 时只返回最近 limit 条。"""
+    history = get_session(session_id).get("conversation_history", [])
+    if not isinstance(history, list):
+        return []
+    return history[-limit:] if limit > 0 else history
+
+
+# ═══════════════════════════════════════════
 # 答题进度
 # ═══════════════════════════════════════════
 

@@ -12,7 +12,12 @@ from app.models.learner import Learner
 from app.models.user import User
 from app.core.auth import get_current_user, make_session_id
 from app.core.llm import get_llm
-from app.core.store import add_feedback, get_session
+from app.core.store import (
+    add_conversation_message,
+    add_feedback,
+    get_conversation_history,
+    get_session,
+)
 from app.core.domains import get_domain_from_input, build_domain_prompt, DomainConfig
 from app.core.rate_limit import RateLimit
 from app.agents.orchestrator import DecisionOrchestrator
@@ -36,8 +41,13 @@ async def generate_heuristic_question(
     round: int = 1,
     previous_context: str = "",
     domain: DomainConfig = None,
+    history: list[dict] | None = None,
 ) -> str:
-    """生成苏格拉底式追问（支持多轮，逐层降级）"""
+    """生成苏格拉底式追问（支持多轮，逐层降级）
+
+    history 为会话级对话记忆（[{role, content}]），注入后追问可引用此前对话，
+    避免重复已解释过的内容。
+    """
     llm = get_llm()
 
     if round == 1:
@@ -51,6 +61,18 @@ async def generate_heuristic_question(
     if previous_context:
         context_part = f"\n[之前的追问] {previous_context}\n学习者仍然没有理解，请换一个角度。"
 
+    history_part = ""
+    if history:
+        lines = "\n".join(
+            f"- {'学习者' if h.get('role') == 'learner' else '你'}: {h.get('content', '')[:200]}"
+            for h in history[-8:]
+        )
+        if lines:
+            history_part = (
+                f"\n[本会话此前的教学对话]\n{lines}\n"
+                "请延续上述对话脉络，不要重复已经解释过的内容。"
+            )
+
     domain_desc = domain.prompt_context if domain else "专业领域"
 
     prompt = f"""你是一位{domain_desc}的教学专家。基于以下题目，生成一个启发式追问（第 {round} 轮）。
@@ -59,7 +81,7 @@ async def generate_heuristic_question(
 [题目] {question}
 [正确答案] {correct_answer}
 [追问风格] {style}
-{context_part}
+{context_part}{history_part}
 
 要求：
 1. 简洁明了，一到两句话
@@ -110,9 +132,23 @@ async def submit_feedback(
                     round=current_round,
                     previous_context=feedback.heuristic_context,
                     domain=domain,
+                    history=get_conversation_history(feedback.session_id, limit=8),
                 )
             except Exception as e:
                 logger.warning("启发式追问生成失败: %s", e)
+
+        # 写入会话级对话记忆（答错的题目 + 生成的追问/揭晓），供后续追问引用
+        add_conversation_message(
+            feedback.session_id, "learner",
+            f"题目「{feedback.question[:80]}」答错了，我的答案：{feedback.user_answer[:80]}",
+        )
+        if heuristic:
+            add_conversation_message(feedback.session_id, "agent", heuristic)
+        elif reveal:
+            add_conversation_message(
+                feedback.session_id, "agent",
+                f"已揭晓正确答案：{feedback.correct_answer[:200]}",
+            )
 
     # 只有确实存在 learner_id 时才写入数据库（避免 foreign key 约束报错）
     if learner_id and learner_id != "unknown":
@@ -211,6 +247,18 @@ async def submit_feedback(
         round=current_round,
         reveal_answer=reveal,
     )
+
+
+@router.get("/conversation/{session_id}")
+async def get_conversation(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """获取会话的苏格拉底追问对话历史（供前端对话式 UI 回放）。"""
+    expected_session = make_session_id(current_user.id, current_user.created_at)
+    if session_id != expected_session and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="无权查看其他用户的会话")
+    return {"session_id": session_id, "messages": get_conversation_history(session_id)}
 
 
 # ──────────────────────────────────────────────

@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 from app.core.store import (
     get_session, update_session, add_resource,
     add_feedback, add_agent_log, get_all_sessions,
+    add_conversation_message, get_conversation_history,
     push_ws_message, pop_ws_messages,
     check_rate_limit, check_redis_health,
     redis_is_available,
@@ -74,6 +75,28 @@ class TestSessionLifecycle:
         assert len(session["agent_logs"]) == 2
         assert session["agent_logs"][0]["agent"] == "diagnosis"
         assert "timestamp" in session["agent_logs"][0]
+
+    def test_conversation_history_append_and_truncate(self):
+        """对话记忆：追加有序、超长截断最旧、limit 生效"""
+        sid = "test_conv_001"
+        get_session(sid)
+        for i in range(25):
+            role = "learner" if i % 2 == 0 else "agent"
+            add_conversation_message(sid, role, f"消息-{i}")
+
+        history = get_conversation_history(sid)
+        assert len(history) == 20  # CONVERSATION_HISTORY_MAX
+        assert history[0]["content"] == "消息-5"  # 最旧的 5 条已被截断
+        assert history[-1]["content"] == "消息-24"
+        assert history[-1]["role"] == "learner"
+        assert "ts" in history[0]
+
+        recent = get_conversation_history(sid, limit=3)
+        assert [m["content"] for m in recent] == ["消息-22", "消息-23", "消息-24"]
+
+    def test_conversation_history_empty_session(self):
+        """无对话记录的会话返回空列表而非报错"""
+        assert get_conversation_history("test_conv_none") == []
 
     def test_get_all_sessions(self):
         """测试获取所有会话"""

@@ -192,6 +192,25 @@
           </div>
           <div style="font-size: 12px; color: var(--text-3); margin-top: 12px; text-align: center">达标参考线：{{ PASS_THRESHOLD }}%</div>
         </div>
+
+        <!-- 教学对话记忆（会话级，跨题目累积） -->
+        <div v-if="conversation.length" class="card">
+          <div class="card__head" style="cursor: pointer" @click="conversationOpen = !conversationOpen">
+            <div class="card__title"> 教学对话</div>
+            <span style="font-size: 12px; color: var(--text-3)">{{ conversationOpen ? '收起 ▲' : `展开（${conversation.length} 条）▼` }}</span>
+          </div>
+          <div v-if="conversationOpen" class="conversation-list">
+            <div
+              v-for="(msg, idx) in conversation"
+              :key="idx"
+              class="conversation-item"
+              :class="msg.role === 'learner' ? 'conversation-item--learner' : 'conversation-item--agent'"
+            >
+              <div class="conversation-item__role">{{ msg.role === 'learner' ? '我' : '导师 Agent' }}</div>
+              <div class="conversation-item__content">{{ msg.content }}</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -215,6 +234,7 @@ const {
   nodes, selectedStage, switchStage, switchLevel,
   questions, currentIndex, currentQuestion, answered, showFeedback, isCorrect, optionClass, selectOption, stripOptionPrefix,
   socraticHistory, socraticLoading, revealAnswer,
+  conversation, conversationOpen,
   practicalAnswer, practicalGrading, practicalGraded, practicalResult, submitPractical,
   comprehensiveScenario, scenarioMarkdown,
   correctCount, wrongCount, accuracy, passed, resultEmoji, resultTitle, resultMessage, resultSaveError, testCompleted, hasNextStage,
@@ -372,6 +392,11 @@ const {
 .feedback-box.ok { background: var(--ok-soft); border: 1px solid #A7F3D0; }
 .feedback-box.err { background: var(--err-soft); border: 1px solid #FECACA; }
 .socratic-box { margin-top: 12px; padding: 14px 16px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.conversation-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.conversation-item { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.6; }
+.conversation-item--agent { background: var(--accent-soft); border: 1px solid var(--line); margin-right: 24px; }
+.conversation-item--learner { background: var(--bg-muted); border: 1px solid var(--line); margin-left: 24px; }
+.conversation-item__role { font-size: 11.5px; font-weight: 600; color: var(--text-3); margin-bottom: 4px; }
 .mini-stat { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: var(--radius-sm); }
 .mini-stat.ok { background: var(--ok-soft); }
 .mini-stat.err { background: var(--err-soft); }
