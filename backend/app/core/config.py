@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     DEBATE_ENABLED: bool = True
     DEBATE_MAX_ROUNDS: int = 2
 
+    # finalize 节点全路径批量生成的并发度（各节点资源/试题并行，信号量限流）
+    FINALIZE_CONCURRENCY: int = 3
+
     # Mock 严苛审核模式（仅 MOCK_MODE 下生效）：审查恒报 critical 问题、首次修正验证判
     # unresolved，强制走一轮"打回重生成"，用于演示审核回环与对抗辩论。
     MOCK_STRICT_REVIEW: bool = False

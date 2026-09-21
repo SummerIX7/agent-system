@@ -27,6 +27,17 @@ def _should_use_llm_cache(label: str) -> bool:
     return any(kw in label for kw in _CACHEABLE_LABEL_KEYWORDS)
 
 
+def _replay_tokens(on_token: Callable[[str], None], text: str, chunk_size: int = 24) -> None:
+    """工具模式下不支持真流式：拿到终答后切片回放，保持前端打字机体验一致。"""
+    if not text:
+        return
+    try:
+        for i in range(0, len(text), chunk_size):
+            on_token(text[i:i + chunk_size])
+    except Exception:  # noqa: BLE001 — 回放失败不影响主流程
+        logger.debug("[流式] 工具模式 token 回放异常", exc_info=True)
+
+
 class BaseAgent:
     """Agent 基类，提供 LLM 调用、知识库检索、日志记录等基础能力"""
 
@@ -374,6 +385,8 @@ class BaseAgent:
 
             # 无工具请求 → 终答
             if not tool_calls:
+                if on_token:
+                    _replay_tokens(on_token, response.content or "")
                 return response.content or ""
 
             # 达到轮数上限：不再执行工具，逼模型基于已有信息给结论
@@ -404,8 +417,12 @@ class BaseAgent:
         # 轮数耗尽仍未终答：再要一次纯文本结论
         try:
             final = await self.llm.ainvoke(messages)
+            if on_token:
+                _replay_tokens(on_token, final.content or last_content)
             return final.content or last_content
         except Exception:  # noqa: BLE001
+            if on_token:
+                _replay_tokens(on_token, last_content)
             return last_content
 
     def collect_trace(self) -> list:
