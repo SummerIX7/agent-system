@@ -2,6 +2,9 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import get_settings
 
+# 单次请求超时（秒）：防止个别请求无限挂起拖死整条链路（OpenAI 客户端默认 600s 过长）
+LLM_REQUEST_TIMEOUT = 120
+
 
 def get_llm(provider: str | None = None, temperature: float = 0.7) -> ChatOpenAI:
     """
@@ -29,6 +32,7 @@ def get_llm(provider: str | None = None, temperature: float = 0.7) -> ChatOpenAI
         api_key=settings.LLM_API_KEY,
         base_url=settings.LLM_BASE_URL,
         temperature=temperature,
+        timeout=LLM_REQUEST_TIMEOUT,
     )
 
 
@@ -52,6 +56,7 @@ def get_verifier_llm(temperature: float = 0.0) -> ChatOpenAI:
             api_key=settings.VERIFIER_LLM_API_KEY,
             base_url=settings.VERIFIER_LLM_BASE_URL,
             temperature=temperature,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
 
     # 未配置独立校验模型：回落主 LLM
