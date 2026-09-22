@@ -1,7 +1,8 @@
-"""③½ 审核纠偏 Agent 节点（双视角审查 + 修正）。"""
+"""③½ 审核纠偏 Agent 节点（双视角审查 + 对抗辩论 + 修正，三类内容并行）。"""
 
 from __future__ import annotations
 
+import asyncio
 import time as _time
 
 from app.graph.nodes._common import (
@@ -31,42 +32,44 @@ async def review_correct_node(state: AgentState) -> dict:
 
     _broadcast(session_id, "审核纠偏 Agent", "running", "启动双视角审核纠偏...", 59)
 
-    for content_type, content in generated.items():
-        progress = 59 + len(review_results) * 5
+    # 三类内容并行审核（trace 埋点经 ContextVar 隔离，gather 任务各持独立上下文，
+    # 但 _trace_calls 列表对象继承自父上下文，父任务 collect_trace() 仍能收齐）
+    async def review_one(idx: int, content_type: str, content: str):
+        progress = 59 + idx * 5
 
-        # 跳过非文本内容
-        if content_type == "test":
-            review_results[content_type] = {
+        if content_type == "test":  # 跳过非文本内容
+            return content_type, {
                 "passed": True, "score": 1.0, "issues": [],
                 "final_content": content, "correction_applied": False,
             }
-            continue
 
-        # 达到最大重试次数，标记为降级
-        if retry_count >= MAX_RETRIES:
-            review_results[content_type] = {
+        if retry_count >= MAX_RETRIES:  # 达到最大重试次数，标记为降级
+            return content_type, {
                 "passed": False, "score": 0, "issues": [],
                 "final_content": content, "correction_applied": False,
                 "degraded": True,
             }
-            continue
 
         _broadcast(session_id, "审核纠偏 Agent", "running",
                    f"审核+纠偏: {content_type}...", progress)
-
         try:
             result = await review_agent.corrective_review(
                 content, topic,
                 on_event=lambda msg, p=progress: _broadcast(
                     session_id, "审核纠偏 Agent", "running", f"[{content_type}] {msg}", p),
             )
-            review_results[content_type] = result
+            return content_type, result
         except Exception as e:  # noqa: BLE001
-            review_results[content_type] = {
+            return content_type, {
                 "passed": False, "score": 0,
                 "issues": [f"审核纠偏异常: {str(e)}"],
                 "final_content": content, "correction_applied": False,
             }
+
+    gathered = await asyncio.gather(
+        *(review_one(idx, ct, content) for idx, (ct, content) in enumerate(generated.items()))
+    )
+    review_results = dict(gathered)
 
     all_passed = all(r.get("passed", False) for r in review_results.values())
     has_degraded = any(r.get("degraded", False) for r in review_results.values())

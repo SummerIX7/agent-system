@@ -15,6 +15,19 @@ from app.core.store import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _clean_redis_test_keys():
+    """Redis 在线时清理本模块测试 key：数据会跨测试运行残留（内存降级模式无此问题）。"""
+    if redis_is_available():
+        from app.core.store._client import _get_redis
+        r = _get_redis()
+        for pattern in ("session:test_*", "ws:test_*", "ratelimit:test*"):
+            keys = list(r.scan_iter(pattern))
+            if keys:
+                r.delete(*keys)
+    yield
+
+
 class TestSessionLifecycle:
     """会话生命周期测试"""
 

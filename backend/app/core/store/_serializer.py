@@ -26,7 +26,7 @@ _JSON_FIELDS = {
     "profile", "resources", "feedback", "agent_logs", "trace_entries",
     "cached_questions", "practice_state", "node_states", "node_resources",
     "tiered_questions", "tiered_questions_map", "comprehensive_questions",
-    "test_results", "practice_results",
+    "test_results", "practice_results", "conversation_history",
 }
 
 
@@ -59,6 +59,7 @@ _JSON_DEFAULTS: dict = {
     "tiered_questions_map": {},
     "comprehensive_questions": None,
     "test_results": {},
+    "conversation_history": [],
 }
 
 

@@ -294,17 +294,31 @@ class TestReviewAgentDebate:
         assert agent.llm.ainvoke.await_count == 6
 
     @pytest.mark.asyncio
+    async def test_debate_skipped_for_minor_only_issues(self, agent):
+        """仅 minor/suggestion 质疑 → 不触发辩论，直接评分"""
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(self._issues("minor", "suggestion"))),
+            MagicMock(content="[]"),
+        ])
+
+        result = await agent.corrective_review("内容", "主题")
+
+        assert result["debate_rounds"] == 0
+        assert agent.llm.ainvoke.await_count == 2  # 仅双视角，无辩论调用
+        assert result["passed"] is True  # minor+suggestion = 0.93 ≥ 0.70
+
+    @pytest.mark.asyncio
     async def test_debate_early_exit_when_all_withdrawn(self, agent):
         """质疑者全部撤回 → 提前终局，不再进入第 2 轮"""
         agent.llm.ainvoke = AsyncMock(side_effect=[
-            MagicMock(content=json.dumps(self._issues("minor"))),
+            MagicMock(content=json.dumps(self._issues("critical"))),
             MagicMock(content="[]"),
             MagicMock(content=json.dumps([
-                {"issue": "问题-minor-0", "stance": "rebut", "argument": "举证充分"}])),
+                {"issue": "问题-critical-0", "stance": "rebut", "argument": "举证充分"}])),
             MagicMock(content=json.dumps([
-                {"issue": "问题-minor-0", "verdict": "withdraw", "reason": "辩护成立"}])),
+                {"issue": "问题-critical-0", "verdict": "withdraw", "reason": "辩护成立"}])),
             MagicMock(content=json.dumps([
-                {"issue": "问题-minor-0", "final_severity": "invalid", "reason": "质疑已撤回"}])),
+                {"issue": "问题-critical-0", "final_severity": "invalid", "reason": "质疑已撤回"}])),
         ])
 
         result = await agent.corrective_review("内容", "主题")
@@ -313,7 +327,45 @@ class TestReviewAgentDebate:
         assert agent.llm.ainvoke.await_count == 5
 
     @pytest.mark.asyncio
-    async def test_debate_judge_parse_failure_conservative(self, agent):
+    async def test_issues_capped_at_five_for_scoring(self, agent, monkeypatch):
+        """质疑超过 5 条 → 按严重度截断为 5 条参与评分（防严重度通胀拖垮评分）"""
+        # 本用例验证截断本身，关闭辩论以隔离干扰
+        from app.core.config import get_settings
+        monkeypatch.setattr(get_settings(), "DEBATE_MAX_ROUNDS", 0, raising=False)
+        issues = [{"issue": f"问题-{i}", "severity": "critical" if i < 8 else "minor"}
+                  for i in range(10)]
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(issues)),
+            MagicMock(content="[]"),
+            MagicMock(content="修正后的内容"),
+            MagicMock(content=json.dumps({"verdict": "resolved", "reason": "已修复"})),
+        ])
+
+        result = await agent.corrective_review("内容", "主题")
+
+        # 5 条 critical：1.0 - 0.75 = 0.25 < 0.70 → 触发修正
+        assert result["score"] == pytest.approx(0.25)
+        assert len(result["critical_issues"]) == 5
+
+    @pytest.mark.asyncio
+    async def test_debate_max_rounds_param_overrides_settings(self, agent):
+        """debate_max_rounds=1 参数覆盖全局配置：只跑 1 轮辩论即裁决"""
+        agent.llm.ainvoke = AsyncMock(side_effect=[
+            MagicMock(content=json.dumps(self._issues("critical"))),   # 学术审查
+            MagicMock(content="[]"),                                    # 工业审查
+            MagicMock(content=json.dumps([                             # 辩护反驳（第1轮，无质疑回应）
+                {"issue": "问题-critical-0", "stance": "rebut", "argument": "举证"}])),
+            MagicMock(content=json.dumps([                             # 辩论裁决
+                {"issue": "问题-critical-0", "final_severity": "invalid", "reason": "驳回"}])),
+        ])
+
+        result = await agent.corrective_review("内容", "主题", debate_max_rounds=1)
+
+        assert result["debate_rounds"] == 1
+        assert agent.llm.ainvoke.await_count == 4
+
+    @pytest.mark.asyncio
+    async def test_judge_parse_failure_conservative(self, agent):
         """裁决解析失败 → 保守视为原质疑全部成立，评分按原 severity 计算"""
         agent.llm.ainvoke = AsyncMock(side_effect=[
             MagicMock(content=json.dumps(self._issues("critical", "critical", "critical"))),

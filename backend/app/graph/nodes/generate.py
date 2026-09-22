@@ -34,14 +34,19 @@ async def generate_node(state: AgentState) -> dict:
     logs = []
 
     # 重试时收集上一轮审核反馈，注入到生成 prompt 中
+    # 只注入 critical 级问题且总量截断为 5 条：全量注入会导致模型为逐条回应而扩写，
+    # 内容越长越容易被挑出问题，形成"越长越糟"的正反馈（真实实测已复现）
     retry_context = ""
     if retry_count > 0:
         issues_parts = []
         review_results = state.get("review_results", {})
         for ct, review in review_results.items():
-            if review.get("issues"):
-                for issue in review["issues"]:
-                    issues_parts.append(f"[审核-{ct}] {issue}")
+            critical = review.get("critical_issues")
+            if critical is None:  # 兼容无 critical_issues 的旧结果
+                critical = review.get("issues", [])[:5]
+            for issue in critical[:5]:
+                issues_parts.append(f"[审核-{ct}] {issue}")
+        issues_parts = issues_parts[:5]
         if issues_parts:
             retry_context = "\n".join(issues_parts)
             logs.append(f"注入上一轮反馈: {len(issues_parts)} 条问题")

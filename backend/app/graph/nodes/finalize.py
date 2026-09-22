@@ -250,7 +250,9 @@ async def generate_resources_for_stage(
                 flush()
 
             try:
-                review = await review_agent_inst.corrective_review(content, full_topic)
+                # 批量阶段辩论降为 1 轮：节点 2-5 的审核以吞吐优先，完整 2 轮辩论仅保留节点 1
+                review = await review_agent_inst.corrective_review(
+                    content, full_topic, debate_max_rounds=1)
                 final_content = review.get("final_content", content)
             except Exception as e:  # noqa: BLE001
                 # 审核异常不再静默放行：标记降级并附质量提醒，让学习者明确知情

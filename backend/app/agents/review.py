@@ -273,7 +273,7 @@ class ReviewAgent(BaseAgent):
 {transcript_text}
 
 对每条原始质疑输出最终严重度：
-- "critical" / "minor" / "suggestion"：质疑成立，按严重度定级
+- "critical" / "minor" / "suggestion"：质疑成立，按严重度定级（**critical 全文最多 2 条**，超出必须降为 minor 或 invalid）
 - "invalid"：质疑不成立（辩护方已用证据驳倒）
 
 输出 JSON 数组：
@@ -303,7 +303,8 @@ class ReviewAgent(BaseAgent):
         return rulings or None
 
     async def _debate(self, content: str, context: str, issues: list,
-                      on_event: Callable[[str], None] | None = None) -> tuple[list, list]:
+                      on_event: Callable[[str], None] | None = None,
+                      debate_max_rounds: int | None = None) -> tuple[list, list]:
         """对抗辩论：辩护 ↔ 质疑多轮交锋 → 裁决者终审。
 
         返回 (final_issues, transcript)：
@@ -311,7 +312,9 @@ class ReviewAgent(BaseAgent):
         - 任何环节解析失败都保守处理（质疑视为成立），宁多修不漏修。
         """
         from app.core.config import get_settings
-        max_rounds = max(1, getattr(get_settings(), "DEBATE_MAX_ROUNDS", 2))
+        max_rounds = debate_max_rounds if debate_max_rounds is not None \
+            else max(0, getattr(get_settings(), "DEBATE_MAX_ROUNDS", 2))
+        max_rounds = max(1, max_rounds)
 
         transcript: list[dict] = []
         current_issues = issues
@@ -355,7 +358,8 @@ class ReviewAgent(BaseAgent):
         return final_issues, transcript
 
     async def corrective_review(self, content: str, topic: str,
-                                on_event: Callable[[str], None] | None = None) -> dict:
+                                on_event: Callable[[str], None] | None = None,
+                                debate_max_rounds: int | None = None) -> dict:
         """
         合并审查+修正：双视角审查 → 评分 → 必要时修正 → 返回最终结果
 
@@ -385,9 +389,9 @@ class ReviewAgent(BaseAgent):
   {{{{"issue": "问题描述", "severity": "suggestion"}}}}
 ]
 
-severity 取值：
-- "critical": 事实性错误、概念定义错误、编造不存在的内容/API/函数
-- "minor": 表述不精确、推理不严谨、缺乏引用来源
+severity 取值（严格遵守，防止严重度通胀）：
+- "critical": 与参考资料**明确矛盾**的事实性错误、概念定义错误、编造不存在的内容/API/函数；**全文最多标注 2 条**，超过的同类问题一律降为 "minor"
+- "minor": 表述不精确、推理不严谨、缺乏引用来源、存疑但无法确认的事项
 - "suggestion": 优化建议、风格改进、补充说明建议
 
 如无任何问题，输出空数组 []。"""
@@ -411,7 +415,7 @@ severity 取值：
   {{{{"issue": "问题描述", "severity": "suggestion"}}}}
 ]
 
-severity 取值同上。
+severity 取值同上（critical 全文最多 2 条，超出的一律降为 minor）。
 如无任何问题，输出空数组 []。"""
 
         # 并行调用两个视角（可按需调用 fact_check_lookup 核查具体断言）
@@ -422,16 +426,29 @@ severity 取值同上。
         issues_b = self._parse_issues(response_b)
         all_issues = self._merge_issues(issues_a, issues_b)
 
-        # ── 1½. 对抗辩论（issues 非空时：辩护 ↔ 质疑多轮 → 裁决终审）──
+        # ── 1¼. 评分输入截断：质疑过多时只保留严重度最高的 5 条，评分对"挑刺数量"脱敏 ──
+        if len(all_issues) > 5:
+            rank = {"critical": 3, "minor": 2, "suggestion": 1}
+            all_issues = sorted(
+                all_issues,
+                key=lambda i: rank.get(i.get("severity", "minor"), 1),
+                reverse=True,
+            )[:5]
+            if on_event:
+                on_event(f"质疑过多，按严重度截断为 {len(all_issues)} 条参与评分")
+
+        # ── 1½. 对抗辩论（仅当初审含 critical 质疑时触发：纯 minor/suggestion 直接评分）──
         from app.core.config import get_settings
         settings = get_settings()
         debate_transcript: list = []
+        has_critical = any(i.get("severity") == "critical" for i in all_issues)
         debate_enabled = getattr(settings, "DEBATE_ENABLED", True) \
             and getattr(settings, "DEBATE_MAX_ROUNDS", 0) > 0
-        if all_issues and debate_enabled:
+        if all_issues and has_critical and debate_enabled:
             if on_event:
-                on_event(f"质疑者提出 {len(all_issues)} 项质疑，进入对抗辩论...")
-            all_issues, debate_transcript = await self._debate(content, context, all_issues, on_event)
+                on_event(f"质疑者提出 {len(all_issues)} 项质疑（含 critical），进入对抗辩论...")
+            all_issues, debate_transcript = await self._debate(
+                content, context, all_issues, on_event, debate_max_rounds)
             if on_event:
                 overruled = len([e for e in debate_transcript if e.get("type") == "judge"
                                  for r in e.get("rulings", []) if r.get("final_severity") == "invalid"])
@@ -441,6 +458,7 @@ severity 取值同上。
         score = self._severity_weighted_score(all_issues)
 
         debate_rounds = len([e for e in debate_transcript if e.get("type") == "round"])
+        critical_issues = [i["issue"] for i in all_issues if i.get("severity") == "critical"]
 
         # ── 3. 如果通过，直接返回原始内容 ──
         if score >= 0.70:
@@ -448,6 +466,7 @@ severity 取值同上。
                 "passed": True,
                 "score": score,
                 "issues": [i["issue"] for i in all_issues],
+                "critical_issues": critical_issues,
                 "suggestions": [f"({i['severity']}): {i['issue']}" for i in all_issues],
                 "final_content": content,
                 "correction_applied": False,
@@ -473,6 +492,7 @@ severity 取值同上。
             "passed": fix_result["passed"],
             "score": score,
             "issues": feedback_issues,
+            "critical_issues": critical_issues,
             "suggestions": [f"({i['severity']}): {i['issue']}" for i in all_issues],
             "final_content": corrected if fix_result["passed"] else content,
             "correction_applied": True,
