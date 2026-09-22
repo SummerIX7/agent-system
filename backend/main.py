@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -80,9 +81,26 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     logger.info("数据库表已就绪")
 
+    # 5. 后台预热：jieba 分词 + 知识库索引（首个业务请求不再承担 ~20s 懒加载）
+    async def _warmup():
+        try:
+            import jieba
+            await asyncio.to_thread(jieba.initialize)
+            if settings.ENABLE_KNOWLEDGE_BASE:
+                from app.knowledge.retriever import get_retriever
+                await _asyncio.to_thread(get_retriever)
+            logger.info("预热完成：jieba 分词与知识库索引已就绪")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("预热失败（不影响服务，首个请求将承担加载耗时）: %s", e)
+
+    warmup_task = asyncio.create_task(_warmup())
+    app.state.warmup_task = warmup_task
+
     yield
 
     # ── 关闭时 ──
+    if not warmup_task.done():
+        warmup_task.cancel()
     await engine.dispose()
 
 

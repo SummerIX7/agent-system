@@ -38,6 +38,25 @@ def _replay_tokens(on_token: Callable[[str], None], text: str, chunk_size: int =
         logger.debug("[流式] 工具模式 token 回放异常", exc_info=True)
 
 
+def _extract_usage(response) -> dict | None:
+    """提取 LLM 响应的 token 用量（langchain usage_metadata 优先，兼容 response_metadata）。"""
+    meta = getattr(response, "usage_metadata", None)
+    if isinstance(meta, dict) and meta.get("total_tokens") is not None:
+        return {
+            "input": meta.get("input_tokens"),
+            "output": meta.get("output_tokens"),
+            "total": meta.get("total_tokens"),
+        }
+    tu = (getattr(response, "response_metadata", None) or {}).get("token_usage") or {}
+    if tu.get("total_tokens") is not None:
+        return {
+            "input": tu.get("prompt_tokens"),
+            "output": tu.get("completion_tokens"),
+            "total": tu.get("total_tokens"),
+        }
+    return None
+
+
 class BaseAgent:
     """Agent 基类，提供 LLM 调用、知识库检索、日志记录等基础能力"""
 
@@ -166,13 +185,14 @@ class BaseAgent:
                 response = await self.llm.ainvoke(prompt)
                 elapsed_ms = round((time.time() - start) * 1000)
 
-                # 追踪埋点：记录 prompt/response/耗时
+                # 追踪埋点：记录 prompt/response/耗时/token 用量
                 self._trace_calls.append({
                     "label": label or f"LLM调用#{attempt+1}",
                     "prompt": prompt,
                     "response": response.content[:8000],
                     "elapsed_ms": elapsed_ms,
                     "cache_hit": False,
+                    "usage": _extract_usage(response),
                     "timestamp": datetime.now().isoformat(),
                 })
 
@@ -264,9 +284,13 @@ class BaseAgent:
         # ── 流式调用（失败回落 call_llm 重试链路）──
         start = time.time()
         parts: list[str] = []
+        usage = None
         try:
             async for chunk in self.llm.astream(prompt):
                 delta = getattr(chunk, "content", "") or ""
+                chunk_usage = _extract_usage(chunk)
+                if chunk_usage:
+                    usage = chunk_usage  # 通常出现在最后一个 chunk
                 if not delta:
                     continue
                 parts.append(delta)
@@ -287,6 +311,7 @@ class BaseAgent:
             "response": full[:8000],
             "elapsed_ms": elapsed_ms,
             "cache_hit": False,
+            "usage": usage,
             "timestamp": datetime.now().isoformat(),
         })
 
@@ -373,6 +398,7 @@ class BaseAgent:
                 ],
                 "elapsed_ms": elapsed_ms,
                 "cache_hit": False,
+                "usage": _extract_usage(response),
                 "timestamp": datetime.now().isoformat(),
             })
             try:
