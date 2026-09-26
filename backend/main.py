@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
             await asyncio.to_thread(jieba.initialize)
             if settings.ENABLE_KNOWLEDGE_BASE:
                 from app.knowledge.retriever import get_retriever
-                await _asyncio.to_thread(get_retriever)
+                await asyncio.to_thread(get_retriever)
             logger.info("预热完成：jieba 分词与知识库索引已就绪")
         except Exception as e:  # noqa: BLE001
             logger.warning("预热失败（不影响服务，首个请求将承担加载耗时）: %s", e)
