@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "deepseek"  # 仅用于日志展示，不再决定 base_url
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = "https://api.deepseek.com/v1"
-    LLM_MODEL: str = "deepseek-chat"
+    LLM_MODEL: str = "deepseek-flash"
+    # 统一密钥入口：优先读系统环境变量 DEEPSEEK_API_KEY，LLM_API_KEY 保留兼容
+    DEEPSEEK_API_KEY: str = ""
 
     # 校验 LLM（跨模型谬误核查用；留空则回落主 LLM）
     # 建议配置为与生成模型不同厂商/模型，降低"自评偏差"
@@ -112,6 +114,13 @@ class Settings(BaseSettings):
                 "ENVIRONMENT=production 下必须更换 JWT_SECRET_KEY（当前仍为演示默认值）。"
                 "请在环境变量或 .env 中设置强随机密钥后重启。"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _apply_shared_deepseek_key(self) -> "Settings":
+        """统一密钥入口：系统环境变量 DEEPSEEK_API_KEY 优先，LLM_API_KEY 保留兼容回退。"""
+        if self.DEEPSEEK_API_KEY:
+            self.LLM_API_KEY = self.DEEPSEEK_API_KEY
         return self
 
 

@@ -49,6 +49,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-agent_system}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      # 系统环境变量里的 DeepSeek 密钥透传给容器（compose 从宿主机环境或 --env-file 读取）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     volumes:
       # 知识库目录（KNOWLEDGE_BASE_DIRS 默认 ../knowledge-base/cnc_domain → /knowledge-base/cnc_domain）
       - ./knowledge-base:/knowledge-base:ro

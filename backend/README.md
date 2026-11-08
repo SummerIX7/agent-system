@@ -127,7 +127,7 @@ uv run python setup.py
 |------|------|------|
 | LLM_API_KEY | ✅ | LLM API Key（支持任意 OpenAI 兼容平台） |
 | LLM_BASE_URL | - | LLM API 地址，默认 DeepSeek |
-| LLM_MODEL | - | LLM 模型名，默认 deepseek-chat |
+| LLM_MODEL | - | LLM 模型名，默认 deepseek-flash |
 | EMBEDDING_API_KEY | ✅ | 嵌入模型 API Key |
 | EMBEDDING_BASE_URL | - | 嵌入模型 API 地址，默认 DashScope |
 | EMBEDDING_MODEL | - | 嵌入模型名，默认 text-embedding-v3 |
