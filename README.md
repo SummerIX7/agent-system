@@ -30,7 +30,7 @@
 │                       ↕ 决策调度 ↕                     │
 ├─────────────────────────────────────────────────────┤
 │                     基础设施层                         │
-│   LLM (OpenAI 兼容)  │  ChromaDB  │  MySQL 8.0  │  Redis │
+│   LLM (OpenAI 兼容)  │  ChromaDB  │  PostgreSQL │  Redis │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -43,7 +43,7 @@
 | uv | 0.12+ | Python 环境与依赖管理（自动提供 Python 3.11+，替代 conda/pip） |
 | Node.js | 18+ | 前端构建环境 |
 | pnpm | 8+ | 包管理器 |
-| MySQL | 8.0+ | 关系数据库 |
+| PostgreSQL | 17+ | 关系数据库 |
 | Redis | 7.0+ | 缓存与会话（不可用时自动降级） |
 
 ### API Key
@@ -193,8 +193,8 @@ uv run pytest tests/test_main.py -v
 ### 知识库索引更新
 修改知识库文档后，重新执行 `python setup.py`，或在 B 端「系统设置」中点击「重建索引」。
 
-### MySQL 连接失败
-确保 `.env` 中数据库配置正确，或 MySQL 服务已启动。
+### PostgreSQL 连接失败
+确保 `.env` 中数据库配置正确，或 PostgreSQL 服务已启动。
 
 ### 切换 LLM 平台
 
@@ -238,7 +238,7 @@ MOCK_STRICT_REVIEW=true
 1. 设置 `ENVIRONMENT=production` 并更换强随机 `JWT_SECRET_KEY`（未更换时系统将拒绝启动）
 2. 通过 `ADMIN_PASSWORD` 环境变量初始化管理员强密码
 3. 配置真实 `LLM_API_KEY` / `EMBEDDING_API_KEY`，关闭 `MOCK_MODE`
-4. 为 MySQL / Redis 设置强密码，收敛 `CORS_ORIGINS` 到实际域名，启用 HTTPS 反向代理
+4. 为 PostgreSQL / Redis 设置强密码，收敛 `CORS_ORIGINS` 到实际域名，启用 HTTPS 反向代理
 5. 建议补充（演示场景未实现）：JWT 刷新/滑动过期、密码强度策略、管理员首登强制改密、限流阈值按业务调整
 
 ---

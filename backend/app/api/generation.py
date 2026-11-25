@@ -246,7 +246,7 @@ async def get_resources(
     _validated: str = Depends(validate_session_ownership),
 ):
     """获取指定会话的生成资源。传 stage 参数可按学习节点过滤。"""
-    # 先从 MySQL 查询
+    # 先从数据库查询
     stmt = select(Resource).where(
         Resource.session_id == session_id,
         Resource.resource_type.in_(["lecture", "guide", "project"]),

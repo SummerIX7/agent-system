@@ -6,7 +6,7 @@
 
 - **框架**: FastAPI + Uvicorn
 - **环境与依赖**: uv（自动管理 Python 3.11，版本由 uv.lock 锁定）
-- **数据库**: MySQL 8.0 + SQLAlchemy (async)
+- **数据库**: PostgreSQL 17 + SQLAlchemy (async, asyncpg)
 - **缓存**: Redis 7.0（自动降级为内存存储）
 - **向量索引**: ChromaDB
 - **工作流**: LangGraph
@@ -131,9 +131,9 @@ uv run python setup.py
 | EMBEDDING_API_KEY | ✅ | 嵌入模型 API Key |
 | EMBEDDING_BASE_URL | - | 嵌入模型 API 地址，默认 DashScope |
 | EMBEDDING_MODEL | - | 嵌入模型名，默认 text-embedding-v3 |
-| MYSQL_HOST | - | 默认 localhost |
-| MYSQL_PORT | - | 默认 3306 |
-| MYSQL_USER | - | 默认 root |
+| POSTGRES_HOST | - | 默认 localhost |
+| POSTGRES_PORT | - | 默认 5432 |
+| POSTGRES_USER | - | 默认 postgres |
 | MOCK_MODE | - | 设为 true 启用 Mock 模式，不调用外部 API |
 
 ## 测试
