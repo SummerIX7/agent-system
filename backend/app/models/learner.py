@@ -35,11 +35,11 @@ class Learner(Base):
 
     # 机台使用审批
     machine_approval_status = Column(String(20), default="none", nullable=False, index=True, comment="机器使用审批: none | pending | approved | rejected")
-    machine_approval_at = Column(DateTime, nullable=True, comment="审批时间")
+    machine_approval_at = Column(DateTime(timezone=True), nullable=True, comment="审批时间")
     machine_approval_by = Column(Integer, ForeignKey("users.id"), nullable=True, comment="审批人ID")
 
-    created_at = Column(DateTime, default=_utcnow)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
 
     # 关联
     user = relationship("User", back_populates="learner", foreign_keys=[user_id])

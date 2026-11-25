@@ -20,8 +20,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False, comment="密码哈希")
     email = Column(String(100), nullable=True, comment="邮箱")
     role = Column(String(20), default="learner", nullable=False, index=True, comment="角色: learner | admin")
-    created_at = Column(DateTime, default=_utcnow)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
 
     # 关联：一个用户对应一个画像
     learner = relationship("Learner", back_populates="user", uselist=False, lazy="selectin", foreign_keys="Learner.user_id")

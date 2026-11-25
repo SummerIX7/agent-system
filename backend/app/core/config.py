@@ -15,12 +15,12 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # MySQL
-    MYSQL_HOST: str = "localhost"
-    MYSQL_PORT: int = 3306
-    MYSQL_USER: str = "root"
-    MYSQL_PASSWORD: str = ""
-    MYSQL_DATABASE: str = "agent_system"
+    # PostgreSQL
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_DATABASE: str = "agent_system"
 
     # 运行环境：development（默认）/ production（启动强制校验安全默认值）
     ENVIRONMENT: str = "development"
@@ -96,9 +96,8 @@ class Settings(BaseSettings):
         if self.TEST_DATABASE_URL:
             return self.TEST_DATABASE_URL
         return (
-            f"mysql+aiomysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
-            f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
-            f"?charset=utf8mb4"
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DATABASE}"
         )
 
     @property

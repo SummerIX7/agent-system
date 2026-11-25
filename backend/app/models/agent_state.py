@@ -26,7 +26,7 @@ class AgentLog(Base):
     progress = Column(Float, default=0, comment="进度 0-100")
     input_data = Column(JsonText, nullable=True, comment="输入数据")
     output_data = Column(JsonText, nullable=True, comment="输出数据")
-    created_at = Column(DateTime, default=_utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     def __repr__(self):
         return f"<AgentLog(agent={self.agent_name}, status={self.status})>"
@@ -46,7 +46,7 @@ class FeedbackRecord(Base):
     stage = Column(Integer, nullable=True, comment="所属学习路径节点编号")
     test_level = Column(String(20), nullable=True, comment="考核等级: basic/advanced")
     heuristic_question = Column(String(500), nullable=True, comment="启发式追问")
-    created_at = Column(DateTime, default=_utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     def __repr__(self):
         return f"<FeedbackRecord(topic={self.topic}, is_correct={self.is_correct}, stage={self.stage}, level={self.test_level})>"
@@ -67,7 +67,7 @@ class PracticeResult(Base):
     question_count = Column(Integer, default=0, comment="总题数")
     questions = Column(JsonText, nullable=True, comment="题目明细列表")
     label = Column(String(20), nullable=True, comment="等级中文标签")
-    created_at = Column(DateTime, default=_utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow, index=True)
 
     def __repr__(self):
         return f"<PracticeResult(learner_id={self.learner_id}, level={self.level}, score={self.score}, stage={self.stage})>"
@@ -80,7 +80,7 @@ class ReportCache(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     learner_id = Column(Integer, ForeignKey("learners.id", ondelete="CASCADE"), nullable=False, unique=True, index=True, comment="学习者 ID")
     cache_data = Column(JsonText, nullable=True, comment="报告指标快照 {hallucination_rate, difficulty_match_rate, knowledge_coverage_rate, match_curve, learning_stats}")
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
 
     def __repr__(self):
         return f"<ReportCache(learner_id={self.learner_id})>"

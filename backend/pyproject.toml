@@ -14,9 +14,8 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     # 数据库（建表由 main.py lifespan 的 create_all 负责，不使用迁移工具）
     "sqlalchemy[asyncio]>=2.0.52",
-    "aiomysql>=0.3.2",
+    "asyncpg>=0.30.0",
     "aiosqlite>=0.22.1",
-    "pymysql>=1.1.0",
     # 缓存/队列
     "redis>=8.1.0",
     # LLM

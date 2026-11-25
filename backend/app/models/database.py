@@ -1,5 +1,6 @@
 import json
 from sqlalchemy import Text, TypeDecorator
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -9,7 +10,7 @@ settings = get_settings()
 
 
 class JsonText(TypeDecorator):
-    """自定义类型：Python dict/list ↔ MySQL TEXT（JSON 字符串），字符串直接透传"""
+    """自定义类型：Python dict/list ↔ TEXT（JSON 字符串），字符串直接透传"""
     impl = Text
     cache_ok = True
 
@@ -29,7 +30,7 @@ class JsonText(TypeDecorator):
         return value
 
 
-_is_sqlite = "sqlite" in settings.DATABASE_URL
+_is_sqlite = make_url(settings.DATABASE_URL).get_backend_name() == "sqlite"
 _engine_kwargs: dict = {"echo": False}
 if not _is_sqlite:
     _engine_kwargs.update(pool_size=10, max_overflow=20, pool_pre_ping=True)

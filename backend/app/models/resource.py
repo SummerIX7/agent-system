@@ -34,7 +34,7 @@ class Resource(Base):
         comment="审核状态",
     )
     retry_count = Column(Integer, default=0, comment="重试次数")
-    created_at = Column(DateTime, default=_utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     # 关联
     learner = relationship("Learner", back_populates="resources")

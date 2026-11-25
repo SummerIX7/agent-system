@@ -18,7 +18,7 @@ class ApprovalLog(Base):
     action = Column(String(20), nullable=False, comment="操作: submit | approve | reject")
     operator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True, comment="操作人ID")
     reason = Column(Text, nullable=True, comment="备注/理由")
-    created_at = Column(DateTime, default=_utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow, index=True)
 
     # 关联
     learner = relationship("Learner", lazy="selectin")
