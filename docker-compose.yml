@@ -5,21 +5,16 @@
 #        http://localhost:8000/docs     （后端 API 文档，直连）
 
 services:
-  mysql:
-    image: mysql:8.0
-    command: >-
-      --default-authentication-plugin=mysql_native_password
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
+  postgres:
+    image: postgres:17-alpine
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-agent_system}
-      MYSQL_USER: ${MYSQL_USER:-agent}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-agent_pass}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_pass}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-agent_system}
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_pass}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -42,11 +37,11 @@ services:
       - .env.docker
     environment:
       # 数据库 / Redis 指向 compose 内部服务（覆盖 env_file 中的 host）
-      MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
-      MYSQL_USER: ${MYSQL_USER:-agent}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-agent_pass}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-agent_system}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_pass}
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-agent_system}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       # 系统环境变量里的 DeepSeek 密钥透传给容器（compose 从宿主机环境或 --env-file 读取）
@@ -59,7 +54,7 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -91,6 +86,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
+  pg_data:
   redis_data:
   chroma_data:

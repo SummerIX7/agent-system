@@ -23,7 +23,7 @@ COPY . .
 # uv sync 创建的虚拟环境直接放进 PATH（entrypoint 与 CMD 均使用它）
 ENV PATH="/app/.venv/bin:$PATH"
 
-# 入口脚本：等待 MySQL → 启动服务（建表由 main.py lifespan 的 create_all 负责）
+# 入口脚本：等待 PostgreSQL → 启动服务（建表由 main.py lifespan 的 create_all 负责）
 RUN sed -i 's/\r$//' docker-entrypoint.sh \
     && chmod +x docker-entrypoint.sh
 
