@@ -5,35 +5,36 @@ import asyncio
 import functools
 import logging
 
-from sqlalchemy.exc import OperationalError, PendingRollbackError
+import asyncpg
+from sqlalchemy.exc import DBAPIError, PendingRollbackError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-# MySQL error code 1213: ER_LOCK_DEADLOCK
-DEADLOCK_ERRNO = 1213
+# PostgreSQL SQLSTATE 40P01: deadlock_detected
+DEADLOCK_SQLSTATE = "40P01"
 MAX_RETRIES = 3
 RETRY_DELAYS = [0.5, 1.0, 2.0]
 
 
 def _is_deadlock(exc: BaseException) -> bool:
-    """检测异常是否为 MySQL 1213 死锁（支持多层包装解包）。
+    """检测异常是否为 PostgreSQL 40P01 死锁（支持多层包装解包）。
 
-    说明：aiomysql 的 OperationalError 可能多层嵌套，
-    逐层解包 orig 直到找到原始错误码。
+    asyncpg 异常会被 SQLAlchemy 异步适配层逐层包装，
+    沿 orig/__cause__ 链查找原始异常类型或 sqlstate。
     """
-    current = exc
-    while isinstance(current, OperationalError):
-        orig = getattr(current, "orig", None)
-        if orig is None:
-            break
-        errno = getattr(orig, "args", [None])
-        if errno and isinstance(errno[0], int) and errno[0] == DEADLOCK_ERRNO:
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, asyncpg.exceptions.DeadlockDetectedError):
             return True
-        current = orig
-    # 兜底：字符串匹配（某些驱动版本不暴露 errno）
-    msg = str(exc)
-    return "1213" in msg and "deadlock" in msg.lower()
+        if getattr(current, "sqlstate", None) == DEADLOCK_SQLSTATE:
+            return True
+        current = getattr(current, "orig", None) or current.__cause__
+    # 兜底：字符串匹配（某些包装层不暴露 sqlstate）
+    msg = str(exc).lower()
+    return "40p01" in msg or "deadlock detected" in msg
 
 
 def _find_db_session(args, kwargs) -> AsyncSession | None:
@@ -53,7 +54,7 @@ def retry_on_deadlock(max_retries: int = MAX_RETRIES, delays=None):
     """
     异步函数死锁重试装饰器。
 
-    捕获 sqlalchemy.exc.OperationalError（MySQL 1213），
+    捕获 PostgreSQL 40P01 死锁（asyncpg DeadlockDetectedError），
     死锁时自动回滚 AsyncSession 后重试，最多重试 max_retries 次。
     也会捕获 PendingRollbackError（通常是前次死锁导致），
     自动回滚后重试。
@@ -96,7 +97,7 @@ def retry_on_deadlock(max_retries: int = MAX_RETRIES, delays=None):
                         delay = delays[min(attempt, len(delays) - 1)]
                         logger.warning(
                             f"[DB死锁重试] {func.__qualname__}: "
-                            f"第 {attempt + 1}/{max_retries + 1} 次因 1213 死锁失败, "
+                            f"第 {attempt + 1}/{max_retries + 1} 次因 40P01 死锁失败, "
                             f"{delay}s 后重试..."
                         )
                         # 死锁后回滚 session 以便重试

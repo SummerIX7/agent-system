@@ -4,7 +4,7 @@
 \u8bbe\u8ba1\u76ee\u6807\uff08\u5bf9\u9f50 K8s / \u4f20\u7edf LB\u30017.2 \u8282\uff09\uff1a
 - ``/livez`` : \u8fdb\u7a0b\u5b58\u6d3b\u63a2\u9488\u3002\u53ea\u8981 FastAPI \u80fd\u56de\u5e94\u5c31\u8fd4\u56de 200\uff0c\u4e0d\u505a\u4efb\u4f55\u4f9d\u8d56\u68c0\u6d4b\u3002
 - ``/readyz`` : \u5c31\u7eea\u63a2\u9488\u3002\u4f9d\u5b58\u4e0d\u5065\u5eb7\u65f6\u8fd4\u56de 503\uff0c\u8ba9 LB \u4e0d\u5f80\u672c\u8282\u70b9\u8f6c\u53d1\u3002\n  \u68c0\u6d4b\u9879\uff1a
-    * MySQL \u53ef\u8fbe\uff08select 1\uff09
+    * PostgreSQL \u53ef\u8fbe\uff08select 1\uff09
     * Redis \u53ef\u8fbe\uff08_is_redis_ok\uff09
     * \u5fc5\u8981\u7684\u5bc6\u94a5\u5df2\u914d\u7f6e\uff08MOCK \u6a21\u5f0f\u65f6\u8df3\u8fc7\uff09
 - ``/metrics`` : Prometheus \u6587\u672c\u683c\u5f0f\u7684\u8f7b\u91cf\u6307\u6807\u3002\u5f53\u524d\u5305\u542b\uff1a
@@ -70,7 +70,7 @@ async def livez() -> dict[str, str]:
 # /readyz \u2014 \u4e25\u683c\u4f9d\u8d56\u68c0\u67e5\uff0c\u4efb\u4e00\u5931\u8d25 -> 503
 # ═══════════════════════════════════════════
 
-async def _check_mysql() -> dict[str, Any]:
+async def _check_postgres() -> dict[str, Any]:
     try:
         async with async_session() as sess:
             await sess.execute(text("SELECT 1"))
@@ -107,7 +107,7 @@ async def readyz(response: Response) -> dict[str, Any]:
     settings = get_settings()
 
     checks = {
-        "mysql": await _check_mysql(),
+        "postgres": await _check_postgres(),
         "redis": _check_redis(),
         "llm_config": _check_llm_config(settings),
     }

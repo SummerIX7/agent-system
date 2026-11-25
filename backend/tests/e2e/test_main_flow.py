@@ -45,7 +45,7 @@ class TestHealth:
         data = resp.json()
         assert data["status"] == "ok"
         checks = data["checks"]
-        assert "mysql" in checks
+        assert "postgres" in checks
         assert "redis" in checks
         assert "llm_config" in checks
         assert checks["llm_config"]["mode"] == "mock"
