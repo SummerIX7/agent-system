@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 后端测试（Mock 模式，无外部服务）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run pytest tests/ -q
+
+  frontend:
+    name: 前端构建（vue-tsc 类型检查 + vite build）
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [user-frontend, admin-frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pnpm install
+        working-directory: ${{ matrix.dir }}
+      - run: pnpm run build
+        working-directory: ${{ matrix.dir }}
