@@ -106,6 +106,15 @@ pnpm dev          # http://localhost:5173
 
 管理员初始账号：`admin` / `admin123`
 
+### 5. Docker 一键部署（可选）
+
+```bash
+# 从模板生成配置（占位值即可跑通 Mock 全链路）
+cp .env.docker.example .env.docker
+
+docker compose --env-file .env.docker up -d --build
+```
+
 ---
 
 ## 项目结构
