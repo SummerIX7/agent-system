@@ -17,6 +17,10 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      # 部分 fixture 以 MOCK_MODE=false 构造真实 ChatOpenAI（openai>=3 在构造期强校验
+      # 非空 Key），需提供 dummy key 才能实例化；测试全程不发起真实 API 调用
+      DEEPSEEK_API_KEY: ci-dummy-key-not-real
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
