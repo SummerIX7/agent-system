@@ -245,4 +245,4 @@ MOCK_STRICT_REVIEW=true
 
 ## License
 
-MIT
+本项目基于 [MIT](LICENSE) 协议开源。
