@@ -25,6 +25,10 @@ node_modules/
 .output/
 dist/
 
+# unplugin 自动生成的类型声明（vite build 会在本地重新生成）
+**/auto-imports.d.ts
+**/components.d.ts
+
 # IDE
 .idea/
 .vscode/
